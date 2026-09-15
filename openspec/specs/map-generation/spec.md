@@ -9,101 +9,138 @@ landmass rather than per-cell visual noise.
 
 ## Requirements
 
-### Requirement: Deterministic map generation
-Given the same seed and the same request parameters (grid type, size
-preset), the system SHALL produce a byte-identical map on every
-invocation, on any machine, indefinitely. Changing any request parameter
-MAY change the resulting map.
+### Requirement: Deterministic per-cell terrain
+Given the same seed, the biome of the cell at any coordinate `(x, y)`
+(both arbitrary integers, positive, negative, or zero) SHALL be
+byte-identical on every invocation, on any machine, indefinitely.
+Changing the seed MAY change the resulting terrain.
 
-#### Scenario: Same seed and parameters produce identical maps
-- **WHEN** a map is generated twice with the same seed, grid type, and
-  size preset
-- **THEN** every cell's biome and elevation are identical between the two
-  results
+#### Scenario: Same seed and coordinate always produce the same biome
+- **WHEN** the cell at a given `(x, y)` is requested twice for the same
+  seed, whether in the same window request or in two different window
+  requests
+- **THEN** the returned biome is identical both times
 
-#### Scenario: Different seeds produce different maps
-- **WHEN** two maps are generated with the same grid type and size
-  preset but different seeds
-- **THEN** the resulting cell grids SHALL NOT be identical
+#### Scenario: Different seeds produce different terrain
+- **WHEN** the same window is requested for two different seeds
+- **THEN** the resulting cells SHALL NOT be identical
 
-### Requirement: Caller-chosen grid type
-The system SHALL support generating a map on a `Square` grid or on a
-`Hex` grid (rectangular offset layout), selected explicitly by the
-caller per request.
+### Requirement: Location-independent generation
+A cell's biome SHALL depend only on the seed and that cell's own
+coordinates - never on which other cells have been requested before it,
+what window shape contains it, or its position within that window - so
+that exploring a world by requesting successive windows never causes
+previously-seen terrain to change, and a window far from the origin is
+generated exactly as if it had been the first (or only) request made.
 
-#### Scenario: Requesting a square grid
-- **WHEN** a map is requested with grid type `Square`
-- **THEN** the resulting map's cells are addressed by `(x, y)` coordinates
-  forming a rectangular grid, and each interior cell has exactly 4
-  orthogonal neighbors
+#### Scenario: An unexplored distant window matches an equivalent combined window
+- **WHEN** a window far from `(0, 0)` is requested for a seed, having
+  made no prior request for that seed
+- **AND** a second, larger window that fully contains the first is
+  requested for the same seed
+- **THEN** every cell's biome in the overlap is identical between the
+  two responses
 
-#### Scenario: Requesting a hex grid
-- **WHEN** a map is requested with grid type `Hex`
-- **THEN** the resulting map's cells are addressed by offset coordinates
-  forming a rectangular layout, and each interior cell has exactly 6
-  neighbors
+#### Scenario: Overlapping windows agree
+- **WHEN** two windows that partially overlap are requested for the same
+  seed, in either order
+- **THEN** every cell in the overlapping region has the same biome in
+  both responses
 
-### Requirement: Fixed size presets
-The system SHALL support exactly four size presets, each with a fixed,
-documented width and height in cells: `Small` (32x32), `Medium` (64x64),
-`Large` (128x128), `Huge` (256x256). The system SHALL NOT accept an
-arbitrary caller-chosen width or height.
+### Requirement: Windowed terrain query over HTTP
+The system SHALL expose terrain generation over HTTP, accepting a seed
+and a requested rectangular window (an origin `x` and `y`, each any
+integer, plus a width and height in cells) as request parameters, and
+returning exactly that window's cells as JSON: each cell's absolute `x`
+and `y` coordinates and its biome (a string). Width and height SHALL
+each be constrained to a documented maximum per request, to bound
+response size; a request exceeding that maximum SHALL be rejected
+without generating any terrain.
 
-#### Scenario: Requested preset determines dimensions
-- **WHEN** a map is requested with a given size preset
-- **THEN** the resulting map's width and height match that preset's fixed,
-  documented dimensions exactly
+#### Scenario: A window returns exactly its requested cells
+- **WHEN** a window is requested with origin `(ox, oy)`, width `w`, and
+  height `h`
+- **THEN** the response contains exactly `w * h` cells, one for every
+  `(x, y)` with `ox <= x < ox + w` and `oy <= y < oy + h`, each carrying
+  its absolute coordinates and biome
 
-### Requirement: Per-cell elevation
-Every cell SHALL have an elevation value, normalized to a fixed range
-(`0.0` low to `1.0` high inclusive), derived from proximity to the
-nearest grain, and SHALL vary smoothly across neighboring cells rather
-than being assigned independently at random per cell: a cell's elevation
-SHALL be closer, on average, to its immediate neighbors' elevations than
-to the elevation of a cell chosen uniformly at random from the same map.
+#### Scenario: Negative coordinates are valid
+- **WHEN** a window is requested with a negative `x` or `y` origin
+- **THEN** the request succeeds and returns cells at those negative
+  coordinates
 
-#### Scenario: Every cell has a valid elevation
-- **WHEN** a map is generated
-- **THEN** every cell has an elevation between 0.0 and 1.0 inclusive
+#### Scenario: An oversized window is rejected
+- **WHEN** a window is requested whose width or height exceeds the
+  documented per-request maximum
+- **THEN** the request is rejected and no terrain is generated
 
-#### Scenario: Neighboring cells have closer elevations than random cells
-- **WHEN** comparing, across a generated map, the average absolute
-  elevation difference between each cell and its immediate neighbors
-  against the average absolute elevation difference between each cell and
-  a uniformly random other cell
-- **THEN** the neighbor average is smaller
+### Requirement: Biome set from elevation and moisture
+The system SHALL assign each cell's biome from a fixed, documented set
+of ten biomes - `Ocean`, `Beach`, `Desert`, `Grassland`, `Swamp`,
+`Tundra`, `Forest`, `Rainforest`, `Mountains`, `Snow` - by sampling two
+independent, continuous, seed-derived values at that cell's coordinates
+(an elevation value and a moisture value) and combining them through a
+fixed, documented table. Elevation alone determines the lowest band
+(`Ocean`), the next (`Beach`), and the highest band (split into
+`Mountains` or `Snow` by moisture); for the two middle elevation bands,
+moisture additionally determines which of three biomes applies for that
+band.
 
-### Requirement: Map generation over HTTP
-The system SHALL expose map generation over HTTP, accepting seed, grid
-type, and size preset as request parameters, and returning the generated
-map as JSON with grid type, size preset, dimensions, and the full cell
-grid (each cell's coordinates, biome as a string, and elevation).
+#### Scenario: Every cell has a value in the documented biome set
+- **WHEN** any cell is generated
+- **THEN** its biome is one of `Ocean`, `Beach`, `Desert`, `Grassland`,
+  `Swamp`, `Tundra`, `Forest`, `Rainforest`, `Mountains`, `Snow`
 
-#### Scenario: Requesting a map
-- **WHEN** a client requests a map with a valid seed, grid type, and size
-  preset
-- **THEN** the response is `200 OK` with a JSON body containing the grid
-  type, size preset, width, height, and every cell's coordinates, biome
-  (as a string), and elevation
+#### Scenario: Low and mid-low elevation determine water and coast regardless of moisture
+- **WHEN** a cell's elevation value falls in the lowest or second-lowest
+  documented elevation band
+- **THEN** its biome is `Ocean` or `Beach` respectively, regardless of
+  its moisture value
 
-#### Scenario: Requesting a map with an invalid parameter
-- **WHEN** a client requests a map with a grid type or size preset value
-  outside the documented sets
-- **THEN** the response is a `4xx` client error and no map is generated
+#### Scenario: Moisture determines the biome within a middle elevation band
+- **WHEN** a cell's elevation value falls in one of the two middle
+  documented elevation bands
+- **THEN** its biome additionally depends on its moisture value: dry,
+  medium, and wet moisture map to three different biomes for that
+  elevation band, per the documented table
 
-### Requirement: Grain-scattered land/ocean silhouette
-The system SHALL generate a map's land/ocean silhouette by scattering a
-seed-dependent number of circular "grains" of varying size across the
-grid; a cell SHALL be land if it falls within any grain's radius
-(overlapping grains merge into one landmass), and `Ocean` otherwise.
-Every land cell SHALL have the same single fixed biome value.
+#### Scenario: The highest elevation band splits into Mountains or Snow by moisture
+- **WHEN** a cell's elevation value falls in the highest documented
+  elevation band
+- **THEN** its biome is `Mountains` for drier moisture values and `Snow`
+  for the wettest, per the documented table
 
-#### Scenario: A generated map has both land and ocean
-- **WHEN** a map is generated
-- **THEN** the result contains at least one `Ocean` cell and, for all but
-  pathologically small grain counts, typically at least one non-`Ocean`
-  cell
+#### Scenario: Band and table values are fixed and documented
+- **WHEN** the same seed and coordinate are sampled
+- **THEN** the biome returned matches applying the documented elevation
+  thresholds, moisture thresholds, and elevation-by-moisture table to
+  that coordinate's two values, reproducibly
 
-#### Scenario: Every land cell shares the same biome
-- **WHEN** inspecting any two non-`Ocean` cells in a generated map
-- **THEN** their biome values are identical
+### Requirement: Neighboring cells trend toward the same or adjacent biome
+Neighboring cells' underlying elevation and moisture values SHALL each
+vary smoothly rather than being assigned independently at random, so
+that neighboring cells tend to share a biome or a closely related one,
+forming coherent regions (e.g. a body of `Ocean` bordered by a ring of
+`Beach`, a `Desert` fading into `Grassland` rather than jumping straight
+to `Swamp`) rather than cell-to-cell noise. Water bodies SHALL be able
+to span an area large enough to read as an ocean separating continents
+or islands, not just a pond - i.e. the underlying elevation field's
+regions of coherent value SHALL be large relative to a single request
+window at the default zoom level, not confined to a small fraction of
+it.
+
+#### Scenario: Neighboring cells have closer elevation and moisture values than random cells
+- **WHEN** comparing, across a generated window, the average absolute
+  difference between each cell and its immediate neighbors against the
+  average absolute difference between each cell and a uniformly random
+  other cell in that window - computed separately for elevation and for
+  moisture
+- **THEN** the neighbor average is smaller than the random-pair average,
+  for both elevation and moisture
+
+#### Scenario: Water bodies can span a large area
+- **WHEN** a sufficiently large window is sampled for a seed that
+  produces a large `Ocean` region
+- **THEN** that `Ocean` region's extent is not bounded by a small fixed
+  size - it can span an area comparable to the window itself, large
+  enough to plausibly separate two landmasses

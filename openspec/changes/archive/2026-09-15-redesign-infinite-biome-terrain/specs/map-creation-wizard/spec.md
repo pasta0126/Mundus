@@ -97,32 +97,6 @@ control in the UI (pan, zoom, copy seed, go to coordinates).
   exact view (seed, origin `x`/`y`) plus a year-month-day-ordered
   timestamp, rather than a fixed generic filename
 
-### Requirement: Jumping to a specific coordinate
-After a window is rendered, the system SHALL let the user enter a
-specific `x`/`y` world coordinate and jump directly there: the current
-zoom step's full viewport-covering window SHALL be recalculated,
-centered on the entered coordinate, using the same seed. This is
-independent of panning (which shifts by a fixed step) and of the
-default starting position (which SHALL remain `(0, 0)` on initial load
-and on Regenerate).
-
-#### Scenario: Going to a coordinate recenters the view there
-- **WHEN** a user, after viewing a generated window, enters an `x` and a
-  `y` value and confirms
-- **THEN** a new window request is made for the same seed and the
-  current zoom step's cell size, centered on the entered coordinate,
-  and the canvas updates to show the response
-
-#### Scenario: Going to a coordinate preserves the seed and zoom step
-- **WHEN** a user jumps to a coordinate
-- **THEN** the seed and the on-screen cell size used for the new window
-  request are unchanged from the current view
-
-#### Scenario: Initial load and Regenerate still default to the origin
-- **WHEN** the page loads, or a user chooses "Regenerate"
-- **THEN** the resulting window is centered on `(0, 0)`, regardless of
-  any coordinate previously jumped to
-
 ### Requirement: Progress and status feedback
 The system SHALL show visible progress and status feedback for every
 asynchronous action (the automatic initial load, panning, zooming,
@@ -159,6 +133,32 @@ progress" state.
   just a silent lack of progress
 
 ## ADDED Requirements
+
+### Requirement: Jumping to a specific coordinate
+After a window is rendered, the system SHALL let the user enter a
+specific `x`/`y` world coordinate and jump directly there: the current
+zoom step's full viewport-covering window SHALL be recalculated,
+centered on the entered coordinate, using the same seed. This is
+independent of panning (which shifts by a fixed step) and of the
+default starting position (which SHALL remain `(0, 0)` on initial load
+and on Regenerate).
+
+#### Scenario: Going to a coordinate recenters the view there
+- **WHEN** a user, after viewing a generated window, enters an `x` and a
+  `y` value and confirms
+- **THEN** a new window request is made for the same seed and the
+  current zoom step's cell size, centered on the entered coordinate,
+  and the canvas updates to show the response
+
+#### Scenario: Going to a coordinate preserves the seed and zoom step
+- **WHEN** a user jumps to a coordinate
+- **THEN** the seed and the on-screen cell size used for the new window
+  request are unchanged from the current view
+
+#### Scenario: Initial load and Regenerate still default to the origin
+- **WHEN** the page loads, or a user chooses "Regenerate"
+- **THEN** the resulting window is centered on `(0, 0)`, regardless of
+  any coordinate previously jumped to
 
 ### Requirement: Automatic generation on load
 On page load, the system SHALL immediately request an initial window

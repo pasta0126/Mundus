@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Deterministic per-cell terrain
 Given the same seed, the biome of the cell at any coordinate `(x, y)`
@@ -64,8 +64,6 @@ without generating any terrain.
 - **WHEN** a window is requested whose width or height exceeds the
   documented per-request maximum
 - **THEN** the request is rejected and no terrain is generated
-
-## ADDED Requirements
 
 ### Requirement: Biome set from elevation and moisture
 The system SHALL assign each cell's biome from a fixed, documented set
@@ -140,6 +138,14 @@ it.
 
 ## REMOVED Requirements
 
+### Requirement: Deterministic map generation
+**Reason**: Request parameters changed from `(grid type, size preset)`
+to `(origin x/y, width, height)` over an unbounded coordinate space, and
+determinism is now scoped per-cell rather than per-whole-map - see
+"Deterministic per-cell terrain" and "Location-independent generation".
+**Migration**: None - determinism still holds, just re-specified for the
+new per-cell, windowed model.
+
 ### Requirement: Caller-chosen grid type
 **Reason**: Terrain is now addressed by an unbounded integer coordinate
 space rather than a single fixed-size grid, and the actual renderer has
@@ -164,3 +170,19 @@ concern exposed to callers, and nothing in the new model needs a
 separate elevation field alongside biome.
 **Migration**: Callers relying on elevation for rendering (e.g.
 hillshading) SHALL render by biome alone; there is no replacement field.
+
+### Requirement: Map generation over HTTP
+**Reason**: Request/response shape changed from `(grid type, size
+preset)` to a `(origin x/y, width, height)` window, and the response no
+longer carries elevation or a grid type - see "Windowed terrain query
+over HTTP".
+**Migration**: Callers SHALL switch to the windowed query parameters and
+drop any reliance on the removed `gridType`/`elevation` response fields.
+
+### Requirement: Grain-scattered land/ocean silhouette
+**Reason**: Replaced by the two-axis elevation/moisture biome model -
+see "Biome set from elevation and moisture". A single scattered-circle
+land silhouette with one fixed land biome no longer matches the ten-biome
+model.
+**Migration**: None - callers only ever consumed the resulting biome per
+cell, which the new model still provides (with more possible values).

@@ -8,142 +8,112 @@ instead of hand-crafting a URL.
 
 ## Requirements
 
-### Requirement: Fixed wizard step order
-The system SHALL present exactly four steps, in this order: Seed, Grid
-Type, Size Preset, Review. Each step SHALL let the user choose that
-step's parameter (Seed MAY be left blank to mean "generate a random
-seed"). The Review step SHALL display every previously chosen value and
-SHALL be the only step that triggers map generation.
-
-#### Scenario: Steps appear in order
-- **WHEN** the wizard starts
-- **THEN** the first step shown is Seed, and advancing moves through Grid
-  Type, Size Preset, and Review in that order, with no other step
-  reachable in between
-
-#### Scenario: Only Review triggers generation
-- **WHEN** the user is on any step before Review
-- **THEN** no map generation request has been made yet
-
-### Requirement: Back-and-forth navigation preserves selections
-The system SHALL let the user move to the previous step or the next step
-at any point after the first step, and any value chosen on a step SHALL
-remain selected when the user navigates away and back to that step.
-
-#### Scenario: Going back preserves a later re-visit
-- **WHEN** a user selects a value on a step, advances to a later step,
-  then navigates back to the earlier step
-- **THEN** the earlier step still shows the previously selected value
-
-#### Scenario: Changing an earlier selection is possible
-- **WHEN** a user navigates back to an earlier step and selects a
-  different value
-- **THEN** the new value replaces the old one, and advancing forward
-  again reflects the updated value on the Review step
-
-### Requirement: Map generation on confirmation
-The system SHALL request a map from the `map-generation` HTTP API using
-exactly the parameters collected across the wizard's steps (generating a
-random seed first if the Seed step was left blank), triggered only when
-the user confirms on the Review step.
-
-#### Scenario: Confirming generates a map with the collected parameters
-- **WHEN** the user confirms on the Review step after selecting a grid
-  type and size preset (and optionally a seed)
-- **THEN** exactly one request is made to the map-generation API using
-  those parameters, and the rendered result reflects the response
-
-#### Scenario: A failed generation request is shown, not silently dropped
-- **WHEN** the map-generation request fails
-- **THEN** the user is shown that generation failed and can return to the
-  wizard without losing their prior selections
-
 ### Requirement: Canvas rendering of the generated map
-The system SHALL render every cell of a generated map on an HTML canvas,
-positioned according to the map's grid type (square or hex). For a
-`Square` grid, the boundary between `Ocean` and non-`Ocean` biome SHALL
-be rendered as a smoothed vector contour (not a blurred raster and not a
-stair-stepped raw cell edge). For a `Hex` grid, that boundary SHALL be
-rendered as a crisp (non-blurred) line following the actual hex-edge
-steps between land and ocean cells. Terrain SHALL be shaded using each
-cell's local elevation gradient (a directional-light hillshade effect),
-not a flat per-cell lightness multiplier alone. `Ocean` cells SHALL
-carry a wave-line texture rather than a flat or blurred fill. The
-rendered map SHALL be framed by a decorative border.
+The system SHALL render every cell of the current window on an HTML
+canvas as a square grid, each cell filled with a flat, soft pastel color
+determined solely by its biome - no shading, texture, or decorative
+border. Cells of the same biome SHALL use the same color; cells of
+different biomes SHALL be visually distinguishable from one another.
+The canvas SHALL fill the full browser viewport as the page's
+background layer; every other UI element (params panel, pan/zoom
+controls) SHALL render above it as an overlay, never pushing it into a
+bounded card or leaving empty page background beside it.
 
 #### Scenario: Every cell is rendered
-- **WHEN** a map is generated
-- **THEN** the canvas renders the full grid, with no cell of the
-  returned grid omitted from the base terrain rendering
+- **WHEN** a window is generated
+- **THEN** the canvas renders the full window, with no cell of the
+  returned window omitted from rendering
 
 #### Scenario: Different biomes are visually distinguishable
-- **WHEN** a rendered map contains both `Ocean` and non-`Ocean` cells
-- **THEN** those cells are drawn in visually distinct colors
+- **WHEN** a rendered window contains cells of more than one biome
+- **THEN** each biome is drawn in its own distinct flat color
+
+#### Scenario: The map fills the viewport
+- **WHEN** a window is rendered on any screen size
+- **THEN** the canvas spans the full browser viewport width and height,
+  with no visible page background outside it
+
+#### Scenario: UI overlays the map instead of displacing it
+- **WHEN** the params panel or pan/zoom controls are shown
+- **THEN** they render on top of the full-viewport canvas rather than
+  in a separate layout region that shrinks or pushes it aside
 
 #### Scenario: Grid type determines cell layout
-- **WHEN** the generated map's grid type is `Hex`
-- **THEN** cells are laid out as a hexagonal tessellation with alternating
-  row offset, rather than a plain square grid
+- **WHEN** any window is rendered
+- **THEN** cells are always laid out as a plain square grid; there is no
+  alternate grid type to choose or render
 
 #### Scenario: Coastlines are smoothed, not stair-stepped
-- **WHEN** a rendered map has a boundary between `Ocean` and a non-`Ocean`
-  biome
-- **THEN**, for a `Square` grid, that boundary is rendered as a
-  continuous smoothed vector curve (not a blurred gradient and not a
-  sequence of hard right-angle cell edges); for a `Hex` grid, that
-  boundary is rendered as a crisp (non-blurred) line following hex cell
-  edges
+- **WHEN** two adjacent cells in a rendered window have different biomes
+- **THEN** the boundary between them is each cell's own raw edge, with
+  no smoothing curve applied - a single traced "coastline" is no longer
+  a distinct concept once a window can contain many biome boundaries
 
 #### Scenario: Ocean has a wave texture
-- **WHEN** a rendered map contains `Ocean` cells
-- **THEN** those cells show a wave-line pattern rather than a flat or
-  blurred fill
+- **WHEN** a rendered window contains `Ocean` cells
+- **THEN** they are filled with a flat pastel color; no wave-line texture
+  is applied
 
 #### Scenario: The map is framed
-- **WHEN** a map is rendered
-- **THEN** a decorative border frame is visible around the rendered grid
+- **WHEN** a window is rendered
+- **THEN** no decorative border or frame is drawn around the grid
 
 ### Requirement: Post-generation actions
-After a map is rendered, the system SHALL offer exactly three actions:
-Regenerate (generate a new map immediately, with a new random seed but
-the same grid type and size preset, without returning to any wizard
-step), Restart wizard (clear every prior selection and return to the
-Seed step), and Download (save the currently rendered map as a PNG image
-file).
+After a window is rendered, the system SHALL offer exactly two actions:
+Regenerate (generate a new window immediately, with a new random seed,
+centered back on `(0, 0)` at the default zoom level) and Download (save
+the currently rendered window as a PNG image file). Both actions SHALL
+be shown as equally-prominent controls (e.g. filling the available
+width of their row rather than sizing to their label) and SHALL each
+carry an icon alongside their label, consistent with every other
+control in the UI (pan, zoom, copy seed, go to coordinates).
 
 #### Scenario: Regenerate produces a new map without leaving the result view
-- **WHEN** a user, after viewing a generated map, chooses "Regenerate"
-- **THEN** a new map is generated with a new random seed, the same grid
-  type and size preset, and the result view updates to show it without
-  showing any wizard step
+- **WHEN** a user, after viewing a generated window, chooses "Regenerate"
+- **THEN** a new window is generated with a new random seed, centered on
+  `(0, 0)` at the default zoom level, and the view updates to show it
 
 #### Scenario: Restart wizard clears all selections
-- **WHEN** a user, after viewing a generated map, chooses "Restart
-  wizard"
-- **THEN** the Seed step is shown and every step's value (seed, grid
-  type, size preset) is back to its unselected default
+- **WHEN** a user looks for a "Restart wizard" action
+- **THEN** none exists - there is no wizard to restart; "Regenerate" is
+  the only way to get a different seed
 
 #### Scenario: Download saves the rendered map as an image
-- **WHEN** a user, after viewing a generated map, chooses "Download"
-- **THEN** a PNG image file of the currently rendered map is saved to the
-  user's device
+- **WHEN** a user, after viewing a generated window, chooses "Download"
+- **THEN** a PNG image file of the currently rendered window is saved to
+  the user's device, named with the values needed to reproduce that
+  exact view (seed, origin `x`/`y`) plus a year-month-day-ordered
+  timestamp, rather than a fixed generic filename
 
 ### Requirement: Progress and status feedback
 The system SHALL show visible progress and status feedback for every
-asynchronous action (generating a map, rendering it, downloading it), so
-the user is never left without an indication of what is currently
-happening. Feedback SHALL include both a progress indicator and a
-descriptive status message.
+asynchronous action (the automatic initial load, panning, zooming,
+regenerating, downloading), so the user is never left without an
+indication of what is currently happening. Feedback SHALL include both
+a progress indicator and a descriptive status message. When a view is
+loaded from more than one underlying request (see "Tiled, progressive
+window loading"), the progress indicator SHALL reflect the fraction of
+those requests completed so far, not just an indeterminate "in
+progress" state.
 
 #### Scenario: Generating shows progress and a status message
-- **WHEN** a map generation request is in flight
+- **WHEN** a window request (initial load, a pan, a zoom, or a
+  regenerate) is in flight
 - **THEN** a progress indicator is visible along with a message
-  describing that generation is in progress
+  describing that the map is loading
+
+#### Scenario: Progress reflects completed chunks, not just in-flight/done
+- **WHEN** a view's window is being loaded as several chunk requests and
+  some, but not all, have completed
+- **THEN** the progress indicator's value reflects the completed
+  fraction (e.g. roughly half-full at the halfway point), rather than
+  staying at a fixed placeholder value until everything finishes
 
 #### Scenario: Rendering shows a status message
-- **WHEN** a returned map is being drawn to the canvas
-- **THEN** a message indicates rendering is in progress until drawing
-  completes
+- **WHEN** a returned window is being drawn to the canvas
+- **THEN** drawing completes synchronously as part of the same loading
+  state (flat per-cell fills are cheap enough to draw immediately); no
+  separate rendering-specific message is shown
 
 #### Scenario: Failure feedback is descriptive
 - **WHEN** any asynchronous action fails
@@ -157,3 +127,135 @@ messages, page title) SHALL be in English.
 #### Scenario: No non-English user-facing text
 - **WHEN** inspecting any screen of the application
 - **THEN** every piece of user-facing text on it is in English
+
+### Requirement: Jumping to a specific coordinate
+After a window is rendered, the system SHALL let the user enter a
+specific `x`/`y` world coordinate and jump directly there: the current
+zoom step's full viewport-covering window SHALL be recalculated,
+centered on the entered coordinate, using the same seed. This is
+independent of panning (which shifts by a fixed step) and of the
+default starting position (which SHALL remain `(0, 0)` on initial load
+and on Regenerate).
+
+#### Scenario: Going to a coordinate recenters the view there
+- **WHEN** a user, after viewing a generated window, enters an `x` and a
+  `y` value and confirms
+- **THEN** a new window request is made for the same seed and the
+  current zoom step's cell size, centered on the entered coordinate,
+  and the canvas updates to show the response
+
+#### Scenario: Going to a coordinate preserves the seed and zoom step
+- **WHEN** a user jumps to a coordinate
+- **THEN** the seed and the on-screen cell size used for the new window
+  request are unchanged from the current view
+
+#### Scenario: Initial load and Regenerate still default to the origin
+- **WHEN** the page loads, or a user chooses "Regenerate"
+- **THEN** the resulting window is centered on `(0, 0)`, regardless of
+  any coordinate previously jumped to
+
+### Requirement: Automatic generation on load
+On page load, the system SHALL immediately request an initial window
+from the `map-generation` API centered on `(0, 0)`, using a randomly
+generated seed, without requiring any user input. No seed, position, or
+other parameter is collected from the user beforehand.
+
+#### Scenario: Loading the page generates a map without user input
+- **WHEN** the page loads
+- **THEN** exactly one request is made to the map-generation API for a
+  window centered on `(0, 0)`, using a freshly generated random seed,
+  and the rendered result reflects the response once it arrives
+
+#### Scenario: A failed initial generation is shown, not silently dropped
+- **WHEN** the automatic initial map-generation request fails
+- **THEN** the user is shown that generation failed, with a way to
+  retry
+
+### Requirement: Panning the viewport
+After a window is rendered, the system SHALL let the user shift the
+visible window in any of the four cardinal directions (e.g. via
+on-screen controls or arrow keys), each shift requesting a new window
+from the `map-generation` API at the updated origin using the same seed,
+and updating the canvas to show the newly returned cells once loaded.
+
+#### Scenario: Panning shifts the visible window
+- **WHEN** a user pans in a given direction after viewing a generated
+  window
+- **THEN** a new window request is made for the same seed at an origin
+  shifted in that direction, and the canvas updates to show the response
+
+#### Scenario: Panning preserves the seed
+- **WHEN** a user pans
+- **THEN** the seed used for the new window request is unchanged from
+  the one used to generate the current window
+
+### Requirement: Zooming through a fixed set of steps
+The system SHALL default to the most zoomed-out step (the documented
+minimum of 1 pixel per cell) on initial load and on Regenerate, so the
+widest possible view of the world is what the user sees first. After a
+window is rendered, the system SHALL let the user zoom in through a
+small, fixed, documented sequence of steps - growing the on-screen cell
+size at each step, up to a documented maximum - by requesting a new,
+smaller-in-cells window centered on the same point using the same seed,
+sized to cover the full viewport at that step's cell size (see "Tiled,
+progressive window loading" for how a window that size is actually
+fetched). The system SHALL let the user zoom back out through the same
+steps, down to the default (most zoomed-out) cell size, and SHALL NOT
+allow zooming out past the default or in past the largest step. A
+window's cell count SHALL still be bounded by a documented safety
+maximum far larger than any real display's needs at the smallest cell
+size; only beyond that safety maximum MAY the rendered window cover
+less than the full viewport, centered rather than stretched.
+
+#### Scenario: Zooming in shows less of the map in more detail
+- **WHEN** a user zooms in after viewing a generated window
+- **THEN** a new window request is made for the same seed, covering
+  fewer cells than the current window, and the canvas updates to show
+  the response at a larger on-screen cell size
+
+#### Scenario: Zoomed-out views cover the full viewport
+- **WHEN** a user is at any documented zoom step, including the default
+  most-zoomed-out step, on a real display
+- **THEN** the rendered window covers the full browser viewport at that
+  step's on-screen cell size, not a smaller square in the middle of an
+  otherwise-empty page
+
+#### Scenario: Zooming preserves the seed and view center
+- **WHEN** a user zooms in or out
+- **THEN** the seed used for the new window request is unchanged, and
+  the new window is centered on the same point the current window was
+  centered on
+
+#### Scenario: Zoom range is bounded
+- **WHEN** a user is at the default (most zoomed-out) cell size
+- **THEN** no further zoom-out action is available
+- **WHEN** a user is at the largest (most zoomed-in) cell size the
+  system offers
+- **THEN** no further zoom-in action is available
+
+### Requirement: Tiled, progressive window loading
+When the window needed to cover the viewport (at the current zoom
+step) exceeds what a single `map-generation` request can efficiently
+return, the system SHALL split it into multiple smaller chunk requests
+covering the same overall area, issue them concurrently, and render
+each chunk onto the canvas as it individually completes, rather than
+waiting for every chunk before showing anything. A previously-rendered
+view SHALL remain visible while a new one's chunks are still arriving,
+only being replaced once the new view's first chunk has arrived.
+
+#### Scenario: Chunks render as they arrive, not all at once
+- **WHEN** a window is being loaded as multiple chunk requests
+- **THEN** cells from a chunk that has already completed are visible on
+  the canvas before every other chunk has completed
+
+#### Scenario: The previous view persists until new data arrives
+- **WHEN** a pan, zoom, or regenerate is triggered while a previous
+  view is displayed
+- **THEN** the previous view remains visible, unchanged, until the new
+  view's first chunk arrives
+
+#### Scenario: A total loading failure falls back to the last good view
+- **WHEN** every chunk request for a pan, zoom, or regenerate fails, and
+  a previously-rendered view exists
+- **THEN** loading stops and the previous view remains displayed, rather
+  than replacing it with an error screen
