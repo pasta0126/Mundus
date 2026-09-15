@@ -22,7 +22,9 @@ var app = builder.Build();
 
 app.MapOpenApi("/api/openapi/{documentName}.json");
 
-app.UseHttpsRedirection();
+// No UseHttpsRedirection(): Traefik terminates TLS at the edge and this
+// container only ever receives plain HTTP from nginx's internal /api/
+// proxy - redirecting here would just break that internal call.
 app.UseAuthorization();
 app.MapControllers();
 
