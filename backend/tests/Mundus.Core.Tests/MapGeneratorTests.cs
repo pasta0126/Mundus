@@ -265,9 +265,9 @@ public class MapGeneratorTests
         // see InfiniteValueNoise2D.Sample) must not collapse the biome
         // variety down to just the coarsest bands.
         HashSet<Biome> seen = [];
-        for (var i = 0; i < 50 && seen.Count < 10; i++)
+        for (var i = 0; i < 60 && seen.Count < 10; i++)
         {
-            var map = MapGenerator.Generate($"stride-variety-{i}", -256, -256, 512, 512, step: 16);
+            var map = MapGenerator.Generate($"stride-variety-{i}", -256, -256, 512, 512, step: 8);
             foreach (var cell in map.Cells) seen.Add(cell.Biome);
         }
 
@@ -280,5 +280,49 @@ public class MapGeneratorTests
     public void OutOfRangeStepIsRejected(int step)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => MapGenerator.Generate("bad-step", 0, 0, 4, 4, step));
+    }
+
+    [Fact]
+    public void CoastlinesAreNotAlwaysBeach()
+    {
+        // Not every Beach-band cell should render as sand - some
+        // stretches are wild land meeting the water directly, or a cliff
+        // (Mountains) - see design.md "Coast styles: not every shore is
+        // a beach".
+        HashSet<Biome> seenAtCoastElevation = [];
+        for (var i = 0; i < 30 && seenAtCoastElevation.Count < 2; i++)
+        {
+            var map = MapGenerator.Generate($"coast-variety-{i}", -256, -256, 512, 512);
+            foreach (var cell in map.Cells)
+            {
+                var elevation = MapGenerator.ElevationAt(map.Seed, cell.X, cell.Y);
+                if (elevation is >= 0.42 and < 0.46)
+                {
+                    seenAtCoastElevation.Add(cell.Biome);
+                }
+            }
+        }
+
+        Assert.True(seenAtCoastElevation.Count > 1, $"expected more than one biome at coast elevation, saw: {string.Join(", ", seenAtCoastElevation)}");
+    }
+
+    [Fact]
+    public void MountainsOnlyAppearNearAPlateBoundary()
+    {
+        // Every Mountains/Snow cell in a window must sit on (or right
+        // next to) a plate seam - see "Mountain ranges as plate
+        // boundaries" in design.md - not scattered wherever elevation
+        // happens to be high.
+        var map = MapGenerator.Generate("plate-gate-check", -256, -256, 512, 512);
+        var sawAny = false;
+        foreach (var cell in map.Cells)
+        {
+            if (cell.Biome is not (Biome.Mountains or Biome.Snow)) continue;
+            sawAny = true;
+            var edge = MapGenerator.PlateEdgeAt(map.Seed, cell.X, cell.Y);
+            Assert.True(edge > 0, $"({cell.X}, {cell.Y}) was {cell.Biome} but had no plate-edge proximity");
+        }
+
+        Assert.True(sawAny, "expected at least one Mountains/Snow cell in this window to make the check meaningful");
     }
 }

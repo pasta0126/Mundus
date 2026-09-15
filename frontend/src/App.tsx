@@ -333,7 +333,7 @@ function App() {
           </div>
 
           <div className="fixed right-4 bottom-4 z-10 flex items-end gap-3">
-            <div className="bg-card flex flex-col gap-1 rounded-lg border p-1 shadow-lg">
+            <div className="bg-card flex flex-col items-center gap-1 rounded-lg border p-1 shadow-lg">
               <Button
                 variant="outline"
                 size="icon"
@@ -343,6 +343,10 @@ function App() {
               >
                 <ZoomIn />
               </Button>
+              {/* Level 1 = fully zoomed out, counting up to fully zoomed in - matches the usual "higher number = more detail" map convention, opposite of zoomIndex's own 0-at-most-zoomed-in order. */}
+              <span className="text-muted-foreground select-none font-mono text-[10px]" aria-label={`Zoom level ${ZOOM_LEVELS.length - zoomIndex} of ${ZOOM_LEVELS.length}`}>
+                {ZOOM_LEVELS.length - zoomIndex}/{ZOOM_LEVELS.length}
+              </span>
               <Button
                 variant="outline"
                 size="icon"

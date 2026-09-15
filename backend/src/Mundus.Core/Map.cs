@@ -29,7 +29,7 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 12;
+    public const int CurrentSpecVersion = 13;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 512;
@@ -58,6 +58,18 @@ public static class MapGenerator
     private const int ElevationOctaves = 7;
 
     /// <summary>
+    /// Elevation value (of the base octave only - see
+    /// <see cref="Generate"/>'s regional-elevation check) above which a
+    /// cell is considered clearly inland, so a fine-detail dip below the
+    /// Ocean/Beach threshold there is a stray artifact (a tiny pond
+    /// hugging an otherwise-solid coastline) rather than a real part of
+    /// the coast, and gets suppressed. Comfortably above Beach's own
+    /// upper bound so real coastline unevenness (where the *regional*
+    /// value is also near the boundary) is left alone.
+    /// </summary>
+    private const double InlandFloor = 0.48;
+
+    /// <summary>
     /// Moisture's base region scale - broad climate zones, independent of
     /// elevation's own field. Kept close to elevation's scale (though not
     /// identical, so climate zones don't just trace elevation's own
@@ -80,28 +92,32 @@ public static class MapGenerator
     private const double NoisePersistence = 0.5;
 
     /// <summary>
-    /// Ridge field's base region scale - independent of elevation, used
-    /// only to decide where Highland extends into Peak (mountains). A
-    /// plain elevation threshold makes mountains form round blobs around
-    /// local maxima; folding in a ridged transform of a second field
-    /// (see <see cref="InfiniteValueNoise2D.SampleRidged"/>) makes the Peak/Highland boundary
-    /// trace branching, roughly linear seams instead, so mountains read
-    /// as ranges/massifs rather than isolated lumps.
+    /// "Tectonic plate" scale: the average size of one Worley cell in
+    /// <see cref="WorleyBoundaryField"/> - i.e. roughly how far apart
+    /// mountain-range-bearing plate seams are. See design.md ("Mountain
+    /// ranges as plate boundaries").
     /// </summary>
-    private const int RidgeRegionScale = 192;
+    private const int PlateRegionScale = 768;
 
-    private const int RidgeOctaves = 5;
+    /// <summary>Mountain belt half-width, as a fraction of <see cref="PlateRegionScale"/>.</summary>
+    private const double PlateEdgeWidthFraction = 0.05;
 
     /// <summary>
-    /// Elevation floor below which a cell can never become Peak via a
-    /// ridge, even if the ridge value is high - keeps mountain ranges
-    /// confined to already-elevated terrain instead of clawing into
-    /// Lowland.
+    /// Elevation floor below which a cell can never become Peak even
+    /// sitting exactly on a plate seam - keeps mountain ranges confined
+    /// to already-elevated terrain instead of clawing into Lowland.
     /// </summary>
-    private const double RidgeElevationFloor = 0.76;
+    private const double PlateUpliftElevationFloor = 0.76;
 
-    /// <summary>Minimum ridge value (of `[0, 1]`) for a Highland cell above <see cref="RidgeElevationFloor"/> to count as Peak.</summary>
-    private const double RidgeThreshold = 0.58;
+    /// <summary>
+    /// Coast-type field's base region scale - deliberately coarser than
+    /// the coastline's own detail, so one stretch of coast (a bay, a
+    /// peninsula) commits to one style rather than flickering between
+    /// styles cell to cell. See <see cref="CoastBiomeAt"/>.
+    /// </summary>
+    private const int CoastRegionScale = 160;
+
+    private const int CoastOctaves = 3;
 
     /// <summary>Ascending elevation thresholds. A value below a band's threshold falls in the band before it (the lowest, Ocean, has no lower bound).</summary>
     private static readonly (string Band, double UpperBound)[] ElevationBands =
@@ -161,12 +177,14 @@ public static class MapGenerator
         // generalization, not just sparser sampling of the same detail.
         // It also happens to keep every octave's scale comfortably above
         // the sampling gap (scale is always `step` times the step=1
-        // value), so this alone prevents the aliasing the naive
-        // fixed-scale stride had - see InfiniteValueNoise2D.Sample's
+        // value), so this alone prevents the aliasing a naive fixed-scale
+        // stride would have - see InfiniteValueNoise2D.Sample's
         // `minRegionScale` guard, kept as a defensive backstop.
         var elevationNoise = ElevationNoise(seed, step);
         var moistureNoise = MoistureNoise(seed, step);
-        var ridgeNoise = RidgeNoise(seed, step);
+        var plateField = PlateField(seed, step);
+        var coastNoise = CoastNoise(seed, step);
+        var plateEdgeWidth = PlateRegionScale * step * PlateEdgeWidthFraction;
         var cells = new List<Cell>(width * height);
         for (var j = 0; j < height; j++)
         {
@@ -175,9 +193,57 @@ public static class MapGenerator
             {
                 var x = originX + (i * step);
                 var elevation = elevationNoise.Sample(x, y, step);
-                var moisture = moistureNoise.Sample(x, y, step);
-                var ridge = ridgeNoise.SampleRidged(x, y, step);
-                cells.Add(new Cell { X = x, Y = y, Biome = BiomeAt(elevation, moisture, ridge) });
+
+                // Suppress tiny fine-detail dips below the Ocean/Beach
+                // threshold when the *regional* (base-octave-only)
+                // elevation is clearly inland - a stray pond artifact
+                // hugging an otherwise-solid coastline, not a real part
+                // of it. Real coastline unevenness leaves the regional
+                // value near the boundary too, so it's untouched. Only
+                // worth checking at all when the detailed sample is
+                // already below the floor - elsewhere there's nothing to
+                // suppress, and skipping it avoids a second noise sample
+                // for the large majority of cells that aren't near a
+                // coast.
+                if (elevation < InlandFloor)
+                {
+                    var regionalElevation = elevationNoise.Sample(x, y, minRegionScale: ElevationRegionScale * step);
+                    if (regionalElevation >= InlandFloor)
+                    {
+                        elevation = InlandFloor;
+                    }
+                }
+
+                var elevationBand = BandOf(elevation, ElevationBands);
+                Biome biome;
+                if (elevationBand == "Ocean")
+                {
+                    biome = Biome.Ocean;
+                }
+                else if (elevationBand == "Beach")
+                {
+                    // Coast style only needs sampling for the actual
+                    // coastline cells, not the whole map.
+                    var coast = coastNoise.Sample(x, y, step);
+                    var moisture = moistureNoise.Sample(x, y, step);
+                    biome = CoastBiomeAt(coast, moisture);
+                }
+                else
+                {
+                    var moisture = moistureNoise.Sample(x, y, step);
+                    if (elevationBand is "Highland" or "Peak")
+                    {
+                        // Plate-boundary proximity only matters for
+                        // deciding whether elevated ground becomes a
+                        // mountain range - skip it for Lowland.
+                        var plateEdge = plateField.EdgeProximity(x, y, plateEdgeWidth);
+                        elevationBand = UpliftedBand(elevationBand, elevation, plateEdge);
+                    }
+
+                    biome = LandBiomeAt(elevationBand, moisture);
+                }
+
+                cells.Add(new Cell { X = x, Y = y, Biome = biome });
             }
         }
 
@@ -199,39 +265,55 @@ public static class MapGenerator
     /// <summary>Sample the raw [0, 1) moisture value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
     public static double MoistureAt(string seed, int x, int y, int step = 1) => MoistureNoise(seed, step).Sample(x, y, step);
 
-    /// <summary>Sample the ridged-multifractal `[0, 1]` ridge value at a coordinate - exposed for testing.</summary>
-    public static double RidgeAt(string seed, int x, int y, int step = 1) => RidgeNoise(seed, step).SampleRidged(x, y, step);
+    /// <summary>Sample the [0, 1] plate-boundary edge proximity at a coordinate - exposed for testing.</summary>
+    public static double PlateEdgeAt(string seed, int x, int y, int step = 1) =>
+        PlateField(seed, step).EdgeProximity(x, y, PlateRegionScale * step * PlateEdgeWidthFraction);
 
     private static InfiniteValueNoise2D ElevationNoise(string seed, int step) =>
         new(seed, ElevationRegionScale * step, ElevationOctaves, NoisePersistence);
 
     // Suffixing the parent seed (rather than an unrelated string) keeps
-    // moisture anchored to the same seed while guaranteeing independence
-    // from elevation - a different seed string produces entirely
-    // different lattice hashes, so the two fields never correlate.
+    // each field anchored to the same seed while guaranteeing
+    // independence from the others - a different seed string produces
+    // entirely different lattice hashes, so fields never correlate.
     private static InfiniteValueNoise2D MoistureNoise(string seed, int step) =>
         new($"{seed}:moisture", MoistureRegionScale * step, MoistureOctaves, NoisePersistence);
 
-    private static InfiniteValueNoise2D RidgeNoise(string seed, int step) =>
-        new($"{seed}:ridge", RidgeRegionScale * step, RidgeOctaves, NoisePersistence);
+    private static WorleyBoundaryField PlateField(string seed, int step) =>
+        new($"{seed}:plate", PlateRegionScale * step);
 
-    private static Biome BiomeAt(double elevation, double moisture, double ridge)
+    private static InfiniteValueNoise2D CoastNoise(string seed, int step) =>
+        new($"{seed}:coast", CoastRegionScale * step, CoastOctaves, NoisePersistence);
+
+    /// <summary>
+    /// Promotes an elevated cell's band to "Peak" if it sits on a plate
+    /// seam (thrust up into a mountain range), or demotes an already-Peak
+    /// cell away from one back to "Highland" (a plateau, not a jagged
+    /// mountain) - see "Mountain ranges as plate boundaries" in
+    /// design.md. Only ever called for "Highland"/"Peak" bands.
+    /// </summary>
+    private static string UpliftedBand(string elevationBand, double elevation, double plateEdge)
     {
-        var elevationBand = BandOf(elevation, ElevationBands);
-        if (elevationBand == "Highland" && elevation >= RidgeElevationFloor && ridge >= RidgeThreshold)
+        var onPlateSeam = plateEdge > 0;
+        if (elevationBand == "Peak" && !onPlateSeam)
         {
-            // Extend Peak down into Highland along ridge lines, so
-            // mountains read as ranges reaching out from the highest
-            // points rather than a single round summit blob.
-            elevationBand = "Peak";
+            return "Highland";
         }
 
-        var moistureBand = BandOf(moisture, MoistureBands);
+        if (elevationBand == "Highland" && elevation >= PlateUpliftElevationFloor && onPlateSeam)
+        {
+            return "Peak";
+        }
 
+        return elevationBand;
+    }
+
+    /// <summary>Biome for a non-Ocean, non-Beach elevation band, by moisture.</summary>
+    private static Biome LandBiomeAt(string elevationBand, double moisture)
+    {
+        var moistureBand = BandOf(moisture, MoistureBands);
         return elevationBand switch
         {
-            "Ocean" => Biome.Ocean,
-            "Beach" => Biome.Beach,
             "Peak" => moistureBand == "Wet" ? Biome.Snow : Biome.Mountains,
             "Lowland" => moistureBand switch
             {
@@ -247,6 +329,35 @@ public static class MapGenerator
                 _ => Biome.Rainforest,
             },
         };
+    }
+
+    /// <summary>
+    /// Not every coastline is a sandy beach: most of one is (`coast`
+    /// below 0.55), but a stretch can instead be wild land meeting the
+    /// water directly - reusing the Lowland moisture table, so a forest
+    /// or grassland runs right down to the shore (`coast` 0.55-0.8) - or
+    /// a cliff, where Mountains plunges straight into the ocean with no
+    /// beach at all (`coast` above 0.8).
+    /// </summary>
+    private static Biome CoastBiomeAt(double coast, double moisture)
+    {
+        if (coast < 0.55)
+        {
+            return Biome.Beach;
+        }
+
+        if (coast < 0.8)
+        {
+            var moistureBand = BandOf(moisture, MoistureBands);
+            return moistureBand switch
+            {
+                "Dry" => Biome.Desert,
+                "Medium" => Biome.Grassland,
+                _ => Biome.Swamp,
+            };
+        }
+
+        return Biome.Mountains;
     }
 
     private static string BandOf(double value, (string Band, double UpperBound)[] bands)
