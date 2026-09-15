@@ -29,7 +29,7 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 11;
+    public const int CurrentSpecVersion = 12;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 512;
@@ -149,9 +149,24 @@ public static class MapGenerator
             throw new ArgumentOutOfRangeException(nameof(step), $"step must be between 1 and {MaxStep}");
         }
 
-        var elevationNoise = ElevationNoise(seed);
-        var moistureNoise = MoistureNoise(seed);
-        var ridgeNoise = RidgeNoise(seed);
+        // Scaling every field's region scale by `step` (not just spacing
+        // sampled points further apart) is what actually makes continents
+        // and oceans still read as large at a wide zoom-out instead of
+        // many small ones packed side by side: without it, a fixed
+        // regionScale covers a shrinking fraction of the (much larger)
+        // visible world as step grows, so the same absolute feature size
+        // reads as "a little of everything everywhere" once the viewport
+        // spans many of them. Scaling keeps the same "N regions visible
+        // across the viewport" ratio at every step - real-map-style
+        // generalization, not just sparser sampling of the same detail.
+        // It also happens to keep every octave's scale comfortably above
+        // the sampling gap (scale is always `step` times the step=1
+        // value), so this alone prevents the aliasing the naive
+        // fixed-scale stride had - see InfiniteValueNoise2D.Sample's
+        // `minRegionScale` guard, kept as a defensive backstop.
+        var elevationNoise = ElevationNoise(seed, step);
+        var moistureNoise = MoistureNoise(seed, step);
+        var ridgeNoise = RidgeNoise(seed, step);
         var cells = new List<Cell>(width * height);
         for (var j = 0; j < height; j++)
         {
@@ -159,12 +174,6 @@ public static class MapGenerator
             for (var i = 0; i < width; i++)
             {
                 var x = originX + (i * step);
-                // minRegionScale: step keeps each field from folding in
-                // octaves finer than the gap between sampled points - see
-                // InfiniteValueNoise2D.Sample's docs. Avoids the wide
-                // strides used for far zoom-out levels reading as speckled
-                // noise instead of the same smooth continents/mountains
-                // visible at step=1.
                 var elevation = elevationNoise.Sample(x, y, step);
                 var moisture = moistureNoise.Sample(x, y, step);
                 var ridge = ridgeNoise.SampleRidged(x, y, step);
@@ -185,26 +194,26 @@ public static class MapGenerator
     }
 
     /// <summary>Sample the raw [0, 1) elevation value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
-    public static double ElevationAt(string seed, int x, int y) => ElevationNoise(seed).Sample(x, y);
+    public static double ElevationAt(string seed, int x, int y, int step = 1) => ElevationNoise(seed, step).Sample(x, y, step);
 
     /// <summary>Sample the raw [0, 1) moisture value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
-    public static double MoistureAt(string seed, int x, int y) => MoistureNoise(seed).Sample(x, y);
+    public static double MoistureAt(string seed, int x, int y, int step = 1) => MoistureNoise(seed, step).Sample(x, y, step);
 
     /// <summary>Sample the ridged-multifractal `[0, 1]` ridge value at a coordinate - exposed for testing.</summary>
-    public static double RidgeAt(string seed, int x, int y) => RidgeNoise(seed).SampleRidged(x, y);
+    public static double RidgeAt(string seed, int x, int y, int step = 1) => RidgeNoise(seed, step).SampleRidged(x, y, step);
 
-    private static InfiniteValueNoise2D ElevationNoise(string seed) =>
-        new(seed, ElevationRegionScale, ElevationOctaves, NoisePersistence);
+    private static InfiniteValueNoise2D ElevationNoise(string seed, int step) =>
+        new(seed, ElevationRegionScale * step, ElevationOctaves, NoisePersistence);
 
     // Suffixing the parent seed (rather than an unrelated string) keeps
     // moisture anchored to the same seed while guaranteeing independence
     // from elevation - a different seed string produces entirely
     // different lattice hashes, so the two fields never correlate.
-    private static InfiniteValueNoise2D MoistureNoise(string seed) =>
-        new($"{seed}:moisture", MoistureRegionScale, MoistureOctaves, NoisePersistence);
+    private static InfiniteValueNoise2D MoistureNoise(string seed, int step) =>
+        new($"{seed}:moisture", MoistureRegionScale * step, MoistureOctaves, NoisePersistence);
 
-    private static InfiniteValueNoise2D RidgeNoise(string seed) =>
-        new($"{seed}:ridge", RidgeRegionScale, RidgeOctaves, NoisePersistence);
+    private static InfiniteValueNoise2D RidgeNoise(string seed, int step) =>
+        new($"{seed}:ridge", RidgeRegionScale * step, RidgeOctaves, NoisePersistence);
 
     private static Biome BiomeAt(double elevation, double moisture, double ridge)
     {

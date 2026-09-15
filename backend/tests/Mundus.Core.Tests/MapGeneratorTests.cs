@@ -115,7 +115,9 @@ public class MapGeneratorTests
         const int width = 64;
         const int height = 64;
         var rng = new Rng("coherence-sampler");
-        Func<string, int, int, double> sample = elevation ? MapGenerator.ElevationAt : MapGenerator.MoistureAt;
+        Func<string, int, int, double> sample = elevation
+            ? (s, x, y) => MapGenerator.ElevationAt(s, x, y)
+            : (s, x, y) => MapGenerator.MoistureAt(s, x, y);
 
         double neighborDeltaSum = 0;
         var neighborCount = 0;
@@ -263,9 +265,9 @@ public class MapGeneratorTests
         // see InfiniteValueNoise2D.Sample) must not collapse the biome
         // variety down to just the coarsest bands.
         HashSet<Biome> seen = [];
-        for (var i = 0; i < 20 && seen.Count < 10; i++)
+        for (var i = 0; i < 50 && seen.Count < 10; i++)
         {
-            var map = MapGenerator.Generate($"stride-variety-{i}", -128, -128, 256, 256, step: 16);
+            var map = MapGenerator.Generate($"stride-variety-{i}", -256, -256, 512, 512, step: 16);
             foreach (var cell in map.Cells) seen.Add(cell.Biome);
         }
 

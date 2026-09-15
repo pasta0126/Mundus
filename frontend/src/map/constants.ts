@@ -35,7 +35,6 @@ export const ZOOM_LEVELS: readonly ZoomLevel[] = [
   { cellPx: 1, step: 2 },
   { cellPx: 1, step: 4 },
   { cellPx: 1, step: 8 },
-  { cellPx: 1, step: 16 },
 ] as const
 
 /**
