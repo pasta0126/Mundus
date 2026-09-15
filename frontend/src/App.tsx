@@ -15,6 +15,7 @@ type ViewState =
   | { kind: "result"; map: MapDto }
 
 const REVIEW_STEP_INDEX = WIZARD_STEPS.indexOf("review")
+const SEED_STEP_INDEX = WIZARD_STEPS.indexOf("seed")
 
 function randomSeed(): string {
   return Math.random().toString(36).slice(2, 10)
@@ -51,6 +52,11 @@ function App() {
 
   function backToWizard() {
     setStepIndex(REVIEW_STEP_INDEX)
+    setView({ kind: "wizard" })
+  }
+
+  function generateAnother() {
+    setStepIndex(SEED_STEP_INDEX)
     setView({ kind: "wizard" })
   }
 
@@ -113,8 +119,8 @@ function App() {
             className="flex w-full flex-col items-center gap-3"
           >
             <MapCanvas map={view.map} />
-            <Button variant="outline" onClick={backToWizard}>
-              Back to wizard
+            <Button variant="outline" onClick={generateAnother}>
+              Generate another
             </Button>
           </motion.div>
         )}

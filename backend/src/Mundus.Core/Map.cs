@@ -31,7 +31,19 @@ public static class MapGenerator
     public const int CurrentSpecVersion = 1;
 
     private const double OceanThreshold = 0.3;
-    private const double MountainThreshold = 0.85;
+
+    /// <summary>
+    /// Biome is decided by sampling elevation at a single point (a
+    /// region's Voronoi seed point), not a region maximum - and
+    /// bilinear-interpolated lattice noise rarely gets close to its
+    /// theoretical 1.0 ceiling (that needs all four surrounding lattice
+    /// corners to independently roll high). Empirically, well under 1%
+    /// of cells exceed ~0.85, making Mountains practically unreachable
+    /// at that threshold; 0.65 keeps it a genuinely elevated, not
+    /// universal, biome while actually showing up in generated maps.
+    /// </summary>
+    private const double MountainThreshold = 0.65;
+
     private const int MaxRetries = 25;
 
     /// <summary>

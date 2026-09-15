@@ -2,16 +2,18 @@ import type { components } from "@/api/schema"
 
 type Biome = components["schemas"]["Biome"]
 
-// Fixed, recognizable colors per biome - not a generic categorical
-// palette. Players expect blue ocean, green forest, tan desert, etc.
+// Warm, parchment-map-like tones (muted, not saturated) - see this
+// change's design.md. Players expect blue ocean, green forest, tan
+// desert, etc., but toned down to read as an illustrated map rather
+// than a data grid.
 export const BIOME_COLORS: Record<Biome, [number, number, number]> = {
-  Ocean: [30, 95, 140],
-  Forest: [47, 107, 58],
-  Desert: [217, 180, 106],
-  Tundra: [201, 214, 214],
-  Grassland: [139, 176, 74],
-  Swamp: [77, 91, 58],
-  Mountains: [122, 118, 113],
+  Ocean: [58, 96, 110],
+  Forest: [79, 102, 63],
+  Desert: [200, 173, 116],
+  Tundra: [188, 190, 163],
+  Grassland: [163, 168, 106],
+  Swamp: [91, 90, 58],
+  Mountains: [138, 122, 99],
 }
 
 /** Elevation-shaded RGB CSS color for a biome, e.g. "rgb(90 143 175)". */
