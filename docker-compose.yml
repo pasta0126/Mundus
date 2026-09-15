@@ -1,0 +1,33 @@
+name: mundus
+
+services:
+  mundus-web:
+    build: ./frontend
+    image: mundus-web:latest
+    container_name: mundus-web
+    restart: unless-stopped
+    depends_on:
+      - mundus-api
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mundus-web.rule=Host(`mundus.northernarchive.com`)"
+      - "traefik.http.routers.mundus-web.entrypoints=websecure"
+      - "traefik.http.routers.mundus-web.tls.certresolver=le"
+      - "traefik.http.services.mundus-web.loadbalancer.server.port=80"
+
+  mundus-api:
+    build: ./backend
+    image: mundus-api:latest
+    container_name: mundus-api
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - proxy
+    # No Traefik labels: reached only via mundus-web's nginx /api/ proxy,
+    # never routed directly from the internet.
+
+networks:
+  proxy:
+    external: true
