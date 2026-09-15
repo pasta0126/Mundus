@@ -52,8 +52,23 @@ public sealed class InfiniteValueNoise2D
         _persistence = persistence;
     }
 
-    /// <summary>Sample the noise field at integer cell coordinates. Result is in [0, 1).</summary>
-    public double Sample(int x, int y)
+    /// <summary>
+    /// Sample the noise field at integer cell coordinates. Result is in
+    /// [0, 1).
+    /// </summary>
+    /// <param name="minRegionScale">
+    /// Skip any octave whose region scale is smaller than this (default 1
+    /// = include every octave). Set this to the caller's sampling stride
+    /// (see <see cref="Map.MapGenerator"/>'s `step`) to avoid aliasing: an
+    /// octave whose features are smaller than the gap between sampled
+    /// points doesn't get smoothly captured - each sample lands at an
+    /// effectively uncorrelated point of that octave, which reads as
+    /// speckled noise instead of the smooth zoomed-out shape the coarser
+    /// octaves already establish. Skipping those octaves (and
+    /// renormalizing by only the amplitudes actually included) keeps a
+    /// wide-stride sample smooth.
+    /// </param>
+    public double Sample(int x, int y, int minRegionScale = 1)
     {
         var total = 0.0;
         var amplitude = 1.0;
@@ -61,8 +76,15 @@ public sealed class InfiniteValueNoise2D
         var scale = _regionScale;
         for (var octave = 0; octave < _octaves; octave++)
         {
-            total += amplitude * SampleOctave(x, y, scale, octave);
-            maxAmplitude += amplitude;
+            // The base octave (0) always counts, even past minRegionScale,
+            // so an extreme stride still gets a shape instead of NaN from
+            // an empty sum.
+            if (scale >= minRegionScale || octave == 0)
+            {
+                total += amplitude * SampleOctave(x, y, scale, octave);
+                maxAmplitude += amplitude;
+            }
+
             amplitude *= _persistence;
             scale = Math.Max(1, scale / 2);
         }
@@ -82,7 +104,8 @@ public sealed class InfiniteValueNoise2D
     /// technique) instead of one smooth threshold band. Result is in
     /// `[0, 1]`.
     /// </summary>
-    public double SampleRidged(int x, int y)
+    /// <param name="minRegionScale">Same aliasing guard as <see cref="Sample"/> - skip octaves finer than the caller's sampling stride.</param>
+    public double SampleRidged(int x, int y, int minRegionScale = 1)
     {
         var total = 0.0;
         var amplitude = 1.0;
@@ -90,11 +113,15 @@ public sealed class InfiniteValueNoise2D
         var scale = _regionScale;
         for (var octave = 0; octave < _octaves; octave++)
         {
-            var raw = SampleOctave(x, y, scale, octave);
-            var ridged = 1 - Math.Abs((2 * raw) - 1);
-            ridged *= ridged;
-            total += amplitude * ridged;
-            maxAmplitude += amplitude;
+            if (scale >= minRegionScale || octave == 0)
+            {
+                var raw = SampleOctave(x, y, scale, octave);
+                var ridged = 1 - Math.Abs((2 * raw) - 1);
+                ridged *= ridged;
+                total += amplitude * ridged;
+                maxAmplitude += amplitude;
+            }
+
             amplitude *= _persistence;
             scale = Math.Max(1, scale / 2);
         }

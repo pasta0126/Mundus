@@ -7,7 +7,7 @@ import mundusIcon from "@/assets/mundus-icon-header.png"
 import { BiomeLegend } from "@/map/BiomeLegend"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS_PX } from "@/map/constants"
+import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS } from "@/map/constants"
 import { MapCanvas } from "@/map/MapCanvas"
 import { MapParamsPanel } from "@/map/MapParamsPanel"
 import { computeChunkGrid, runWithConcurrency } from "@/map/tiling"
@@ -22,6 +22,7 @@ interface ViewWindow {
   width: number
   height: number
   cellPx: number
+  step: number
   generation: number
 }
 
@@ -36,8 +37,8 @@ function windowSizeForViewport(cellPx: number) {
   return { width, height }
 }
 
-/** Default zoom step: start fully zoomed out (the last, smallest cellPx step) so the whole world is visible, then zoom in from there. */
-const DEFAULT_ZOOM_INDEX = ZOOM_LEVELS_PX.length - 1
+/** Default zoom step: start fully zoomed out (the last, widest-stride step) so the whole world is visible, then zoom in from there. */
+const DEFAULT_ZOOM_INDEX = ZOOM_LEVELS.length - 1
 
 function App() {
   const [phase, setPhase] = useState<Phase>("result")
@@ -56,10 +57,10 @@ function App() {
   // where a state value could be stale.
   const hasViewRef = useRef(false)
 
-  async function fetchTiled(nextSeed: string, x: number, y: number, px: number) {
+  async function fetchTiled(nextSeed: string, x: number, y: number, px: number, step: number) {
     const generation = ++generationRef.current
     const { width, height } = windowSizeForViewport(px)
-    const chunkSpecs = computeChunkGrid(x, y, width, height, CHUNK_SIZE)
+    const chunkSpecs = computeChunkGrid(x, y, width, height, CHUNK_SIZE, step)
 
     setLoading(true)
     setProgress({ loaded: 0, total: chunkSpecs.length })
@@ -69,7 +70,7 @@ function App() {
 
     await runWithConcurrency(chunkSpecs, CHUNK_CONCURRENCY, async (spec) => {
       const { data, error } = await api.GET("/api/Maps", {
-        params: { query: { seed: nextSeed, x: spec.x, y: spec.y, width: spec.width, height: spec.height } },
+        params: { query: { seed: nextSeed, x: spec.x, y: spec.y, width: spec.width, height: spec.height, step: spec.step } },
       })
       if (generationRef.current !== generation) return // a newer fetch superseded this one - drop it
 
@@ -82,7 +83,7 @@ function App() {
         switchedOver = true
         hasViewRef.current = true
         setChunks([data])
-        setViewWindow({ seed: nextSeed, originX: x, originY: y, width, height, cellPx: px, generation })
+        setViewWindow({ seed: nextSeed, originX: x, originY: y, width, height, cellPx: px, step, generation })
         setPhase("result")
       } else {
         setChunks((prev) => [...prev, data])
@@ -106,13 +107,15 @@ function App() {
   // No user input is collected: the first map generates itself, for a
   // fresh random seed centered on (0, 0), the moment the page loads.
   useEffect(() => {
-    void fetchTiled(randomSeed(), 0, 0, ZOOM_LEVELS_PX[DEFAULT_ZOOM_INDEX])
+    const { cellPx, step } = ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]
+    void fetchTiled(randomSeed(), 0, 0, cellPx, step)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function regenerate() {
     setZoomIndex(DEFAULT_ZOOM_INDEX)
-    void fetchTiled(randomSeed(), 0, 0, ZOOM_LEVELS_PX[DEFAULT_ZOOM_INDEX])
+    const { cellPx, step } = ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]
+    void fetchTiled(randomSeed(), 0, 0, cellPx, step)
   }
 
   /** Generates a fresh view from a user-chosen seed instead of a random one - same reset-to-origin/default-zoom behavior as Regenerate. */
@@ -120,36 +123,58 @@ function App() {
     const trimmed = seed.trim()
     if (!trimmed) return
     setZoomIndex(DEFAULT_ZOOM_INDEX)
-    void fetchTiled(trimmed, 0, 0, ZOOM_LEVELS_PX[DEFAULT_ZOOM_INDEX])
+    const { cellPx, step } = ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]
+    void fetchTiled(trimmed, 0, 0, cellPx, step)
   }
 
   function pan(dx: number, dy: number) {
     if (!viewWindow) return
-    const stepX = Math.max(1, Math.round(viewWindow.width / 2))
-    const stepY = Math.max(1, Math.round(viewWindow.height / 2))
-    void fetchTiled(viewWindow.seed, viewWindow.originX + dx * stepX, viewWindow.originY + dy * stepY, viewWindow.cellPx)
+    // Half the current window, in *world* units - the window's width/
+    // height are sample counts, so this must scale by `step` too, or
+    // panning at a wide-stride zoom level would barely move at all.
+    const stepX = Math.max(1, Math.round(viewWindow.width / 2)) * viewWindow.step
+    const stepY = Math.max(1, Math.round(viewWindow.height / 2)) * viewWindow.step
+    void fetchTiled(
+      viewWindow.seed,
+      viewWindow.originX + dx * stepX,
+      viewWindow.originY + dy * stepY,
+      viewWindow.cellPx,
+      viewWindow.step,
+    )
   }
 
   /** Jumps straight to a given world coordinate, re-centering the current zoom level's full window on it - a full recalculation of the visible map, not a pan. */
   function goToPosition(x: number, y: number) {
     if (!viewWindow) return
     const { width, height } = windowSizeForViewport(viewWindow.cellPx)
-    void fetchTiled(viewWindow.seed, x - Math.floor(width / 2), y - Math.floor(height / 2), viewWindow.cellPx)
+    void fetchTiled(
+      viewWindow.seed,
+      x - Math.floor(width / 2) * viewWindow.step,
+      y - Math.floor(height / 2) * viewWindow.step,
+      viewWindow.cellPx,
+      viewWindow.step,
+    )
   }
 
   function zoom(direction: 1 | -1) {
-    const nextIndex = Math.min(ZOOM_LEVELS_PX.length - 1, Math.max(0, zoomIndex + direction))
+    const nextIndex = Math.min(ZOOM_LEVELS.length - 1, Math.max(0, zoomIndex + direction))
     if (nextIndex === zoomIndex) return
     setZoomIndex(nextIndex)
     if (!viewWindow) return
 
     // Re-center on the same point the current window is centered on, at
-    // the new cell size's window dimensions - a zoom, not a pan.
-    const nextPx = ZOOM_LEVELS_PX[nextIndex]
-    const centerX = viewWindow.originX + Math.floor(viewWindow.width / 2)
-    const centerY = viewWindow.originY + Math.floor(viewWindow.height / 2)
+    // the new cell size/step's window dimensions - a zoom, not a pan.
+    const { cellPx: nextPx, step: nextStep } = ZOOM_LEVELS[nextIndex]
+    const centerX = viewWindow.originX + Math.floor(viewWindow.width / 2) * viewWindow.step
+    const centerY = viewWindow.originY + Math.floor(viewWindow.height / 2) * viewWindow.step
     const { width, height } = windowSizeForViewport(nextPx)
-    void fetchTiled(viewWindow.seed, centerX - Math.floor(width / 2), centerY - Math.floor(height / 2), nextPx)
+    void fetchTiled(
+      viewWindow.seed,
+      centerX - Math.floor(width / 2) * nextStep,
+      centerY - Math.floor(height / 2) * nextStep,
+      nextPx,
+      nextStep,
+    )
   }
 
   // Re-fetch the same origin at the new viewport-derived window size on
@@ -167,7 +192,7 @@ function App() {
       timeout = setTimeout(() => {
         const current = viewWindowRef.current
         if (!current) return
-        void fetchTiled(current.seed, current.originX, current.originY, current.cellPx)
+        void fetchTiled(current.seed, current.originX, current.originY, current.cellPx, current.step)
       }, 200)
     }
     window.addEventListener("resize", onResize)
@@ -209,6 +234,7 @@ function App() {
           width={viewWindow.width}
           height={viewWindow.height}
           cellPx={viewWindow.cellPx}
+          step={viewWindow.step}
           generation={viewWindow.generation}
           onCanvasReady={setCanvasEl}
         />
@@ -321,7 +347,7 @@ function App() {
                 variant="outline"
                 size="icon"
                 onClick={() => zoom(1)}
-                disabled={zoomIndex === ZOOM_LEVELS_PX.length - 1}
+                disabled={zoomIndex === ZOOM_LEVELS.length - 1}
                 aria-label="Zoom out"
               >
                 <ZoomOut />

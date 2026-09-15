@@ -29,10 +29,16 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 10;
+    public const int CurrentSpecVersion = 11;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 512;
+
+    /// <summary>
+    /// Largest allowed sampling stride (see `step` on <see cref="Generate"/>)
+    /// - far more than any real zoom-out step needs, just a safety bound.
+    /// </summary>
+    public const int MaxStep = 256;
 
     /// <summary>
     /// Elevation's base region scale (cells per lattice unit at its
@@ -115,7 +121,18 @@ public static class MapGenerator
         ("Wet", double.PositiveInfinity),
     ];
 
-    public static Map Generate(string seed, int originX, int originY, int width, int height)
+    /// <param name="step">
+    /// World-coordinate spacing between sampled cells (default 1 = every
+    /// cell). A returned cell at index `(i, j)` within the window carries
+    /// the biome for world coordinate `(originX + i*step, originY +
+    /// j*step)` - i.e. `step > 1` sparsely samples a much larger world
+    /// area using the same number of cells/requests, for zoom levels
+    /// beyond the finest 1-world-cell-per-screen-pixel step (see
+    /// design.md "Sampling stride for zoom levels past 1px/cell"). Same
+    /// O(1)-per-cell cost as `step=1`; only which world coordinates get
+    /// sampled changes.
+    /// </param>
+    public static Map Generate(string seed, int originX, int originY, int width, int height, int step = 1)
     {
         if (width < 1 || width > MaxWindowDimension)
         {
@@ -127,17 +144,30 @@ public static class MapGenerator
             throw new ArgumentOutOfRangeException(nameof(height), $"height must be between 1 and {MaxWindowDimension}");
         }
 
+        if (step < 1 || step > MaxStep)
+        {
+            throw new ArgumentOutOfRangeException(nameof(step), $"step must be between 1 and {MaxStep}");
+        }
+
         var elevationNoise = ElevationNoise(seed);
         var moistureNoise = MoistureNoise(seed);
         var ridgeNoise = RidgeNoise(seed);
         var cells = new List<Cell>(width * height);
-        for (var y = originY; y < originY + height; y++)
+        for (var j = 0; j < height; j++)
         {
-            for (var x = originX; x < originX + width; x++)
+            var y = originY + (j * step);
+            for (var i = 0; i < width; i++)
             {
-                var elevation = elevationNoise.Sample(x, y);
-                var moisture = moistureNoise.Sample(x, y);
-                var ridge = ridgeNoise.SampleRidged(x, y);
+                var x = originX + (i * step);
+                // minRegionScale: step keeps each field from folding in
+                // octaves finer than the gap between sampled points - see
+                // InfiniteValueNoise2D.Sample's docs. Avoids the wide
+                // strides used for far zoom-out levels reading as speckled
+                // noise instead of the same smooth continents/mountains
+                // visible at step=1.
+                var elevation = elevationNoise.Sample(x, y, step);
+                var moisture = moistureNoise.Sample(x, y, step);
+                var ridge = ridgeNoise.SampleRidged(x, y, step);
                 cells.Add(new Cell { X = x, Y = y, Biome = BiomeAt(elevation, moisture, ridge) });
             }
         }

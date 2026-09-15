@@ -19,7 +19,8 @@ public sealed class MapsController : ControllerBase
         [FromQuery] int? x,
         [FromQuery] int? y,
         [FromQuery] int? width,
-        [FromQuery] int? height)
+        [FromQuery] int? height,
+        [FromQuery] int? step)
     {
         if (string.IsNullOrWhiteSpace(seed))
         {
@@ -41,6 +42,12 @@ public sealed class MapsController : ControllerBase
             return BadRequest($"height must be between 1 and {MapGenerator.MaxWindowDimension}");
         }
 
-        return Ok(MapGenerator.Generate(seed, x.Value, y.Value, width.Value, height.Value));
+        var effectiveStep = step ?? 1;
+        if (effectiveStep < 1 || effectiveStep > MapGenerator.MaxStep)
+        {
+            return BadRequest($"step must be between 1 and {MapGenerator.MaxStep}");
+        }
+
+        return Ok(MapGenerator.Generate(seed, x.Value, y.Value, width.Value, height.Value, effectiveStep));
     }
 }

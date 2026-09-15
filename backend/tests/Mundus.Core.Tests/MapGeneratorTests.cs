@@ -196,4 +196,87 @@ public class MapGeneratorTests
         // a 200x200 window.
         Assert.True(visited.Count > 1000, $"connected Ocean region was only {visited.Count} cells");
     }
+
+    [Fact]
+    public void SameSeedWindowAndStepProduceIdenticalMaps()
+    {
+        var a = MapGenerator.Generate("stride-determinism", 0, 0, 16, 16, step: 4);
+        var b = MapGenerator.Generate("stride-determinism", 0, 0, 16, 16, step: 4);
+        Assert.Equal(a.Cells, b.Cells);
+    }
+
+    [Fact]
+    public void StepSpacesReturnedCellsByWorldCoordinate()
+    {
+        const int originX = 100;
+        const int originY = -40;
+        const int step = 8;
+        var map = MapGenerator.Generate("stride-shape", originX, originY, 5, 3, step);
+
+        var coords = map.Cells.Select(c => (c.X, c.Y)).ToHashSet();
+        for (var i = 0; i < 5; i++)
+        {
+            for (var j = 0; j < 3; j++)
+            {
+                Assert.Contains((originX + (i * step), originY + (j * step)), coords);
+            }
+        }
+    }
+
+    [Fact]
+    public void StepOneMatchesDefaultBehavior()
+    {
+        var withDefault = MapGenerator.Generate("stride-default", 5, -5, 10, 10);
+        var withExplicitStepOne = MapGenerator.Generate("stride-default", 5, -5, 10, 10, step: 1);
+        Assert.Equal(withDefault.Cells, withExplicitStepOne.Cells);
+    }
+
+    [Fact]
+    public void OverlappingSteppedWindowsAgreeOnSharedWorldCoordinates()
+    {
+        // Two windows at the same step, offset so their sampled world
+        // coordinates partially coincide, must agree at every coordinate
+        // they share - the same location-independence guarantee as
+        // step=1, just over a sparser grid of world coordinates.
+        const int step = 4;
+        var a = MapGenerator.Generate("stride-overlap", 0, 0, 10, 10, step);
+        var b = MapGenerator.Generate("stride-overlap", 20, 20, 10, 10, step);
+
+        var aByCoord = a.Cells.ToDictionary(c => (c.X, c.Y), c => c.Biome);
+        var sharedCount = 0;
+        foreach (var cell in b.Cells)
+        {
+            if (aByCoord.TryGetValue((cell.X, cell.Y), out var biome))
+            {
+                Assert.Equal(biome, cell.Biome);
+                sharedCount++;
+            }
+        }
+
+        Assert.True(sharedCount > 0, "expected the two windows to share at least one sampled coordinate");
+    }
+
+    [Fact]
+    public void HigherStepStillProducesEveryDocumentedBiome()
+    {
+        // Filtering out fine octaves at high strides (to avoid aliasing -
+        // see InfiniteValueNoise2D.Sample) must not collapse the biome
+        // variety down to just the coarsest bands.
+        HashSet<Biome> seen = [];
+        for (var i = 0; i < 20 && seen.Count < 10; i++)
+        {
+            var map = MapGenerator.Generate($"stride-variety-{i}", -128, -128, 256, 256, step: 16);
+            foreach (var cell in map.Cells) seen.Add(cell.Biome);
+        }
+
+        Assert.Equal(10, seen.Count);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(257)]
+    public void OutOfRangeStepIsRejected(int step)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => MapGenerator.Generate("bad-step", 0, 0, 4, 4, step));
+    }
 }

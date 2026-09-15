@@ -52,6 +52,7 @@ export interface paths {
                     y?: number | string;
                     width?: number | string;
                     height?: number | string;
+                    step?: number | string;
                 };
                 header?: never;
                 path?: never;
