@@ -131,11 +131,36 @@ seed, originX, originY, width, height, cells: [{ x, y, biome }] }`
 window-relative, so the client never has to add an offset to reason
 about a cell's identity.
 
+### No wizard: generate automatically on load
+The seed/start-position wizard (three steps: Seed, Start Position,
+Review) is removed entirely. On mount, the app fires one window request
+at `(0, 0)` with a freshly generated random seed - no user input is
+collected first. This drops the entire concept of a coordinate the user
+chooses: with pan and zoom both available immediately after that first
+render, typing in a starting `(x, y)` bought little (nobody has explored
+anywhere yet, so any coordinate looks the same) while adding a multi-
+step flow before ever seeing a map. `App.tsx`'s `phase` type drops
+`"wizard"`; `MapCreationWizard.tsx`, its step components, `wizard/
+types.ts`, and `ChoiceGrid.tsx` are deleted outright rather than
+adapted. The `map-creation-wizard` capability keeps its existing spec
+path (renaming it was considered and rejected - the path is an
+implementation identifier, not user-facing, and churning it costs more
+in spec-history continuity than it buys in accuracy).
+
+**Alternatives considered:** keep a minimal one-step wizard (seed only,
+start position always `(0, 0)`) - rejected per the user's explicit ask
+for "solo hay 1 página con un regenerar, la uni y pocomas" (just one
+page with a regenerate, and little else): a single required step the
+user must click through before seeing anything is exactly the
+friction being removed, and Regenerate already covers "I want a
+different seed" for anyone who wants one.
+
 ### Frontend: full-viewport canvas, stepped zoom, pan by half a window
 The map is the page background: canvas width/height are set to the
 browser viewport's size (updated on resize), not a fixed card size.
 Cell size comes from a fixed, small array of steps, `ZOOM_LEVELS_PX =
-[24, 18, 14]` (index `0`, `24px`, is the default/most-zoomed-in level);
+[24, 20, 16, 12, 8]` (index `0`, `24px`, is the default/most-zoomed-in
+level, `8px` the maximum zoom-out);
 the requested window's `width`/`height` (in cells) are computed as
 `ceil(viewportPx / cellPx)` for each axis, clamped to the API's
 documented `1..256` max per axis (only relevant on very large viewports
@@ -150,7 +175,7 @@ the current window (in each axis, at the current zoom level) in the
 chosen direction and re-fetches - large enough to feel like real
 movement, small enough to keep on-screen continuity with the previous
 view (half the grid is cells the user has already seen). Every other UI
-element (wizard, params panel, pan/zoom controls) is positioned as an
+element (params panel, pan/zoom controls) is positioned as an
 absolutely/fixed-positioned overlay on top of the canvas, never in a
 layout flow that shrinks or displaces it.
 

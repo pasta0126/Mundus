@@ -86,20 +86,21 @@
       overlay on top of the full-viewport canvas (fixed/absolute
       positioning), not in a layout flow that shrinks or displaces it.
 
-## 8. Frontend: wizard
+## 8. Frontend: remove the wizard, generate automatically on load
 
-- [x] 8.1 Update `wizard/types.ts`: drop `sizePreset`/`gridType` from
-      `WizardState`, add a start position (`x`, `y`, both optional,
-      defaulting to `0`).
-- [x] 8.2 Replace the `SizePresetStep` with a `StartPositionStep` (two
-      numeric inputs, X and Y, both optional).
-- [x] 8.3 Update `MapCreationWizard.tsx`'s step order to Seed, Start
-      Position, Review, and `ReviewStep.tsx` to display the chosen (or
-      defaulted) start position instead of size.
-- [x] 8.4 Update `App.tsx`'s `generate` call to request the default
-      `32x32` window centered on the chosen start position (or
-      `(0, 0)`), and to build the request query from `seed`, `x`, `y`,
-      `width`, `height`.
+- [x] 8.1 (superseded) `wizard/types.ts` deleted entirely - see 8.x below.
+- [x] 8.2 (superseded) `SizePresetStep`/`StartPositionStep` deleted
+      entirely along with the rest of `src/wizard/` - no step UI remains.
+- [x] 8.3 (superseded) `MapCreationWizard.tsx`/`ReviewStep.tsx` deleted -
+      there are no steps to order or review.
+- [x] 8.4 Delete `src/wizard/` entirely (`MapCreationWizard.tsx`,
+      `ChoiceGrid.tsx`, `types.ts`, `steps/`). Add a mount `useEffect` in
+      `App.tsx` that calls the fetch with a fresh random seed at
+      `(0, 0)`, at the default zoom level, with no user input collected
+      first.
+- [x] 8.5 Drop the "Restart wizard" action; the error screen's "Back to
+      wizard" button becomes "Retry" (re-runs the same auto-generate
+      fetch).
 
 ## 9. Frontend: panning
 
@@ -114,7 +115,7 @@
 
 ## 9a. Frontend: zoom
 
-- [x] 9a.1 Add `ZOOM_LEVELS_PX = [24, 18, 14]` to `map/constants.ts`;
+- [x] 9a.1 Add `ZOOM_LEVELS_PX = [24, 20, 16, 12, 8]` to `map/constants.ts`;
       make `MapCanvas`'s cell size a prop instead of the old fixed
       `CELL_PX` import.
 - [x] 9a.2 Add zoom in/out controls to the result view; zooming
@@ -133,13 +134,12 @@
 
 - [x] 11.1 Run `dotnet build`, `dotnet test`, `npm run build`,
       `npm run lint` and confirm all pass.
-- [ ] 11.2 Manually verify in a browser: generating a map, panning in
-      each of the four directions, requesting the same seed with a
-      start position far from `(0, 0)` and confirming it renders
-      immediately (no dependency on visiting the origin first),
-      Download and Regenerate still work.
-- [ ] 11.3 Manually verify determinism end to end: generate with a
-      fixed seed, note a cell's biome at a specific `(x, y)`, restart
-      the wizard, regenerate with the same seed and a start position
-      that includes that `(x, y)` in its window, and confirm the biome
-      matches.
+- [ ] 11.2 Manually verify in a browser: loading the page generates a
+      map with no user input, panning in each of the four directions,
+      zooming out through all four extra steps and back in, Download and
+      Regenerate still work.
+- [ ] 11.3 Manually verify determinism end to end: via the API, note a
+      cell's biome at a specific `(x, y)` for a fixed seed, request a
+      different window for the same seed that includes that `(x, y)`,
+      and confirm the biome matches (already spot-checked once via curl
+      - see conversation history; redo after this session's changes).

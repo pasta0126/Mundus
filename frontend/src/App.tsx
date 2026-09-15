@@ -8,21 +8,12 @@ import { Progress } from "@/components/ui/progress"
 import { MAX_WINDOW_DIMENSION, ZOOM_LEVELS_PX } from "@/map/constants"
 import { MapCanvas } from "@/map/MapCanvas"
 import { MapParamsPanel } from "@/map/MapParamsPanel"
-import { MapCreationWizard } from "@/wizard/MapCreationWizard"
-import { INITIAL_WIZARD_STATE, type WizardState } from "@/wizard/types"
 
 type MapDto = components["schemas"]["Map"]
-type Phase = "wizard" | "result" | "error"
+type Phase = "result" | "error"
 
 function randomSeed(): string {
   return Math.random().toString(36).slice(2, 10)
-}
-
-function parseCoordinate(raw: string): number {
-  const trimmed = raw.trim()
-  if (trimmed === "") return 0
-  const n = Number.parseInt(trimmed, 10)
-  return Number.isFinite(n) ? n : 0
 }
 
 /** How many cells (per axis) are needed to cover the current viewport at the given cell size, capped at the API's max window dimension. */
@@ -33,9 +24,7 @@ function windowSizeForViewport(cellPx: number) {
 }
 
 function App() {
-  const [wizardState, setWizardState] = useState<WizardState>(INITIAL_WIZARD_STATE)
-  const [stepIndex, setStepIndex] = useState(0)
-  const [phase, setPhase] = useState<Phase>("wizard")
+  const [phase, setPhase] = useState<Phase>("result")
   const [map, setMap] = useState<MapDto | null>(null)
   const [seed, setSeed] = useState("")
   const [zoomIndex, setZoomIndex] = useState(0)
@@ -70,23 +59,16 @@ function App() {
     setPhase("result")
   }
 
-  function handleConfirm() {
-    const nextSeed = wizardState.seed.trim() || randomSeed()
-    void fetchWindow(nextSeed, parseCoordinate(wizardState.x), parseCoordinate(wizardState.y))
-  }
+  // No user input is collected: the first map generates itself, for a
+  // fresh random seed centered on (0, 0), the moment the page loads.
+  useEffect(() => {
+    void fetchWindow(randomSeed(), 0, 0, ZOOM_LEVELS_PX[0])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function regenerate() {
-    void fetchWindow(randomSeed(), 0, 0)
-  }
-
-  function restartWizard() {
-    setWizardState(INITIAL_WIZARD_STATE)
-    setStepIndex(0)
-    setPhase("wizard")
-  }
-
-  function backToWizardAfterError() {
-    setPhase("wizard")
+    setZoomIndex(0)
+    void fetchWindow(randomSeed(), 0, 0, ZOOM_LEVELS_PX[0])
   }
 
   function pan(dx: number, dy: number) {
@@ -159,27 +141,6 @@ function App() {
       {map && <MapCanvas map={map} cellPx={cellPx} onCanvasReady={setCanvasEl} />}
 
       <AnimatePresence mode="wait">
-        {phase === "wizard" && (
-          <motion.div
-            key="wizard"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-10 flex items-center justify-center p-6"
-          >
-            <div className="bg-card w-full max-w-md space-y-4 rounded-lg border p-6 shadow-lg">
-              <h1 className="text-center text-2xl font-semibold tracking-tight">Mundus</h1>
-              <MapCreationWizard
-                state={wizardState}
-                onChange={setWizardState}
-                stepIndex={stepIndex}
-                onStepIndexChange={setStepIndex}
-                onConfirm={handleConfirm}
-              />
-            </div>
-          </motion.div>
-        )}
-
         {phase === "error" && (
           <motion.div
             key="error"
@@ -190,8 +151,8 @@ function App() {
           >
             <div className="bg-card flex flex-col items-center gap-3 rounded-lg border p-6 shadow-lg">
               <p className="text-destructive text-sm">{errorMessage}</p>
-              <Button variant="outline" onClick={backToWizardAfterError}>
-                Back to wizard
+              <Button variant="outline" onClick={regenerate}>
+                Retry
               </Button>
             </div>
           </motion.div>
@@ -216,9 +177,6 @@ function App() {
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={regenerate}>
                   Regenerate
-                </Button>
-                <Button variant="outline" size="sm" onClick={restartWizard}>
-                  Restart wizard
                 </Button>
                 <Button variant="outline" size="sm" onClick={downloadMap}>
                   Download

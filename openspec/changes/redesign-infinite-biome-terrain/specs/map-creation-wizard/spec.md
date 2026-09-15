@@ -1,41 +1,24 @@
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: Fixed wizard step order
-The system SHALL present exactly three steps, in this order: Seed, Start
-Position, Review. Each step SHALL let the user choose that step's value
-(Seed MAY be left blank to mean "generate a random seed"; Start Position
-MAY be left at its default of `(0, 0)`). The Review step SHALL display
-every previously chosen value and SHALL be the only step that triggers
-generation.
+**Reason**: There is no longer a wizard - see "Automatic generation on
+load" below. A seed and a `(0, 0)` start position are no longer
+user-chosen inputs collected across steps; they're generated/fixed
+automatically the moment the page loads.
+**Migration**: None - the app has exactly one screen now.
 
-#### Scenario: Steps appear in order
-- **WHEN** the wizard starts
-- **THEN** the first step shown is Seed, and advancing moves through
-  Start Position and Review in that order, with no other step reachable
-  in between
-
-#### Scenario: Only Review triggers generation
-- **WHEN** the user is on any step before Review
-- **THEN** no terrain generation request has been made yet
+### Requirement: Back-and-forth navigation preserves selections
+**Reason**: No wizard steps exist to navigate between - see "Fixed
+wizard step order" above.
+**Migration**: None.
 
 ### Requirement: Map generation on confirmation
-The system SHALL request an initial window from the `map-generation` HTTP
-API centered on the chosen start position, using the seed collected
-across the wizard's steps (generating a random seed first if the Seed
-step was left blank), triggered only when the user confirms on the
-Review step.
+**Reason**: Replaced by automatic generation on page load - see
+"Automatic generation on load" below. There is no longer a Review step
+or a confirm action that triggers the first request.
+**Migration**: None - the first window request now fires automatically.
 
-#### Scenario: Confirming generates a map with the collected parameters
-- **WHEN** the user confirms on the Review step after optionally
-  choosing a seed and a start position
-- **THEN** exactly one request is made to the map-generation API for a
-  window centered on that start position, using that seed, and the
-  rendered result reflects the response
-
-#### Scenario: A failed generation request is shown, not silently dropped
-- **WHEN** the map-generation request fails
-- **THEN** the user is shown that generation failed and can return to the
-  wizard without losing their prior selections
+## MODIFIED Requirements
 
 ### Requirement: Canvas rendering of the generated map
 The system SHALL render every cell of the current window on an HTML
@@ -44,7 +27,7 @@ determined solely by its biome - no shading, texture, or decorative
 border. Cells of the same biome SHALL use the same color; cells of
 different biomes SHALL be visually distinguishable from one another.
 The canvas SHALL fill the full browser viewport as the page's
-background layer; every other UI element (wizard, params panel, pan
+background layer; every other UI element (params panel, pan/zoom
 controls) SHALL render above it as an overlay, never pushing it into a
 bounded card or leaving empty page background beside it.
 
@@ -63,7 +46,7 @@ bounded card or leaving empty page background beside it.
   with no visible page background outside it
 
 #### Scenario: UI overlays the map instead of displacing it
-- **WHEN** the wizard, params panel, or pan controls are shown
+- **WHEN** the params panel or pan/zoom controls are shown
 - **THEN** they render on top of the full-viewport canvas rather than
   in a separate layout region that shrinks or pushes it aside
 
@@ -88,23 +71,20 @@ bounded card or leaving empty page background beside it.
 - **THEN** no decorative border or frame is drawn around the grid
 
 ### Requirement: Post-generation actions
-After a window is rendered, the system SHALL offer exactly three
-actions: Regenerate (generate a new window immediately, with a new
-random seed, viewing the same window dimensions centered back on
-`(0, 0)`, without returning to any wizard step), Restart wizard (clear
-every prior selection and return to the Seed step), and Download (save
+After a window is rendered, the system SHALL offer exactly two actions:
+Regenerate (generate a new window immediately, with a new random seed,
+centered back on `(0, 0)` at the default zoom level) and Download (save
 the currently rendered window as a PNG image file).
 
 #### Scenario: Regenerate produces a new map without leaving the result view
 - **WHEN** a user, after viewing a generated window, chooses "Regenerate"
-- **THEN** a new window is generated with a new random seed, and the
-  result view updates to show it without showing any wizard step
+- **THEN** a new window is generated with a new random seed, centered on
+  `(0, 0)` at the default zoom level, and the view updates to show it
 
 #### Scenario: Restart wizard clears all selections
-- **WHEN** a user, after viewing a generated window, chooses "Restart
-  wizard"
-- **THEN** the Seed step is shown and every step's value (seed, start
-  position) is back to its unselected default
+- **WHEN** a user looks for a "Restart wizard" action
+- **THEN** none exists - there is no wizard to restart; "Regenerate" is
+  the only way to get a different seed
 
 #### Scenario: Download saves the rendered map as an image
 - **WHEN** a user, after viewing a generated window, chooses "Download"
@@ -113,13 +93,14 @@ the currently rendered window as a PNG image file).
 
 ### Requirement: Progress and status feedback
 The system SHALL show visible progress and status feedback for every
-asynchronous action (fetching a window, panning, downloading), so the
-user is never left without an indication of what is currently happening.
-Feedback SHALL include both a progress indicator and a descriptive
-status message.
+asynchronous action (the automatic initial load, panning, zooming,
+regenerating, downloading), so the user is never left without an
+indication of what is currently happening. Feedback SHALL include both
+a progress indicator and a descriptive status message.
 
 #### Scenario: Generating shows progress and a status message
-- **WHEN** a window request (initial generation or a pan) is in flight
+- **WHEN** a window request (initial load, a pan, a zoom, or a
+  regenerate) is in flight
 - **THEN** a progress indicator is visible along with a message
   describing that the map is loading
 
@@ -135,6 +116,23 @@ status message.
   just a silent lack of progress
 
 ## ADDED Requirements
+
+### Requirement: Automatic generation on load
+On page load, the system SHALL immediately request an initial window
+from the `map-generation` API centered on `(0, 0)`, using a randomly
+generated seed, without requiring any user input. No seed, position, or
+other parameter is collected from the user beforehand.
+
+#### Scenario: Loading the page generates a map without user input
+- **WHEN** the page loads
+- **THEN** exactly one request is made to the map-generation API for a
+  window centered on `(0, 0)`, using a freshly generated random seed,
+  and the rendered result reflects the response once it arrives
+
+#### Scenario: A failed initial generation is shown, not silently dropped
+- **WHEN** the automatic initial map-generation request fails
+- **THEN** the user is shown that generation failed, with a way to
+  retry
 
 ### Requirement: Panning the viewport
 After a window is rendered, the system SHALL let the user shift the
@@ -156,7 +154,7 @@ and updating the canvas to show the newly returned cells once loaded.
 
 ### Requirement: Zooming out a limited amount
 After a window is rendered, the system SHALL let the user zoom out
-through a small, fixed number of steps (at most two steps beyond the
+through a small, fixed number of steps (at most four steps beyond the
 default) by shrinking the on-screen cell size, requesting a new,
 larger-in-cells window centered on the same point using the same seed.
 The system SHALL let the user zoom back in through the same steps, up

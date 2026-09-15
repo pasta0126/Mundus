@@ -34,10 +34,12 @@ seed always reproduces the same content, byte-for-byte, forever.
   `Elevation` is dropped from the cell shape - not needed by the new
   biome-assignment model, which does not distinguish it from the biome
   it determines.
-- **BREAKING**: `map-creation-wizard`'s flow changes: `Grid Type` and
-  `Size Preset` steps are removed (the wizard already dropped `Grid Type`
-  in a prior change), replaced with a single starting-position choice
-  (default: origin), since there is no longer a "whole map" to size.
+- **BREAKING**: the wizard is removed entirely. There is exactly one
+  screen: on load, the app generates a window at `(0, 0)` with a fresh
+  random seed automatically - no seed, position, or size is ever
+  collected from the user. Post-generation actions shrink to
+  Regenerate and Download (no "Restart wizard", since there's no wizard
+  to restart).
 - Rendering keeps today's minimalist style: each cell is a flat, soft
   pastel fill by biome, no shading/texture/decorative border. Pixel-art
   tile images per biome are explicitly out of scope for this change -
@@ -59,11 +61,13 @@ seed always reproduces the same content, byte-for-byte, forever.
 - `map-generation`: replace bounded grain-scatter land/ocean generation
   with unbounded per-cell deterministic biome-noise generation, a richer
   biome set, and a windowed query API. See "What Changes" above.
-- `map-creation-wizard`: replace the Size Preset step with a starting
-  position, and update the canvas rendering requirements to match the
-  flat pastel-fill style already shipped (the existing spec still
-  describes hillshading/wave-texture/decorative-border rendering that no
-  longer exists in the app).
+- `map-creation-wizard`: remove the wizard entirely in favor of
+  automatic generation on load, and update the canvas rendering
+  requirements to match the flat pastel-fill style already shipped (the
+  existing spec still described hillshading/wave-texture/decorative-
+  border rendering that no longer exists in the app). The capability
+  keeps its existing spec path/name despite no longer being a "wizard"
+  - see design.md.
 - `world-generation`: remove entirely (dead capability, superseded by
   `map-generation`'s per-cell deterministic model - see "What Changes").
 
@@ -82,9 +86,10 @@ seed always reproduces the same content, byte-for-byte, forever.
   document; `MapCanvas.tsx` and `contour.ts` (marching-squares coastline
   extraction) are replaced by a simpler flat-cell-fill renderer since
   there is no longer a single binary land/ocean boundary to trace; the
-  wizard (`MapCreationWizard.tsx`, its steps, `types.ts`) drops the size
-  step; `MapParamsPanel.tsx` shows the seed and viewed window instead of
-  seed and size preset.
+  entire wizard (`MapCreationWizard.tsx`, its steps, `wizard/types.ts`,
+  `ChoiceGrid.tsx`) is deleted, replaced by an effect that fires the
+  first window request on mount; `MapParamsPanel.tsx` shows the seed and
+  viewed window instead of seed and size preset.
 - **OpenSpec**: `specs/map-generation/spec.md` and
   `specs/map-creation-wizard/spec.md` are rewritten via delta specs;
   `specs/world-generation/spec.md` is removed.
