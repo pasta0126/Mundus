@@ -113,6 +113,14 @@ function App() {
     void fetchTiled(randomSeed(), 0, 0, ZOOM_LEVELS_PX[DEFAULT_ZOOM_INDEX])
   }
 
+  /** Generates a fresh view from a user-chosen seed instead of a random one - same reset-to-origin/default-zoom behavior as Regenerate. */
+  function generateFromSeed(seed: string) {
+    const trimmed = seed.trim()
+    if (!trimmed) return
+    setZoomIndex(DEFAULT_ZOOM_INDEX)
+    void fetchTiled(trimmed, 0, 0, ZOOM_LEVELS_PX[DEFAULT_ZOOM_INDEX])
+  }
+
   function pan(dx: number, dy: number) {
     if (!viewWindow) return
     const stepX = Math.max(1, Math.round(viewWindow.width / 2))
@@ -243,7 +251,13 @@ function App() {
                 <img src={mundusIcon} alt="" className="size-6" />
                 Mundus
               </h1>
-              <MapParamsPanel seed={viewWindow.seed} originX={viewWindow.originX} originY={viewWindow.originY} onGoTo={goToPosition} />
+              <MapParamsPanel
+                seed={viewWindow.seed}
+                originX={viewWindow.originX}
+                originY={viewWindow.originY}
+                onGoTo={goToPosition}
+                onGenerateSeed={generateFromSeed}
+              />
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={regenerate} className="flex-1">
                   <RefreshCw />
