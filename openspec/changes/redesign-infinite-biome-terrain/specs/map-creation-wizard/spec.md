@@ -94,7 +94,7 @@ control in the UI (pan, zoom, copy seed, go to coordinates).
 - **WHEN** a user, after viewing a generated window, chooses "Download"
 - **THEN** a PNG image file of the currently rendered window is saved to
   the user's device, named with the values needed to reproduce that
-  exact view (seed, origin `x`/`y`, zoom step, window size) plus a
+  exact view (seed, origin `x`/`y`) plus a year-month-day-ordered
   timestamp, rather than a fixed generic filename
 
 ### Requirement: Jumping to a specific coordinate

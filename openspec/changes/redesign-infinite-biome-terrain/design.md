@@ -281,10 +281,12 @@ smoothing becomes visually obvious, which an open-ended continuous zoom
 would risk.
 
 Downloaded PNGs are named
-`mundus-{seed}-x{originX}-y{originY}-zoom{cellPx}px-{width}x{height}-{YYYY-MM-DD_HHmm}.png`
-- every value needed to reproduce the exact view, plus a timestamp so
-repeated downloads of the same view don't silently overwrite one
-another in the browser's downloads folder.
+`mundus-{seed}-x{originX}-y{originY}-{YYYY}年{MM}月{DD}日_{HH}時{mm}分.png`
+- the seed and origin needed to reproduce the exact view (cell size and
+window size are left out as noise, not needed to reproduce it - the
+seed plus origin already fully determine the terrain), plus a
+year-month-day-ordered timestamp so repeated downloads of the same view
+don't silently overwrite one another in the browser's downloads folder.
 
 ### Tiled, progressive window loading
 At low `cellPx`, the window needed to cover a real viewport (e.g.

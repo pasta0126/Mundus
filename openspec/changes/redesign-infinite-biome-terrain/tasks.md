@@ -238,7 +238,7 @@
       step's window on the entered point via the same `fetchTiled` path
       used by zoom, without touching the seed or `cellPx`.
 - [x] 10a.3 Build the downloaded PNG's filename from the current view's
-      seed, origin, `cellPx`, and window size, plus a timestamp, instead
+      seed and origin, plus a year-month-day-ordered timestamp, instead
       of a fixed `mundus-map.png`.
 - [x] 10a.4 Add an icon to every actionable control that didn't already
       have one (Regenerate, Download, Copy seed, Retry, go-to submit),
