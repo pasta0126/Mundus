@@ -112,6 +112,17 @@
       generation (per `map-creation-wizard`'s "Progress and status
       feedback" requirement).
 
+## 9a. Frontend: zoom
+
+- [x] 9a.1 Add `ZOOM_LEVELS_PX = [24, 18, 14]` to `map/constants.ts`;
+      make `MapCanvas`'s cell size a prop instead of the old fixed
+      `CELL_PX` import.
+- [x] 9a.2 Add zoom in/out controls to the result view; zooming
+      recomputes the window size for the new cell size, re-centers on
+      the current view's center point, and re-fetches with the same
+      seed. Disable zoom-in at the default level and zoom-out at the
+      smallest level.
+
 ## 10. Frontend: params panel
 
 - [x] 10.1 Update `MapParamsPanel.tsx` to show the seed and the current

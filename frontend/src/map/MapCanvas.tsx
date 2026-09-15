@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react"
 import type { components } from "@/api/schema"
 import { BIOME_COLORS } from "@/map/biomeColors"
-import { CELL_PX } from "@/map/constants"
 
 type MapDto = components["schemas"]["Map"]
 
 interface MapCanvasProps {
   map: MapDto
+  /** On-screen size of one cell in CSS pixels - see map/constants.ts's ZOOM_LEVELS_PX. */
+  cellPx: number
   onCanvasReady?: (canvas: HTMLCanvasElement) => void
 }
 
@@ -16,7 +17,7 @@ interface MapCanvasProps {
  * shading, texture, or frame. UI elements render above it as an overlay
  * (see App.tsx), never displacing it.
  */
-export function MapCanvas({ map, onCanvasReady }: MapCanvasProps) {
+export function MapCanvas({ map, cellPx, onCanvasReady }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -37,12 +38,12 @@ export function MapCanvas({ map, onCanvasReady }: MapCanvasProps) {
     const originX = Number(map.originX)
     const originY = Number(map.originY)
     for (const cell of map.cells) {
-      const px = (Number(cell.x) - originX) * CELL_PX
-      const py = (Number(cell.y) - originY) * CELL_PX
+      const px = (Number(cell.x) - originX) * cellPx
+      const py = (Number(cell.y) - originY) * cellPx
       ctx.fillStyle = BIOME_COLORS[cell.biome]
-      ctx.fillRect(px, py, CELL_PX + 0.5, CELL_PX + 0.5)
+      ctx.fillRect(px, py, cellPx + 0.5, cellPx + 0.5)
     }
-  }, [map])
+  }, [map, cellPx])
 
   return <canvas ref={canvasRef} className="fixed inset-0 -z-10 h-screen w-screen" />
 }

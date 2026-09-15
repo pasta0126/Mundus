@@ -54,8 +54,9 @@ Current shape, for reference:
   determinism trivial to reason about; a "snow band" that can appear
   anywhere the field is high (not just at world "poles") is an accepted
   v1 simplification.
-- Zoom, variable window size, or a minimap. Pan-only, fixed window and
-  cell size (see Decisions).
+- A minimap, or continuous/scroll-wheel zoom. Zoom is pan-style
+  (discrete steps, re-fetch), not a smooth continuous transform - see
+  Decisions.
 - Pixel-art biome tiles (explicitly deferred in the proposal).
 - Any change to how the seeded `Rng` itself works - it's reused as-is
   for lattice-point hashing.
@@ -130,22 +131,35 @@ seed, originX, originY, width, height, cells: [{ x, y, biome }] }`
 window-relative, so the client never has to add an offset to reason
 about a cell's identity.
 
-### Frontend: full-viewport canvas, fixed cell size, pan by half a window
+### Frontend: full-viewport canvas, stepped zoom, pan by half a window
 The map is the page background: canvas width/height are set to the
 browser viewport's size (updated on resize), not a fixed card size.
-Cell size is a fixed `24px`; the requested window's `width`/`height` (in
-cells) are computed as `ceil(viewportPx / 24)` for each axis, clamped to
-the API's documented `1..256` max per axis (only relevant on very large
-viewports - e.g. an ultra-wide monitor - where the request is capped at
-256 cells wide and the rightmost sliver of the viewport simply isn't
-covered by a cell rather than over-requesting). Panning shifts the
-origin by half the current window (in each axis) in the chosen
-direction and re-fetches - large enough to feel like real movement,
-small enough to keep on-screen continuity with the previous view (half
-the grid is cells the user has already seen). Every other UI element
-(wizard, params panel, pan controls) is positioned as an absolutely/
-fixed-positioned overlay on top of the canvas, never in a layout flow
-that shrinks or displaces it.
+Cell size comes from a fixed, small array of steps, `ZOOM_LEVELS_PX =
+[24, 18, 14]` (index `0`, `24px`, is the default/most-zoomed-in level);
+the requested window's `width`/`height` (in cells) are computed as
+`ceil(viewportPx / cellPx)` for each axis, clamped to the API's
+documented `1..256` max per axis (only relevant on very large viewports
+- e.g. an ultra-wide monitor - where the request is capped at 256 cells
+wide and the rightmost sliver of the viewport simply isn't covered by a
+cell rather than over-requesting). Zooming steps `cellPx` to the next
+array entry, re-fetching a window centered on the same point (current
+origin + half the current window, in cells) at the new `cellPx` - not a
+CSS/canvas-transform zoom, since the whole point is to reveal more
+*generated* cells, not stretch pixels. Panning shifts the origin by half
+the current window (in each axis, at the current zoom level) in the
+chosen direction and re-fetches - large enough to feel like real
+movement, small enough to keep on-screen continuity with the previous
+view (half the grid is cells the user has already seen). Every other UI
+element (wizard, params panel, pan/zoom controls) is positioned as an
+absolutely/fixed-positioned overlay on top of the canvas, never in a
+layout flow that shrinks or displaces it.
+
+**Alternatives considered:** continuous/scroll-wheel zoom with a CSS
+transform on the canvas between re-fetches - rejected per proposal's
+"not too much" zoom ask: a small, discrete step count keeps the
+region-scale-32 noise field from ever being viewed at a scale where its
+smoothing (or a window's cell-count cap) becomes visually obvious, which
+an open-ended continuous zoom would risk.
 
 `MapCanvas.tsx` becomes a direct per-cell `fillRect` loop (biome ->
 pastel color) with no contour tracer; `contour.ts` is deleted entirely

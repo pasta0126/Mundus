@@ -153,3 +153,31 @@ and updating the canvas to show the newly returned cells once loaded.
 - **WHEN** a user pans
 - **THEN** the seed used for the new window request is unchanged from
   the one used to generate the current window
+
+### Requirement: Zooming out a limited amount
+After a window is rendered, the system SHALL let the user zoom out
+through a small, fixed number of steps (at most two steps beyond the
+default) by shrinking the on-screen cell size, requesting a new,
+larger-in-cells window centered on the same point using the same seed.
+The system SHALL let the user zoom back in through the same steps, up
+to the default cell size, and SHALL NOT allow zooming in past the
+default or out past the last step.
+
+#### Scenario: Zooming out shows more of the map
+- **WHEN** a user zooms out after viewing a generated window
+- **THEN** a new window request is made for the same seed, covering more
+  cells than the current window, and the canvas updates to show the
+  response at a smaller on-screen cell size
+
+#### Scenario: Zooming preserves the seed and view center
+- **WHEN** a user zooms in or out
+- **THEN** the seed used for the new window request is unchanged, and
+  the new window is centered on the same point the current window was
+  centered on
+
+#### Scenario: Zoom range is bounded
+- **WHEN** a user is at the smallest on-screen cell size the system
+  offers
+- **THEN** no further zoom-out action is available
+- **WHEN** a user is at the default (most zoomed-in) cell size
+- **THEN** no further zoom-in action is available

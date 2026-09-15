@@ -1,11 +1,11 @@
 import { AnimatePresence, motion } from "motion/react"
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp } from "lucide-react"
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ZoomIn, ZoomOut } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { CELL_PX, MAX_WINDOW_DIMENSION } from "@/map/constants"
+import { MAX_WINDOW_DIMENSION, ZOOM_LEVELS_PX } from "@/map/constants"
 import { MapCanvas } from "@/map/MapCanvas"
 import { MapParamsPanel } from "@/map/MapParamsPanel"
 import { MapCreationWizard } from "@/wizard/MapCreationWizard"
@@ -25,10 +25,10 @@ function parseCoordinate(raw: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/** How many cells (per axis) are needed to cover the current viewport at CELL_PX each, capped at the API's max window dimension. */
-function windowSizeForViewport() {
-  const width = Math.min(MAX_WINDOW_DIMENSION, Math.max(1, Math.ceil(window.innerWidth / CELL_PX)))
-  const height = Math.min(MAX_WINDOW_DIMENSION, Math.max(1, Math.ceil(window.innerHeight / CELL_PX)))
+/** How many cells (per axis) are needed to cover the current viewport at the given cell size, capped at the API's max window dimension. */
+function windowSizeForViewport(cellPx: number) {
+  const width = Math.min(MAX_WINDOW_DIMENSION, Math.max(1, Math.ceil(window.innerWidth / cellPx)))
+  const height = Math.min(MAX_WINDOW_DIMENSION, Math.max(1, Math.ceil(window.innerHeight / cellPx)))
   return { width, height }
 }
 
@@ -38,13 +38,16 @@ function App() {
   const [phase, setPhase] = useState<Phase>("wizard")
   const [map, setMap] = useState<MapDto | null>(null)
   const [seed, setSeed] = useState("")
+  const [zoomIndex, setZoomIndex] = useState(0)
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState("")
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
 
-  async function fetchWindow(nextSeed: string, x: number, y: number) {
+  const cellPx = ZOOM_LEVELS_PX[zoomIndex]
+
+  async function fetchWindow(nextSeed: string, x: number, y: number, px: number = cellPx) {
     setLoading(true)
-    const { width, height } = windowSizeForViewport()
+    const { width, height } = windowSizeForViewport(px)
     const { data, error } = await api.GET("/api/Maps", {
       params: { query: { seed: nextSeed, x, y, width, height } },
     })
@@ -52,8 +55,9 @@ function App() {
 
     if (error !== undefined || !data) {
       // Only the very first generation (no map yet) gets a full error
-      // screen - a failed pan/regenerate/resize re-fetch just leaves the
-      // last good map on screen so exploring the world never blanks out.
+      // screen - a failed pan/zoom/regenerate/resize re-fetch just
+      // leaves the last good map on screen so exploring the world never
+      // blanks out.
       if (!map) {
         setErrorMessage("Failed to generate the map. Please try again.")
         setPhase("error")
@@ -92,16 +96,34 @@ function App() {
     void fetchWindow(seed, Number(map.originX) + dx * stepX, Number(map.originY) + dy * stepY)
   }
 
+  function zoom(direction: 1 | -1) {
+    const nextIndex = Math.min(ZOOM_LEVELS_PX.length - 1, Math.max(0, zoomIndex + direction))
+    if (nextIndex === zoomIndex) return
+    setZoomIndex(nextIndex)
+    if (!map) return
+
+    // Re-center on the same point the current window is centered on, at
+    // the new cell size's window dimensions - a zoom, not a pan.
+    const nextPx = ZOOM_LEVELS_PX[nextIndex]
+    const centerX = Number(map.originX) + Math.floor(Number(map.width) / 2)
+    const centerY = Number(map.originY) + Math.floor(Number(map.height) / 2)
+    const { width, height } = windowSizeForViewport(nextPx)
+    void fetchWindow(seed, centerX - Math.floor(width / 2), centerY - Math.floor(height / 2), nextPx)
+  }
+
   // Re-fetch the same origin at the new viewport-derived window size on
   // resize, so the map keeps covering the full page background. Refs
-  // (not state) so the resize listener always reads the latest map/seed
-  // without needing to be torn down and re-added on every fetch.
+  // (not state) so the resize listener always reads the latest
+  // map/seed/zoom without needing to be torn down and re-added on every
+  // fetch.
   const mapRef = useRef(map)
   const seedRef = useRef(seed)
+  const cellPxRef = useRef(cellPx)
   useEffect(() => {
     mapRef.current = map
     seedRef.current = seed
-  }, [map, seed])
+    cellPxRef.current = cellPx
+  }, [map, seed, cellPx])
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>
     function onResize() {
@@ -109,7 +131,7 @@ function App() {
       timeout = setTimeout(() => {
         const current = mapRef.current
         if (!current) return
-        void fetchWindow(seedRef.current, Number(current.originX), Number(current.originY))
+        void fetchWindow(seedRef.current, Number(current.originX), Number(current.originY), cellPxRef.current)
       }, 200)
     }
     window.addEventListener("resize", onResize)
@@ -134,7 +156,7 @@ function App() {
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden">
-      {map && <MapCanvas map={map} onCanvasReady={setCanvasEl} />}
+      {map && <MapCanvas map={map} cellPx={cellPx} onCanvasReady={setCanvasEl} />}
 
       <AnimatePresence mode="wait">
         {phase === "wizard" && (
@@ -205,24 +227,47 @@ function App() {
             </div>
           </div>
 
-          <div className="fixed right-4 bottom-4 z-10 grid grid-cols-3 grid-rows-3 gap-1">
-            <div />
-            <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(0, -1)} aria-label="Pan north">
-              <ArrowUp />
-            </Button>
-            <div />
-            <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(-1, 0)} aria-label="Pan west">
-              <ArrowLeft />
-            </Button>
-            <div />
-            <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(1, 0)} aria-label="Pan east">
-              <ArrowRight />
-            </Button>
-            <div />
-            <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(0, 1)} aria-label="Pan south">
-              <ArrowDown />
-            </Button>
-            <div />
+          <div className="fixed right-4 bottom-4 z-10 flex items-end gap-3">
+            <div className="bg-card flex flex-col gap-1 rounded-lg border p-1 shadow-lg">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => zoom(-1)}
+                disabled={zoomIndex === 0}
+                aria-label="Zoom in"
+              >
+                <ZoomIn />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => zoom(1)}
+                disabled={zoomIndex === ZOOM_LEVELS_PX.length - 1}
+                aria-label="Zoom out"
+              >
+                <ZoomOut />
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-3 grid-rows-3 gap-1">
+              <div />
+              <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(0, -1)} aria-label="Pan north">
+                <ArrowUp />
+              </Button>
+              <div />
+              <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(-1, 0)} aria-label="Pan west">
+                <ArrowLeft />
+              </Button>
+              <div />
+              <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(1, 0)} aria-label="Pan east">
+                <ArrowRight />
+              </Button>
+              <div />
+              <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(0, 1)} aria-label="Pan south">
+                <ArrowDown />
+              </Button>
+              <div />
+            </div>
           </div>
         </>
       )}
