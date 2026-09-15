@@ -1,9 +1,10 @@
 import { AnimatePresence, motion } from "motion/react"
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Info, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
+import { BiomeLegend } from "@/map/BiomeLegend"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS_PX } from "@/map/constants"
@@ -47,6 +48,7 @@ function App() {
   const [progress, setProgress] = useState({ loaded: 0, total: 0 })
   const [errorMessage, setErrorMessage] = useState("")
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
+  const [showLegend, setShowLegend] = useState(false)
 
   const generationRef = useRef(0)
   // Whether any view has ever loaded successfully - not component state,
@@ -245,12 +247,23 @@ function App() {
 
       {phase === "result" && viewWindow && (
         <>
-          <div className="fixed top-4 left-4 z-10 space-y-3">
+          <div className="fixed top-4 left-4 z-10 flex items-start gap-3">
             <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
-              <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-                <img src={mundusIcon} alt="" className="size-6" />
-                Mundus
-              </h1>
+              <div className="flex items-center justify-between gap-2">
+                <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                  <img src={mundusIcon} alt="" className="size-6" />
+                  Mundus
+                </h1>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => setShowLegend((v) => !v)}
+                  aria-label="Toggle terrain legend"
+                  aria-expanded={showLegend}
+                >
+                  <Info />
+                </Button>
+              </div>
               <MapParamsPanel
                 seed={viewWindow.seed}
                 originX={viewWindow.originX}
@@ -269,6 +282,18 @@ function App() {
                 </Button>
               </div>
             </div>
+            <AnimatePresence>
+              {showLegend && (
+                <motion.div
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -8 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <BiomeLegend />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="fixed right-4 bottom-4 z-10 flex items-end gap-3">

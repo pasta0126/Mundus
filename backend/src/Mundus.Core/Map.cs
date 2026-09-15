@@ -29,7 +29,7 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 9;
+    public const int CurrentSpecVersion = 10;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 512;
@@ -73,6 +73,30 @@ public static class MapGenerator
 
     private const double NoisePersistence = 0.5;
 
+    /// <summary>
+    /// Ridge field's base region scale - independent of elevation, used
+    /// only to decide where Highland extends into Peak (mountains). A
+    /// plain elevation threshold makes mountains form round blobs around
+    /// local maxima; folding in a ridged transform of a second field
+    /// (see <see cref="InfiniteValueNoise2D.SampleRidged"/>) makes the Peak/Highland boundary
+    /// trace branching, roughly linear seams instead, so mountains read
+    /// as ranges/massifs rather than isolated lumps.
+    /// </summary>
+    private const int RidgeRegionScale = 192;
+
+    private const int RidgeOctaves = 5;
+
+    /// <summary>
+    /// Elevation floor below which a cell can never become Peak via a
+    /// ridge, even if the ridge value is high - keeps mountain ranges
+    /// confined to already-elevated terrain instead of clawing into
+    /// Lowland.
+    /// </summary>
+    private const double RidgeElevationFloor = 0.76;
+
+    /// <summary>Minimum ridge value (of `[0, 1]`) for a Highland cell above <see cref="RidgeElevationFloor"/> to count as Peak.</summary>
+    private const double RidgeThreshold = 0.58;
+
     /// <summary>Ascending elevation thresholds. A value below a band's threshold falls in the band before it (the lowest, Ocean, has no lower bound).</summary>
     private static readonly (string Band, double UpperBound)[] ElevationBands =
     [
@@ -105,6 +129,7 @@ public static class MapGenerator
 
         var elevationNoise = ElevationNoise(seed);
         var moistureNoise = MoistureNoise(seed);
+        var ridgeNoise = RidgeNoise(seed);
         var cells = new List<Cell>(width * height);
         for (var y = originY; y < originY + height; y++)
         {
@@ -112,7 +137,8 @@ public static class MapGenerator
             {
                 var elevation = elevationNoise.Sample(x, y);
                 var moisture = moistureNoise.Sample(x, y);
-                cells.Add(new Cell { X = x, Y = y, Biome = BiomeAt(elevation, moisture) });
+                var ridge = ridgeNoise.SampleRidged(x, y);
+                cells.Add(new Cell { X = x, Y = y, Biome = BiomeAt(elevation, moisture, ridge) });
             }
         }
 
@@ -134,6 +160,9 @@ public static class MapGenerator
     /// <summary>Sample the raw [0, 1) moisture value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
     public static double MoistureAt(string seed, int x, int y) => MoistureNoise(seed).Sample(x, y);
 
+    /// <summary>Sample the ridged-multifractal `[0, 1]` ridge value at a coordinate - exposed for testing.</summary>
+    public static double RidgeAt(string seed, int x, int y) => RidgeNoise(seed).SampleRidged(x, y);
+
     private static InfiniteValueNoise2D ElevationNoise(string seed) =>
         new(seed, ElevationRegionScale, ElevationOctaves, NoisePersistence);
 
@@ -144,9 +173,20 @@ public static class MapGenerator
     private static InfiniteValueNoise2D MoistureNoise(string seed) =>
         new($"{seed}:moisture", MoistureRegionScale, MoistureOctaves, NoisePersistence);
 
-    private static Biome BiomeAt(double elevation, double moisture)
+    private static InfiniteValueNoise2D RidgeNoise(string seed) =>
+        new($"{seed}:ridge", RidgeRegionScale, RidgeOctaves, NoisePersistence);
+
+    private static Biome BiomeAt(double elevation, double moisture, double ridge)
     {
         var elevationBand = BandOf(elevation, ElevationBands);
+        if (elevationBand == "Highland" && elevation >= RidgeElevationFloor && ridge >= RidgeThreshold)
+        {
+            // Extend Peak down into Highland along ridge lines, so
+            // mountains read as ranges reaching out from the highest
+            // points rather than a single round summit blob.
+            elevationBand = "Peak";
+        }
+
         var moistureBand = BandOf(moisture, MoistureBands);
 
         return elevationBand switch

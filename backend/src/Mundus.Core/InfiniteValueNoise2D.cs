@@ -70,6 +70,38 @@ public sealed class InfiniteValueNoise2D
         return total / maxAmplitude;
     }
 
+    /// <summary>
+    /// Ridged-multifractal variant of <see cref="Sample"/>: each octave's
+    /// own raw `[0, 1)` value is folded via `1 - |2v - 1|` (so it peaks at
+    /// 1 along that octave's own former mid-value contour, which is
+    /// naturally a branching, elongated line rather than a blob) and
+    /// squared (sharpens the crest) before being summed - not just the
+    /// final composite folded once. Doing this per-octave is what gives
+    /// the result thin, fractal-branching ridge lines at multiple scales
+    /// simultaneously (the classic "ridged multifractal" terrain
+    /// technique) instead of one smooth threshold band. Result is in
+    /// `[0, 1]`.
+    /// </summary>
+    public double SampleRidged(int x, int y)
+    {
+        var total = 0.0;
+        var amplitude = 1.0;
+        var maxAmplitude = 0.0;
+        var scale = _regionScale;
+        for (var octave = 0; octave < _octaves; octave++)
+        {
+            var raw = SampleOctave(x, y, scale, octave);
+            var ridged = 1 - Math.Abs((2 * raw) - 1);
+            ridged *= ridged;
+            total += amplitude * ridged;
+            maxAmplitude += amplitude;
+            amplitude *= _persistence;
+            scale = Math.Max(1, scale / 2);
+        }
+
+        return total / maxAmplitude;
+    }
+
     private double SampleOctave(int x, int y, int regionScale, int octave)
     {
         var (ix, tx) = LatticeIndexAndFraction(x, regionScale);
