@@ -94,12 +94,23 @@ export function extractContours(
         case 2: push(bottom, right); break
         case 3: push(left, right); break
         case 4: push(right, top); break
-        case 5: push(left, top); push(bottom, right); break
+        // Saddle cases (two diagonal corners land, two water): each half
+        // is isolated the same way a single-corner case would isolate it
+        // (e.g. the br corner here the same way case 13 - "br is the only
+        // water corner" - isolates it, not case 2's "br is the only land
+        // corner" direction). Getting this backwards for either half was
+        // exactly self-consistent within the cell (so it looked fine in
+        // isolation) but disagreed with every ordinary neighboring cell
+        // about which of {start, end} a shared edge point was, which
+        // silently broke chains into unclosed (and therefore dropped)
+        // fragments - rare with a few big grains, common with hundreds of
+        // small overlapping ones. See the bug report this fixes.
+        case 5: push(left, top); push(right, bottom); break
         case 6: push(bottom, top); break
         case 7: push(left, top); break
         case 8: push(top, left); break
         case 9: push(top, bottom); break
-        case 10: push(top, right); push(left, bottom); break
+        case 10: push(top, right); push(bottom, left); break
         case 11: push(top, right); break
         case 12: push(right, left); break
         case 13: push(right, bottom); break
@@ -117,8 +128,19 @@ function keyOf(p: Point): string {
 }
 
 function chainSegments(segments: [Point, Point][]): Point[][] {
-  const bySource = new Map<string, [Point, Point]>()
-  for (const seg of segments) bySource.set(keyOf(seg[0]), seg)
+  // Keyed by start point -> every segment starting there, not just one:
+  // with a dense, convoluted coastline (hundreds of overlapping grains),
+  // it's common for more than one segment to share a start point, and a
+  // single-valued map would silently drop all but the last, breaking the
+  // chain and causing large loops to end up open (and therefore dropped
+  // below) even though a valid closed path exists.
+  const bySource = new Map<string, [Point, Point][]>()
+  for (const seg of segments) {
+    const key = keyOf(seg[0])
+    const existing = bySource.get(key)
+    if (existing) existing.push(seg)
+    else bySource.set(key, [seg])
+  }
 
   const used = new Set<[Point, Point]>()
   const polylines: Point[][] = []
@@ -136,8 +158,9 @@ function chainSegments(segments: [Point, Point][]): Point[][] {
         closed = true
         break
       }
-      const next = bySource.get(keyOf(current))
-      if (!next || used.has(next)) break
+      const candidates = bySource.get(keyOf(current))
+      const next = candidates?.find((s) => !used.has(s))
+      if (!next) break
       used.add(next)
       current = next[1]
       polyline.push(current)

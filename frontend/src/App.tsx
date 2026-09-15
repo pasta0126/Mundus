@@ -5,6 +5,7 @@ import type { components } from "@/api/schema"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { MapCanvas } from "@/map/MapCanvas"
+import { MapParamsPanel } from "@/map/MapParamsPanel"
 import { MapCreationWizard } from "@/wizard/MapCreationWizard"
 import { INITIAL_WIZARD_STATE, type WizardState } from "@/wizard/types"
 
@@ -87,7 +88,7 @@ function App() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center gap-6 p-6">
+    <main className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center gap-6 p-6">
       <h1 className="text-3xl font-semibold tracking-tight">Mundus</h1>
 
       <AnimatePresence mode="wait">
@@ -136,19 +137,22 @@ function App() {
                 <Progress value={90} className="w-full" />
               </div>
             )}
-            <div className={view.kind === "rendering" ? "hidden" : "contents"}>
-              <MapCanvas map={view.map} onCanvasReady={setCanvasEl} />
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={regenerate}>
-                  Regenerate
-                </Button>
-                <Button variant="outline" onClick={restartWizard}>
-                  Restart wizard
-                </Button>
-                <Button variant="outline" onClick={downloadMap}>
-                  Download
-                </Button>
+            <div className={view.kind === "rendering" ? "hidden" : "flex w-full flex-col items-center gap-6 md:flex-row md:items-start md:justify-center"}>
+              <div className="w-full max-w-md space-y-3">
+                <MapCanvas map={view.map} onCanvasReady={setCanvasEl} />
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={regenerate}>
+                    Regenerate
+                  </Button>
+                  <Button variant="outline" onClick={restartWizard}>
+                    Restart wizard
+                  </Button>
+                  <Button variant="outline" onClick={downloadMap}>
+                    Download
+                  </Button>
+                </div>
               </div>
+              <MapParamsPanel map={view.map} />
             </div>
           </motion.div>
         )}

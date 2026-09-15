@@ -73,7 +73,7 @@ export function MapCanvas({ map, onCanvasReady }: MapCanvasProps) {
       ref={canvasRef}
       width={VIEWPORT}
       height={VIEWPORT}
-      className="border-border aspect-square w-full rounded-lg border"
+      className="aspect-square w-full border border-black"
     />
   )
 }

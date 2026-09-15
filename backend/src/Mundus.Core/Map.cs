@@ -32,7 +32,7 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 3;
+    public const int CurrentSpecVersion = 4;
 
     /// <summary>Below this elevation, a cell is Ocean. Also hardcoded on
     /// the frontend for contour extraction - see MapCanvas.tsx.</summary>
@@ -40,26 +40,74 @@ public static class MapGenerator
 
     private const Biome LandBiome = Biome.Grassland;
 
-    /// <summary>Grain radius bands as a fraction of grid width, roughly evoking rice/lentil/chickpea.</summary>
-    private static readonly double[] GrainRadiusFractions = [0.06, 0.10, 0.16];
+    /// <summary>Radius bands (as a fraction of grid width) for the big base grains that establish each landmass - roughly chickpea/lentil scale.</summary>
+    private static readonly double[] BaseGrainRadiusFractions = [0.06, 0.10, 0.16];
+
+    /// <summary>
+    /// Radius bands for the fine detail grains scattered along each base
+    /// grain's rim - true grain-of-rice-on-a-sheet-of-paper scale relative
+    /// to the grid, an order of magnitude smaller than the base grains.
+    /// Alone they'd be too small and sparse to ever merge into a
+    /// landmass, but layered onto the base grains' edges they rough up an
+    /// otherwise-smooth circle into the gulfs/capes/inlets a real
+    /// coastline has - see design.md.
+    /// </summary>
+    private static readonly double[] DetailGrainRadiusFractions = [0.008, 0.014, 0.020];
 
     public static Map Generate(string seed, GridType gridType, SizePreset sizePreset)
     {
         var (width, height) = sizePreset.Dimensions();
         var rng = new Rng(seed);
 
-        var (minGrains, maxGrains) = sizePreset.GrainCountRange();
-        var grainCount = rng.Child("grain-count").Int(minGrains, maxGrains);
-        var grains = PlaceGrains(rng.Child("grains"), grainCount, width, height);
+        var (minBase, maxBase) = sizePreset.BaseGrainCountRange();
+        var baseCount = rng.Child("base-grain-count").Int(minBase, maxBase);
+        var baseGrains = PlaceBaseGrains(rng.Child("base-grains"), baseCount, width, height);
+
+        var (minDetail, maxDetail) = sizePreset.DetailGrainCountRange();
+        var detailCount = rng.Child("detail-grain-count").Int(minDetail, maxDetail);
+        var detailGrains = PlaceDetailGrains(rng.Child("detail-grains"), detailCount, baseGrains, width);
+
+        var grains = new List<Grain>(baseGrains.Count + detailGrains.Count);
+        grains.AddRange(baseGrains);
+        grains.AddRange(detailGrains);
+
+        var elevation = new double[width * height];
+        // Splat each grain only over its own bounding box rather than
+        // scanning every cell against every grain - at hundreds of tiny
+        // grains, a naive width*height*grainCount scan gets slow, while
+        // this stays proportional to each grain's (small) footprint.
+        foreach (var grain in grains)
+        {
+            var minX = Math.Max(0, (int)Math.Floor(grain.X - grain.Radius));
+            var maxX = Math.Min(width - 1, (int)Math.Ceiling(grain.X + grain.Radius));
+            var minY = Math.Max(0, (int)Math.Floor(grain.Y - grain.Radius));
+            var maxY = Math.Min(height - 1, (int)Math.Ceiling(grain.Y + grain.Radius));
+
+            for (var y = minY; y <= maxY; y++)
+            {
+                for (var x = minX; x <= maxX; x++)
+                {
+                    var dx = x - grain.X;
+                    var dy = y - grain.Y;
+                    var distance = Math.Sqrt((dx * dx) + (dy * dy));
+                    var falloff = Math.Clamp(1 - (distance / grain.Radius), 0, 1);
+                    var index = (y * width) + x;
+                    if (falloff > elevation[index])
+                    {
+                        elevation[index] = falloff;
+                    }
+                }
+            }
+        }
 
         var cells = new List<Cell>(width * height);
         for (var y = 0; y < height; y++)
         {
             for (var x = 0; x < width; x++)
             {
-                var elevation = ElevationAt(x, y, grains);
-                var biome = elevation >= OceanThreshold ? LandBiome : Biome.Ocean;
-                cells.Add(new Cell { X = x, Y = y, Biome = biome, Elevation = elevation });
+                var e = elevation[(y * width) + x];
+                var biome = e >= OceanThreshold ? LandBiome : Biome.Ocean;
+                cells.Add(new Cell { X = x, Y = y, Biome = biome, Elevation = e });
             }
         }
 
@@ -77,14 +125,14 @@ public static class MapGenerator
 
     private readonly record struct Grain(double X, double Y, double Radius);
 
-    private static List<Grain> PlaceGrains(Rng rng, int count, int width, int height)
+    private static List<Grain> PlaceBaseGrains(Rng rng, int count, int width, int height)
     {
         var grains = new List<Grain>(count);
         for (var i = 0; i < count; i++)
         {
             var x = rng.Float() * width;
             var y = rng.Float() * height;
-            var fraction = rng.Pick(GrainRadiusFractions);
+            var fraction = rng.Pick(BaseGrainRadiusFractions);
             var radius = fraction * width;
             grains.Add(new Grain(x, y, radius));
         }
@@ -93,27 +141,27 @@ public static class MapGenerator
     }
 
     /// <summary>
-    /// "Metaball"-style union: the max, over all grains, of a radial
-    /// falloff from that grain's center. Overlapping grains merge into
-    /// one landmass; the result is a smooth field suitable for both
-    /// hillshading and the frontend's marching-squares contour
-    /// extraction, not just a hard land/ocean boolean.
+    /// Scatters each detail grain near the rim of a random base grain
+    /// (0.5x-1.4x its radius out from the center), rather than uniformly
+    /// across the whole grid, so the fine texture lands where a coastline
+    /// actually is instead of producing unrelated confetti islands far
+    /// from any landmass.
     /// </summary>
-    private static double ElevationAt(int x, int y, List<Grain> grains)
+    private static List<Grain> PlaceDetailGrains(Rng rng, int count, List<Grain> baseGrains, int width)
     {
-        var max = 0.0;
-        foreach (var grain in grains)
+        var grains = new List<Grain>(count);
+        for (var i = 0; i < count; i++)
         {
-            var dx = x - grain.X;
-            var dy = y - grain.Y;
-            var distance = Math.Sqrt((dx * dx) + (dy * dy));
-            var falloff = Math.Clamp(1 - (distance / grain.Radius), 0, 1);
-            if (falloff > max)
-            {
-                max = falloff;
-            }
+            var anchor = rng.Pick(baseGrains);
+            var angle = rng.Float() * Math.Tau;
+            var distance = anchor.Radius * (0.5 + (rng.Float() * 0.9));
+            var x = anchor.X + (Math.Cos(angle) * distance);
+            var y = anchor.Y + (Math.Sin(angle) * distance);
+            var fraction = rng.Pick(DetailGrainRadiusFractions);
+            var radius = fraction * width;
+            grains.Add(new Grain(x, y, radius));
         }
 
-        return max;
+        return grains;
     }
 }
