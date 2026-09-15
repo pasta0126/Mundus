@@ -133,7 +133,7 @@ function App() {
   }
 
   return (
-    <main className="bg-background relative min-h-screen w-full overflow-hidden">
+    <main className="relative min-h-screen w-full overflow-hidden">
       {map && <MapCanvas map={map} onCanvasReady={setCanvasEl} />}
 
       <AnimatePresence mode="wait">
