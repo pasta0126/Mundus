@@ -9,17 +9,17 @@ instead of hand-crafting a URL.
 ## Requirements
 
 ### Requirement: Fixed wizard step order
-The system SHALL present exactly five steps, in this order: Seed, Grid
-Type, Size Preset, Shape Archetype, Review. Each step SHALL let the user
-choose that step's parameter (Seed MAY be left blank to mean "generate a
-random seed"). The Review step SHALL display every previously chosen
-value and SHALL be the only step that triggers map generation.
+The system SHALL present exactly four steps, in this order: Seed, Grid
+Type, Size Preset, Review. Each step SHALL let the user choose that
+step's parameter (Seed MAY be left blank to mean "generate a random
+seed"). The Review step SHALL display every previously chosen value and
+SHALL be the only step that triggers map generation.
 
 #### Scenario: Steps appear in order
 - **WHEN** the wizard starts
 - **THEN** the first step shown is Seed, and advancing moves through Grid
-  Type, Size Preset, Shape Archetype, and Review in that order, with no
-  other step reachable in between
+  Type, Size Preset, and Review in that order, with no other step
+  reachable in between
 
 #### Scenario: Only Review triggers generation
 - **WHEN** the user is on any step before Review
@@ -49,7 +49,7 @@ the user confirms on the Review step.
 
 #### Scenario: Confirming generates a map with the collected parameters
 - **WHEN** the user confirms on the Review step after selecting a grid
-  type, size preset, and shape archetype (and optionally a seed)
+  type and size preset (and optionally a seed)
 - **THEN** exactly one request is made to the map-generation API using
   those parameters, and the rendered result reflects the response
 
@@ -67,12 +67,9 @@ stair-stepped raw cell edge). For a `Hex` grid, that boundary SHALL be
 rendered as a crisp (non-blurred) line following the actual hex-edge
 steps between land and ocean cells. Terrain SHALL be shaded using each
 cell's local elevation gradient (a directional-light hillshade effect),
-not a flat per-cell lightness multiplier alone. Cells whose biome is
-`Mountains` or `Forest` SHALL be overlaid with an icon distinguishing
-that biome, denser and more detailed than a single simple mark per
-sampled cell. `Ocean` cells SHALL carry a wave-line texture rather than a
-flat or blurred fill. The rendered map SHALL be framed by a decorative
-border.
+not a flat per-cell lightness multiplier alone. `Ocean` cells SHALL
+carry a wave-line texture rather than a flat or blurred fill. The
+rendered map SHALL be framed by a decorative border.
 
 #### Scenario: Every cell is rendered
 - **WHEN** a map is generated
@@ -80,7 +77,7 @@ border.
   returned grid omitted from the base terrain rendering
 
 #### Scenario: Different biomes are visually distinguishable
-- **WHEN** a rendered map contains cells of at least two different biomes
+- **WHEN** a rendered map contains both `Ocean` and non-`Ocean` cells
 - **THEN** those cells are drawn in visually distinct colors
 
 #### Scenario: Grid type determines cell layout
@@ -97,12 +94,6 @@ border.
   boundary is rendered as a crisp (non-blurred) line following hex cell
   edges
 
-#### Scenario: Mountains and Forest cells carry an icon
-- **WHEN** a rendered map contains cells of biome `Mountains` or `Forest`
-- **THEN** a majority of those cells display a multi-part icon (not a
-  single dot or triangle) distinguishing that biome, in addition to its
-  base terrain color
-
 #### Scenario: Ocean has a wave texture
 - **WHEN** a rendered map contains `Ocean` cells
 - **THEN** those cells show a wave-line pattern rather than a flat or
@@ -112,25 +103,57 @@ border.
 - **WHEN** a map is rendered
 - **THEN** a decorative border frame is visible around the rendered grid
 
-### Requirement: Returning to the wizard after viewing a map
-After a map is rendered, the system SHALL let the user return to the
-wizard with every previously chosen value still selected, so they can
-change one parameter and generate again without re-entering the others.
+### Requirement: Post-generation actions
+After a map is rendered, the system SHALL offer exactly three actions:
+Regenerate (generate a new map immediately, with a new random seed but
+the same grid type and size preset, without returning to any wizard
+step), Restart wizard (clear every prior selection and return to the
+Seed step), and Download (save the currently rendered map as a PNG image
+file).
 
-#### Scenario: Returning to the wizard keeps prior selections
-- **WHEN** a user, after viewing a generated map, chooses to return to
-  the wizard
-- **THEN** every step still shows the values used for that generation
+#### Scenario: Regenerate produces a new map without leaving the result view
+- **WHEN** a user, after viewing a generated map, chooses "Regenerate"
+- **THEN** a new map is generated with a new random seed, the same grid
+  type and size preset, and the result view updates to show it without
+  showing any wizard step
 
-### Requirement: Generate another map after viewing a result
-After a map is rendered, the system SHALL offer a "generate another"
-action that returns to the wizard's Seed step specifically (not the
-Review step), with grid type, size preset, and shape archetype kept as
-they were.
+#### Scenario: Restart wizard clears all selections
+- **WHEN** a user, after viewing a generated map, chooses "Restart
+  wizard"
+- **THEN** the Seed step is shown and every step's value (seed, grid
+  type, size preset) is back to its unselected default
 
-#### Scenario: Generate another returns to the Seed step
-- **WHEN** a user, after viewing a generated map, chooses "generate
-  another"
-- **THEN** the wizard's Seed step is shown, and the grid type, size
-  preset, and shape archetype selections used for that generation are
-  still set
+#### Scenario: Download saves the rendered map as an image
+- **WHEN** a user, after viewing a generated map, chooses "Download"
+- **THEN** a PNG image file of the currently rendered map is saved to the
+  user's device
+
+### Requirement: Progress and status feedback
+The system SHALL show visible progress and status feedback for every
+asynchronous action (generating a map, rendering it, downloading it), so
+the user is never left without an indication of what is currently
+happening. Feedback SHALL include both a progress indicator and a
+descriptive status message.
+
+#### Scenario: Generating shows progress and a status message
+- **WHEN** a map generation request is in flight
+- **THEN** a progress indicator is visible along with a message
+  describing that generation is in progress
+
+#### Scenario: Rendering shows a status message
+- **WHEN** a returned map is being drawn to the canvas
+- **THEN** a message indicates rendering is in progress until drawing
+  completes
+
+#### Scenario: Failure feedback is descriptive
+- **WHEN** any asynchronous action fails
+- **THEN** the user is shown a message describing that it failed, not
+  just a silent lack of progress
+
+### Requirement: All user-facing text is in English
+Every piece of user-facing text in the application (labels, buttons,
+messages, page title) SHALL be in English.
+
+#### Scenario: No non-English user-facing text
+- **WHEN** inspecting any screen of the application
+- **THEN** every piece of user-facing text on it is in English
