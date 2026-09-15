@@ -29,13 +29,24 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 5;
+    public const int CurrentSpecVersion = 6;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 256;
 
-    /// <summary>Cells per lattice unit for the terrain noise - roughly how large a biome region reads as.</summary>
+    /// <summary>Cells per lattice unit at the noise's base (largest) octave - roughly how large the broadest terrain features read as.</summary>
     private const int RegionScale = 32;
+
+    /// <summary>
+    /// Layers of noise summed together (see InfiniteValueNoise2D) so
+    /// terrain isn't just same-sized blobs everywhere: the base octave
+    /// sets broad regions, finer octaves add the local variation real
+    /// terrain has (small lakes inside a landmass, small islands
+    /// offshore, ragged coastlines).
+    /// </summary>
+    private const int NoiseOctaves = 4;
+
+    private const double NoisePersistence = 0.5;
 
     /// <summary>
     /// Ascending thresholds mapping a [0, 1) terrain value to a
@@ -65,7 +76,7 @@ public static class MapGenerator
             throw new ArgumentOutOfRangeException(nameof(height), $"height must be between 1 and {MaxWindowDimension}");
         }
 
-        var noise = new InfiniteValueNoise2D(seed, RegionScale);
+        var noise = new InfiniteValueNoise2D(seed, RegionScale, NoiseOctaves, NoisePersistence);
         var cells = new List<Cell>(width * height);
         for (var y = originY; y < originY + height; y++)
         {
@@ -89,7 +100,8 @@ public static class MapGenerator
     }
 
     /// <summary>Sample the raw [0, 1) terrain value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
-    public static double TerrainValueAt(string seed, int x, int y) => new InfiniteValueNoise2D(seed, RegionScale).Sample(x, y);
+    public static double TerrainValueAt(string seed, int x, int y) =>
+        new InfiniteValueNoise2D(seed, RegionScale, NoiseOctaves, NoisePersistence).Sample(x, y);
 
     private static Biome BiomeAt(double value)
     {

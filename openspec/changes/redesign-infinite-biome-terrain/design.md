@@ -45,10 +45,6 @@ Current shape, for reference:
   properties end to end.
 
 **Non-Goals:**
-- Multi-octave/fractal noise (layering several frequencies for more
-  natural-looking regions). Single-octave value noise is enough to
-  satisfy the spec's smoothness requirement; revisit only if the result
-  looks too uniformly blob-shaped in practice.
 - A second noise axis (e.g. temperature/moisture) for biome assignment.
   One ordered scalar band model is enough for six biomes and keeps
   determinism trivial to reason about; a "snow band" that can appear
@@ -96,6 +92,32 @@ scale, and adjust visually during implementation.
   same reason `ValueNoise2D`'s own doc comment gives - this generation
   logic is a core product capability, not incidental plumbing worth an
   external dependency for.
+
+### Fractal (fBm) noise: 4 octaves, 0.5 persistence
+A single octave of value noise reads as same-sized smooth blobs
+everywhere - every region is roughly `regionScale` cells across, with no
+finer structure, which in practice looked too uniform (confirmed by
+trying it - see the "revisit only if..." note this section replaces).
+`InfiniteValueNoise2D` now sums 4 octaves: the base (`regionScale = 32`)
+plus three more, each at half the previous octave's region scale
+(double the frequency) and half its amplitude (`persistence = 0.5`),
+normalized by the sum of amplitudes so the result stays in `[0, 1)`.
+Each octave hashes lattice points with its own octave index folded into
+the seed (`{seed}:lattice:{octave}:{lx}:{ly}`) so octaves don't
+correlate with each other. The base octave still dominates (its
+normalized weight is `1 / (1 + 0.5 + 0.25 + 0.125) ≈ 53%`), so
+large-scale shape is unchanged; the finer octaves add exactly the local
+variation real terrain has - a small lake inside an otherwise-Grassland
+region, a ragged coastline, a stray island - without needing a second
+noise axis or hand-authored features.
+
+**Alternatives considered:** higher persistence (more weight on fine
+detail) - tried and rejected, it broke the "neighboring cells trend
+toward the same or adjacent biome band" spec requirement's spirit (too
+much cell-to-cell jitter, verged back toward per-cell noise); more than
+4 octaves - rejected, region scale bottoms out at a few cells within 4
+steps (`32 -> 16 -> 8 -> 4`) already, and a 5th octave at scale 2 added
+visual noise without adding recognizable terrain features.
 
 ### Biome bands: six fixed thresholds on one scalar
 Fixed, ascending thresholds on the `[0, 1)` terrain value:

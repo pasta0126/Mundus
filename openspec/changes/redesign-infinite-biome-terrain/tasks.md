@@ -124,6 +124,20 @@
       seed. Disable zoom-in at the default level and zoom-out at the
       smallest level.
 
+## 9b. Backend: fractal noise for a more organic look
+
+- [x] 9b.1 Extend `InfiniteValueNoise2D` to sum `octaves` layers
+      (default 1, unused unless requested) at halving region scale and
+      amplitude per octave (`persistence`), each octave's lattice hash
+      salted with its own index so octaves don't correlate; normalize by
+      the summed amplitudes.
+- [x] 9b.2 Wire `MapGenerator` to sample with 4 octaves, 0.5 persistence,
+      instead of a single octave; bump `CurrentSpecVersion`.
+- [x] 9b.3 Spot-check via the API across several seeds: biome
+      proportions vary seed-to-seed (not just Grassland/Forest every
+      time) and a rendered ASCII sample shows ragged coastlines/small
+      lakes rather than uniform blobs.
+
 ## 10. Frontend: params panel
 
 - [x] 10.1 Update `MapParamsPanel.tsx` to show the seed and the current
