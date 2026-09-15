@@ -29,39 +29,43 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 6;
+    public const int CurrentSpecVersion = 7;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 256;
 
-    /// <summary>Cells per lattice unit at the noise's base (largest) octave - roughly how large the broadest terrain features read as.</summary>
-    private const int RegionScale = 32;
-
     /// <summary>
-    /// Layers of noise summed together (see InfiniteValueNoise2D) so
-    /// terrain isn't just same-sized blobs everywhere: the base octave
-    /// sets broad regions, finer octaves add the local variation real
-    /// terrain has (small lakes inside a landmass, small islands
-    /// offshore, ragged coastlines).
+    /// Elevation's base region scale (cells per lattice unit at its
+    /// broadest octave) - large enough that a body of water reads as an
+    /// ocean separating continents/islands, not a lake. See design.md.
     /// </summary>
-    private const int NoiseOctaves = 4;
+    private const int ElevationRegionScale = 128;
+
+    private const int ElevationOctaves = 5;
+
+    /// <summary>Moisture's base region scale - broad climate zones, independent of elevation's.</summary>
+    private const int MoistureRegionScale = 96;
+
+    private const int MoistureOctaves = 4;
 
     private const double NoisePersistence = 0.5;
 
-    /// <summary>
-    /// Ascending thresholds mapping a [0, 1) terrain value to a
-    /// <see cref="Biome"/> band, in <see cref="Biome"/>'s declared order.
-    /// A value below a band's threshold falls in the band before it (the
-    /// first band, Ocean, has no lower bound).
-    /// </summary>
-    private static readonly (Biome Biome, double UpperBound)[] BiomeBands =
+    /// <summary>Ascending elevation thresholds. A value below a band's threshold falls in the band before it (the lowest, Ocean, has no lower bound).</summary>
+    private static readonly (string Band, double UpperBound)[] ElevationBands =
     [
-        (Biome.Ocean, 0.35),
-        (Biome.Beach, 0.40),
-        (Biome.Grassland, 0.62),
-        (Biome.Forest, 0.78),
-        (Biome.Tundra, 0.90),
-        (Biome.Snow, double.PositiveInfinity),
+        ("Ocean", 0.42),
+        ("Beach", 0.46),
+        ("Lowland", 0.68),
+        ("Highland", 0.85),
+        ("Peak", double.PositiveInfinity),
+    ];
+
+    /// <summary>Ascending moisture thresholds: dry, medium, wet.</summary>
+    private static readonly (string Band, double UpperBound)[] MoistureBands =
+    [
+        ("Dry", 0.35),
+        ("Medium", 0.65),
+        ("Wet", double.PositiveInfinity),
     ];
 
     public static Map Generate(string seed, int originX, int originY, int width, int height)
@@ -76,14 +80,16 @@ public static class MapGenerator
             throw new ArgumentOutOfRangeException(nameof(height), $"height must be between 1 and {MaxWindowDimension}");
         }
 
-        var noise = new InfiniteValueNoise2D(seed, RegionScale, NoiseOctaves, NoisePersistence);
+        var elevationNoise = ElevationNoise(seed);
+        var moistureNoise = MoistureNoise(seed);
         var cells = new List<Cell>(width * height);
         for (var y = originY; y < originY + height; y++)
         {
             for (var x = originX; x < originX + width; x++)
             {
-                var value = noise.Sample(x, y);
-                cells.Add(new Cell { X = x, Y = y, Biome = BiomeAt(value) });
+                var elevation = elevationNoise.Sample(x, y);
+                var moisture = moistureNoise.Sample(x, y);
+                cells.Add(new Cell { X = x, Y = y, Biome = BiomeAt(elevation, moisture) });
             }
         }
 
@@ -99,20 +105,58 @@ public static class MapGenerator
         };
     }
 
-    /// <summary>Sample the raw [0, 1) terrain value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
-    public static double TerrainValueAt(string seed, int x, int y) =>
-        new InfiniteValueNoise2D(seed, RegionScale, NoiseOctaves, NoisePersistence).Sample(x, y);
+    /// <summary>Sample the raw [0, 1) elevation value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
+    public static double ElevationAt(string seed, int x, int y) => ElevationNoise(seed).Sample(x, y);
 
-    private static Biome BiomeAt(double value)
+    /// <summary>Sample the raw [0, 1) moisture value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
+    public static double MoistureAt(string seed, int x, int y) => MoistureNoise(seed).Sample(x, y);
+
+    private static InfiniteValueNoise2D ElevationNoise(string seed) =>
+        new(seed, ElevationRegionScale, ElevationOctaves, NoisePersistence);
+
+    // Suffixing the parent seed (rather than an unrelated string) keeps
+    // moisture anchored to the same seed while guaranteeing independence
+    // from elevation - a different seed string produces entirely
+    // different lattice hashes, so the two fields never correlate.
+    private static InfiniteValueNoise2D MoistureNoise(string seed) =>
+        new($"{seed}:moisture", MoistureRegionScale, MoistureOctaves, NoisePersistence);
+
+    private static Biome BiomeAt(double elevation, double moisture)
     {
-        foreach (var (biome, upperBound) in BiomeBands)
+        var elevationBand = BandOf(elevation, ElevationBands);
+        var moistureBand = BandOf(moisture, MoistureBands);
+
+        return elevationBand switch
+        {
+            "Ocean" => Biome.Ocean,
+            "Beach" => Biome.Beach,
+            "Peak" => moistureBand == "Wet" ? Biome.Snow : Biome.Mountains,
+            "Lowland" => moistureBand switch
+            {
+                "Dry" => Biome.Desert,
+                "Medium" => Biome.Grassland,
+                _ => Biome.Swamp,
+            },
+            // "Highland"
+            _ => moistureBand switch
+            {
+                "Dry" => Biome.Tundra,
+                "Medium" => Biome.Forest,
+                _ => Biome.Rainforest,
+            },
+        };
+    }
+
+    private static string BandOf(double value, (string Band, double UpperBound)[] bands)
+    {
+        foreach (var (band, upperBound) in bands)
         {
             if (value < upperBound)
             {
-                return biome;
+                return band;
             }
         }
 
-        return BiomeBands[^1].Biome;
+        return bands[^1].Band;
     }
 }

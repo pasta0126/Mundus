@@ -1,18 +1,25 @@
 namespace Mundus.Core;
 
 /// <summary>
-/// Ordered biome bands, low terrain value to high - see
-/// <see cref="MapGenerator"/>'s threshold table. The order is part of the
-/// generation contract: which biomes can border which is determined by
-/// adjacency in this sequence, not assigned independently. Reordering or
-/// removing a value is a breaking change to <see cref="Map.SpecVersion"/>.
+/// Assigned from two independent values - elevation and moisture - via
+/// the fixed table in <see cref="MapGenerator"/>. Unlike a single
+/// ordered scalar, there's no total order across all ten values here;
+/// adjacency is governed by each of the two underlying fields varying
+/// smoothly, not by declaration order. Reordering or removing a value is
+/// still a breaking change to <see cref="Map.SpecVersion"/> (it changes
+/// what an existing seed's cells decode to), but declaration order
+/// itself carries no generation meaning.
 /// </summary>
 public enum Biome
 {
     Ocean,
     Beach,
+    Desert,
     Grassland,
-    Forest,
+    Swamp,
     Tundra,
+    Forest,
+    Rainforest,
+    Mountains,
     Snow,
 }

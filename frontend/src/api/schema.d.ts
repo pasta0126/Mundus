@@ -85,7 +85,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {unknown} */
-        Biome: "Ocean" | "Beach" | "Grassland" | "Forest" | "Tundra" | "Snow";
+        Biome: "Ocean" | "Beach" | "Desert" | "Grassland" | "Swamp" | "Tundra" | "Forest" | "Rainforest" | "Mountains" | "Snow";
         Cell: {
             /** Format: int32 */
             x: number | string;

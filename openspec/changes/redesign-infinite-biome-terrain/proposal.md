@@ -25,15 +25,20 @@ seed always reproduces the same content, byte-for-byte, forever.
   window requested far from `(0, 0)` is identical whether or not any
   nearer window was ever requested first.
 - **BREAKING**: Replace the two-biome set (`Grassland`, `Ocean`) with a
-  richer biome set assigned by the noise field's value, with adjacent
-  biomes on the same field chosen so transitions read as a coherent
-  region (ocean fading into beach into grassland/forest, cold biomes
-  clustering together) rather than jarring cuts. `GridType` (`Square`
-  vs. `Hex`) is dropped - only a square grid is supported going forward,
-  matching the current renderer, which already ignores grid type.
-  `Elevation` is dropped from the cell shape - not needed by the new
-  biome-assignment model, which does not distinguish it from the biome
-  it determines.
+  ten-biome set (`Ocean`, `Beach`, `Desert`, `Grassland`, `Swamp`,
+  `Tundra`, `Forest`, `Rainforest`, `Mountains`, `Snow`) assigned from
+  two independent noise fields - elevation and moisture - combined
+  through a fixed table, so terrain has real climate-like variety
+  (a dry Lowland reads as Desert, a wet one as Swamp, an in-between one
+  as Grassland) instead of a single value driving everything.
+  `GridType` (`Square` vs. `Hex`) is dropped - only a square grid is
+  supported going forward, matching the current renderer, which already
+  ignores grid type. `Elevation` is dropped from the cell shape as an
+  API field - it's still computed internally (now alongside moisture),
+  but isn't itself exposed to callers.
+- The elevation field's base noise scale grows so large water bodies
+  read as oceans separating continents/islands rather than lake-sized
+  ponds - see design.md.
 - **BREAKING**: the wizard is removed entirely. There is exactly one
   screen: on load, the app generates a window at `(0, 0)` with a fresh
   random seed automatically - no seed, position, or size is ever

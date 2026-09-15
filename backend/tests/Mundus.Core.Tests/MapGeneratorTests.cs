@@ -98,17 +98,24 @@ public class MapGeneratorTests
     public void EveryCellHasABiomeFromTheDocumentedSet()
     {
         var map = MapGenerator.Generate("biome-set", 0, 0, 64, 64);
-        var allowed = new[] { Biome.Ocean, Biome.Beach, Biome.Grassland, Biome.Forest, Biome.Tundra, Biome.Snow };
+        var allowed = new[]
+        {
+            Biome.Ocean, Biome.Beach, Biome.Desert, Biome.Grassland, Biome.Swamp,
+            Biome.Tundra, Biome.Forest, Biome.Rainforest, Biome.Mountains, Biome.Snow,
+        };
         Assert.All(map.Cells, c => Assert.Contains(c.Biome, allowed));
     }
 
-    [Fact]
-    public void NeighboringCellsHaveCloserTerrainValuesThanRandomCells()
+    [Theory]
+    [InlineData(true)] // elevation
+    [InlineData(false)] // moisture
+    public void NeighboringCellsHaveCloserValuesThanRandomCells(bool elevation)
     {
         const string seed = "coherence";
         const int width = 64;
         const int height = 64;
         var rng = new Rng("coherence-sampler");
+        Func<string, int, int, double> sample = elevation ? MapGenerator.ElevationAt : MapGenerator.MoistureAt;
 
         double neighborDeltaSum = 0;
         var neighborCount = 0;
@@ -118,12 +125,12 @@ public class MapGeneratorTests
             for (var y = 0; y < height; y++)
             {
                 coords.Add((x, y));
-                var value = MapGenerator.TerrainValueAt(seed, x, y);
+                var value = sample(seed, x, y);
                 foreach (var (dx, dy) in new[] { (1, 0), (0, 1) })
                 {
                     var (nx, ny) = (x + dx, y + dy);
                     if (nx >= width || ny >= height) continue;
-                    var neighborValue = MapGenerator.TerrainValueAt(seed, nx, ny);
+                    var neighborValue = sample(seed, nx, ny);
                     neighborDeltaSum += Math.Abs(value - neighborValue);
                     neighborCount++;
                 }
@@ -135,11 +142,58 @@ public class MapGeneratorTests
         {
             var a = coords[rng.Int(0, coords.Count - 1)];
             var b = coords[rng.Int(0, coords.Count - 1)];
-            randomDeltaSum += Math.Abs(MapGenerator.TerrainValueAt(seed, a.X, a.Y) - MapGenerator.TerrainValueAt(seed, b.X, b.Y));
+            randomDeltaSum += Math.Abs(sample(seed, a.X, a.Y) - sample(seed, b.X, b.Y));
         }
 
         var neighborAverage = neighborDeltaSum / neighborCount;
         var randomAverage = randomDeltaSum / neighborCount;
         Assert.True(neighborAverage < randomAverage, $"neighbor avg {neighborAverage} was not less than random avg {randomAverage}");
+    }
+
+    [Fact]
+    public void WaterBodiesCanSpanALargeArea()
+    {
+        // Find a seed whose (0,0) cell is Ocean, then confirm the
+        // connected Ocean region around it covers a large fraction of a
+        // big window - continent-scale, not a lake - via flood fill.
+        string? oceanSeed = null;
+        for (var i = 0; i < 50; i++)
+        {
+            var candidate = $"ocean-search-{i}";
+            if (MapGenerator.Generate(candidate, -2, -2, 4, 4).Cells.First(c => c is { X: 0, Y: 0 }).Biome == Biome.Ocean)
+            {
+                oceanSeed = candidate;
+                break;
+            }
+        }
+
+        Assert.NotNull(oceanSeed);
+
+        const int size = 200;
+        var map = MapGenerator.Generate(oceanSeed!, -size / 2, -size / 2, size, size);
+        var byCoord = map.Cells.ToDictionary(c => (c.X, c.Y), c => c.Biome);
+
+        var visited = new HashSet<(int, int)>();
+        var queue = new Queue<(int, int)>();
+        queue.Enqueue((0, 0));
+        visited.Add((0, 0));
+        while (queue.Count > 0)
+        {
+            var (x, y) = queue.Dequeue();
+            foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+            {
+                var next = (x + dx, y + dy);
+                if (visited.Contains(next)) continue;
+                if (!byCoord.TryGetValue(next, out var biome) || biome != Biome.Ocean) continue;
+                visited.Add(next);
+                queue.Enqueue(next);
+            }
+        }
+
+        // A lake-scale body (the old regionScale=32 behavior) would top
+        // out around a few hundred cells; a continent-scale ocean at
+        // regionScale=128 should comfortably exceed that within a
+        // 200x200 window.
+        Assert.True(visited.Count > 1000, $"connected Ocean region was only {visited.Count} cells");
     }
 }

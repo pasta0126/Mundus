@@ -138,6 +138,32 @@
       time) and a rendered ASCII sample shows ragged coastlines/small
       lakes rather than uniform blobs.
 
+## 9c. Backend: continent-scale elevation + moisture-driven biomes
+
+- [x] 9c.1 Bump elevation's `InfiniteValueNoise2D` to `regionScale: 128,
+      octaves: 5` (up from `32, 4`) so water bodies read as
+      oceans/continents rather than lakes.
+- [x] 9c.2 Add an independent moisture field:
+      `InfiniteValueNoise2D($"{seed}:moisture", regionScale: 96,
+      octaves: 4, persistence: 0.5)`.
+- [x] 9c.3 Replace the `Biome` enum with the ten-value set (`Ocean`,
+      `Beach`, `Desert`, `Grassland`, `Swamp`, `Tundra`, `Forest`,
+      `Rainforest`, `Mountains`, `Snow`) and implement the
+      elevation-band / moisture-band / lookup-table biome assignment
+      from design.md.
+- [x] 9c.4 Bump `Map.CurrentSpecVersion`.
+- [x] 9c.5 Update `MapGeneratorTests.cs`: the documented-biome-set test
+      covers all ten values; the neighbor-smoothness test covers both
+      elevation and moisture; add a test that a sufficiently large
+      window can contain an `Ocean` region spanning a large fraction of
+      it (continent-scale, not lake-scale).
+- [x] 9c.6 Update `frontend/src/map/biomeColors.ts` with pastel colors
+      for all ten biomes.
+- [x] 9c.7 Spot-check via the API/ASCII render: oceans span a large
+      fraction of a big window (not lake-sized), and multiple new
+      biomes (Desert, Swamp, Rainforest, Mountains) actually appear
+      across a sample of seeds.
+
 ## 10. Frontend: params panel
 
 - [x] 10.1 Update `MapParamsPanel.tsx` to show the seed and the current

@@ -67,38 +67,76 @@ without generating any terrain.
 
 ## ADDED Requirements
 
-### Requirement: Biome set and ordered terrain bands
-The system SHALL assign each cell's biome from a fixed, documented,
-ordered sequence of biome bands - `Ocean`, `Beach`, `Grassland`,
-`Forest`, `Tundra`, `Snow` - by sampling a single continuous
-seed-derived terrain value at that cell's coordinates and mapping it
-through fixed, documented thresholds in that order, so which biomes can
-border which is determined by band adjacency in this sequence rather
-than assigned independently per cell.
+### Requirement: Biome set from elevation and moisture
+The system SHALL assign each cell's biome from a fixed, documented set
+of ten biomes - `Ocean`, `Beach`, `Desert`, `Grassland`, `Swamp`,
+`Tundra`, `Forest`, `Rainforest`, `Mountains`, `Snow` - by sampling two
+independent, continuous, seed-derived values at that cell's coordinates
+(an elevation value and a moisture value) and combining them through a
+fixed, documented table. Elevation alone determines the lowest band
+(`Ocean`), the next (`Beach`), and the highest band (split into
+`Mountains` or `Snow` by moisture); for the two middle elevation bands,
+moisture additionally determines which of three biomes applies for that
+band.
 
 #### Scenario: Every cell has a value in the documented biome set
 - **WHEN** any cell is generated
-- **THEN** its biome is one of `Ocean`, `Beach`, `Grassland`, `Forest`,
-  `Tundra`, `Snow`
+- **THEN** its biome is one of `Ocean`, `Beach`, `Desert`, `Grassland`,
+  `Swamp`, `Tundra`, `Forest`, `Rainforest`, `Mountains`, `Snow`
 
-#### Scenario: Band thresholds are fixed and documented
+#### Scenario: Low and mid-low elevation determine water and coast regardless of moisture
+- **WHEN** a cell's elevation value falls in the lowest or second-lowest
+  documented elevation band
+- **THEN** its biome is `Ocean` or `Beach` respectively, regardless of
+  its moisture value
+
+#### Scenario: Moisture determines the biome within a middle elevation band
+- **WHEN** a cell's elevation value falls in one of the two middle
+  documented elevation bands
+- **THEN** its biome additionally depends on its moisture value: dry,
+  medium, and wet moisture map to three different biomes for that
+  elevation band, per the documented table
+
+#### Scenario: The highest elevation band splits into Mountains or Snow by moisture
+- **WHEN** a cell's elevation value falls in the highest documented
+  elevation band
+- **THEN** its biome is `Mountains` for drier moisture values and `Snow`
+  for the wettest, per the documented table
+
+#### Scenario: Band and table values are fixed and documented
 - **WHEN** the same seed and coordinate are sampled
-- **THEN** the biome returned matches applying the documented threshold
-  table to that coordinate's terrain value, reproducibly
+- **THEN** the biome returned matches applying the documented elevation
+  thresholds, moisture thresholds, and elevation-by-moisture table to
+  that coordinate's two values, reproducibly
 
-### Requirement: Neighboring cells trend toward the same or adjacent biome band
-Neighboring cells' underlying terrain values SHALL vary smoothly rather
-than being assigned independently at random, so that neighboring cells
-tend to share a biome band or sit in adjacent bands, forming coherent
-regions (e.g. a body of `Ocean` bordered by a ring of `Beach`) rather
-than cell-to-cell noise.
+### Requirement: Neighboring cells trend toward the same or adjacent biome
+Neighboring cells' underlying elevation and moisture values SHALL each
+vary smoothly rather than being assigned independently at random, so
+that neighboring cells tend to share a biome or a closely related one,
+forming coherent regions (e.g. a body of `Ocean` bordered by a ring of
+`Beach`, a `Desert` fading into `Grassland` rather than jumping straight
+to `Swamp`) rather than cell-to-cell noise. Water bodies SHALL be able
+to span an area large enough to read as an ocean separating continents
+or islands, not just a pond - i.e. the underlying elevation field's
+regions of coherent value SHALL be large relative to a single request
+window at the default zoom level, not confined to a small fraction of
+it.
 
-#### Scenario: Neighboring cells have closer terrain values than random cells
+#### Scenario: Neighboring cells have closer elevation and moisture values than random cells
 - **WHEN** comparing, across a generated window, the average absolute
-  terrain-value difference between each cell and its immediate neighbors
-  against the average absolute terrain-value difference between each
-  cell and a uniformly random other cell in that window
-- **THEN** the neighbor average is smaller
+  difference between each cell and its immediate neighbors against the
+  average absolute difference between each cell and a uniformly random
+  other cell in that window - computed separately for elevation and for
+  moisture
+- **THEN** the neighbor average is smaller than the random-pair average,
+  for both elevation and moisture
+
+#### Scenario: Water bodies can span a large area
+- **WHEN** a sufficiently large window is sampled for a seed that
+  produces a large `Ocean` region
+- **THEN** that `Ocean` region's extent is not bounded by a small fixed
+  size - it can span an area comparable to the window itself, large
+  enough to plausibly separate two landmasses
 
 ## REMOVED Requirements
 

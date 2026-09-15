@@ -45,11 +45,12 @@ Current shape, for reference:
   properties end to end.
 
 **Non-Goals:**
-- A second noise axis (e.g. temperature/moisture) for biome assignment.
-  One ordered scalar band model is enough for six biomes and keeps
-  determinism trivial to reason about; a "snow band" that can appear
-  anywhere the field is high (not just at world "poles") is an accepted
-  v1 simplification.
+- A third+ noise axis (e.g. temperature as distinct from moisture), or
+  latitude-based biome placement (so `Snow` only appears near world
+  "poles"). Two axes (elevation, moisture) is enough for ten biomes with
+  believable variety; a `Snow` band that can appear anywhere the
+  elevation field is high enough, not just at a modeled "pole", is an
+  accepted simplification.
 - A minimap, or continuous/scroll-wheel zoom. Zoom is pan-style
   (discrete steps, re-fetch), not a smooth continuous transform - see
   Decisions.
@@ -93,53 +94,87 @@ scale, and adjust visually during implementation.
   logic is a core product capability, not incidental plumbing worth an
   external dependency for.
 
-### Fractal (fBm) noise: 4 octaves, 0.5 persistence
+### Fractal (fBm) noise: two independent fields, continent-scale base
 A single octave of value noise reads as same-sized smooth blobs
 everywhere - every region is roughly `regionScale` cells across, with no
-finer structure, which in practice looked too uniform (confirmed by
-trying it - see the "revisit only if..." note this section replaces).
-`InfiniteValueNoise2D` now sums 4 octaves: the base (`regionScale = 32`)
-plus three more, each at half the previous octave's region scale
-(double the frequency) and half its amplitude (`persistence = 0.5`),
-normalized by the sum of amplitudes so the result stays in `[0, 1)`.
-Each octave hashes lattice points with its own octave index folded into
-the seed (`{seed}:lattice:{octave}:{lx}:{ly}`) so octaves don't
-correlate with each other. The base octave still dominates (its
-normalized weight is `1 / (1 + 0.5 + 0.25 + 0.125) ≈ 53%`), so
-large-scale shape is unchanged; the finer octaves add exactly the local
-variation real terrain has - a small lake inside an otherwise-Grassland
-region, a ragged coastline, a stray island - without needing a second
-noise axis or hand-authored features.
+finer structure, which in practice looked too uniform. `InfiniteValueNoise2D`
+sums several octaves instead: a base octave plus finer ones, each at
+half the previous octave's region scale (double the frequency) and half
+its amplitude (`persistence = 0.5`), normalized by the sum of
+amplitudes so the result stays in `[0, 1)`. Each octave hashes lattice
+points with its own octave index folded into the seed
+(`{seed}:lattice:{octave}:{lx}:{ly}`) so octaves don't correlate.
+
+Two such fields are sampled per cell, from two *independent* seeds (so
+they don't correlate with each other either):
+- **Elevation** - `InfiniteValueNoise2D(seed, regionScale: 128, octaves: 5,
+  persistence: 0.5)`. Region scales `128 -> 64 -> 32 -> 16 -> 8`; base
+  octave carries `1 / 1.9375 ≈ 52%` of the weight. `regionScale: 128`
+  (up from an earlier `32`) is what makes water bodies read as oceans
+  separating continents/islands instead of lake-sized ponds - the
+  *first* request confirmed `32` read as "lakes", not "an ocean", per
+  user feedback.
+- **Moisture** - `InfiniteValueNoise2D($"{seed}:moisture", regionScale: 96,
+  octaves: 4, persistence: 0.5)`. Region scales `96 -> 48 -> 24 -> 12`;
+  base octave carries `1 / 1.875 ≈ 53%` of the weight. Deriving its seed
+  by suffixing the parent seed (not a fresh unrelated string) keeps it
+  anchored to the same seed while guaranteeing independence from the
+  elevation field (different seed string -> entirely different lattice
+  hashes).
+
+Both fields still satisfy the spec's neighbor-smoothness requirement
+(each is itself a smooth fBm field); the finer octaves in each add the
+local variation real terrain has - a small lake inside a landmass, a dry
+patch inside a otherwise-wet region - without disturbing the large-scale
+shape the base octave establishes.
 
 **Alternatives considered:** higher persistence (more weight on fine
-detail) - tried and rejected, it broke the "neighboring cells trend
-toward the same or adjacent biome band" spec requirement's spirit (too
-much cell-to-cell jitter, verged back toward per-cell noise); more than
-4 octaves - rejected, region scale bottoms out at a few cells within 4
-steps (`32 -> 16 -> 8 -> 4`) already, and a 5th octave at scale 2 added
-visual noise without adding recognizable terrain features.
+detail) - rejected, it broke the neighbor-smoothness requirement's
+spirit (too much cell-to-cell jitter, verged back toward per-cell
+noise); reusing one field for both elevation and moisture with a
+coordinate offset (e.g. sample elevation at `(x, y)` and moisture at
+`(x + 10000, y)`) - rejected, offsetting into the *same* lattice doesn't
+guarantee independence the way a different hash seed does, and costs
+nothing extra to do properly.
 
-### Biome bands: six fixed thresholds on one scalar
-Fixed, ascending thresholds on the `[0, 1)` terrain value:
+### Biome set: elevation bands, moisture splits the middle two
+Fixed, ascending thresholds on the elevation value, four bands:
 
-| Biome      | Range         |
-|------------|---------------|
-| `Ocean`    | `< 0.35`      |
-| `Beach`    | `0.35 - 0.40` |
-| `Grassland`| `0.40 - 0.62` |
-| `Forest`   | `0.62 - 0.78` |
-| `Tundra`   | `0.78 - 0.90` |
-| `Snow`     | `>= 0.90`     |
+| Elevation band | Range         |
+|-----------------|---------------|
+| Ocean            | `< 0.42`      |
+| Beach             | `0.42 - 0.46` |
+| Lowland          | `0.46 - 0.68` |
+| Highland          | `0.68 - 0.85` |
+| Peak               | `>= 0.85`     |
 
-Chosen so oceans and grassland/forest (the two most common outdoor
-biomes for exploration) each get a wide band, while `Beach` stays a thin
-transitional ring around ocean edges (mirroring the old `OceanThreshold`
-cutoff's role) and `Snow` stays rare, at the extreme.
+`Ocean` and `Beach` map directly to those biomes regardless of
+moisture. `Peak` maps to `Mountains` (moisture `< 0.65`) or `Snow`
+(moisture `>= 0.65`) - a snow-capped peak reads as a wet peak, a bare
+rocky one as a dry-to-medium peak. `Lowland` and `Highland` each split
+three ways on the moisture value (`< 0.35` dry, `0.35 - 0.65` medium,
+`>= 0.65` wet):
 
-**Alternatives considered:** equal-width bands (`1/6` each) - rejected,
-makes `Beach` far too thick (a wide ring of "beach" around every ocean
-reads as unrealistic) and gives `Snow`/`Tundra` outsized real estate for
-what should be a rare extreme.
+| Elevation band | Dry      | Medium      | Wet          |
+|------------------|----------|-------------|--------------|
+| Lowland           | Desert   | Grassland   | Swamp        |
+| Highland          | Tundra   | Forest      | Rainforest   |
+
+Ten biomes total: `Ocean`, `Beach`, `Desert`, `Grassland`, `Swamp`,
+`Tundra`, `Forest`, `Rainforest`, `Mountains`, `Snow`. Elevation bands
+keep unequal widths for the same reason the original six-band table did
+(`Ocean`/`Lowland` wide since they're the most common ground the user
+explores; `Beach`/`Peak` narrow since they're transitional/rare) - see
+the archived single-axis version of this table in git history for the
+prior rationale, which still applies to the elevation axis alone.
+Moisture bands are simple equal thirds - there's no equivalent
+"transitional ring" concern on that axis.
+
+**Alternatives considered:** a `Mountains`-only peak band (no `Snow`
+split) - rejected, `Snow` was one of the original six biomes and gating
+it behind "high AND wet" (rather than "high" alone) is arguably more
+realistic than the original single-axis model where any sufficiently
+high value was always `Snow`.
 
 ### Window query API
 `GET /api/Maps?seed=<string>&x=<int>&y=<int>&width=<int>&height=<int>`.
@@ -230,14 +265,15 @@ changes substantially.
 
 ## Risks / Trade-offs
 
-- **A single ordered scalar can rarely place non-adjacent bands next to
-  each other** (e.g. `Snow` bordering `Grassland` if the lattice swings
-  sharply between two neighboring cells) → Mitigation: the spec's
-  "neighboring cells trend toward the same or adjacent biome band"
-  requirement is explicitly statistical (average neighbor difference
-  smaller than average random-pair difference), not an absolute
-  guarantee - the same standard the old elevation field already met in
-  production. A wide enough region scale keeps this rare in practice.
+- **The elevation/moisture fields can rarely place unlikely biome
+  neighbors next to each other** (e.g. `Desert` bordering `Swamp` across
+  a moisture-band boundary, with no `Grassland` cell between them, if
+  the moisture lattice swings sharply right at an elevation-band
+  boundary) → Mitigation: the spec's neighbor-smoothness requirement is
+  explicitly statistical (average neighbor difference smaller than
+  average random-pair difference), not an absolute guarantee - the same
+  standard the original single-axis field already met in production. A
+  wide enough region scale on both fields keeps this rare in practice.
 - **Negative-coordinate math (lattice index, cell-to-lattice division)
   must floor-divide, not truncate**, or values just west/north of `0`
   read from the wrong lattice cell → Mitigation: implement and test
