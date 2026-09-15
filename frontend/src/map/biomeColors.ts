@@ -12,17 +12,17 @@ type Biome = components["schemas"]["Biome"]
  */
 export const BIOME_COLORS: Record<Biome, string> = {
   // Water / coast
-  Ocean: "#bfe3f0",
-  Beach: "#f5e6c8",
-  // Lowland (dry -> wet): warm sand -> bright green -> dark olive marsh
-  Desert: "#e8c179",
-  Grassland: "#b3e089",
-  Swamp: "#748a5c",
-  // Highland (dry -> wet): cool blue-grey -> mid green -> deep green
-  Tundra: "#c3d3d8",
-  Forest: "#5fa668",
-  Rainforest: "#2f6b4f",
-  // Peak (dry/medium -> wet): bare rock -> snowcap
-  Mountains: "#a89a8a",
+  Ocean: "#c3e4ef",
+  Beach: "#f3e6cc",
+  // Lowland (dry -> wet): warm sand -> soft green -> muted sage marsh
+  Desert: "#e9d3a3",
+  Grassland: "#cbe6ac",
+  Swamp: "#a9b494",
+  // Highland (dry -> wet): cool pale blue-grey -> soft mid green -> deeper soft green
+  Tundra: "#d2dfe1",
+  Forest: "#96c299",
+  Rainforest: "#79a68b",
+  // Peak (dry/medium -> wet): soft warm stone -> snowcap
+  Mountains: "#bfb2a4",
   Snow: "#f7f9fb",
 }
