@@ -37,8 +37,8 @@ function windowSizeForViewport(cellPx: number) {
   return { width, height }
 }
 
-/** Default zoom step: start fully zoomed out (the last, widest-stride step) so the whole world is visible, then zoom in from there. */
-const DEFAULT_ZOOM_INDEX = ZOOM_LEVELS.length - 1
+/** Default zoom step: index 1 - the wide, continent-scale 1px/cell view ("x3" of 4, see the zoom indicator), with one step to zoom in and two more to zoom out from there. */
+const DEFAULT_ZOOM_INDEX = 1
 
 function App() {
   const [phase, setPhase] = useState<Phase>("result")
@@ -343,9 +343,12 @@ function App() {
               >
                 <ZoomIn />
               </Button>
-              {/* Level 1 = fully zoomed out, counting up to fully zoomed in - matches the usual "higher number = more detail" map convention, opposite of zoomIndex's own 0-at-most-zoomed-in order. */}
-              <span className="text-muted-foreground select-none font-mono text-[10px]" aria-label={`Zoom level ${ZOOM_LEVELS.length - zoomIndex} of ${ZOOM_LEVELS.length}`}>
-                {ZOOM_LEVELS.length - zoomIndex}/{ZOOM_LEVELS.length}
+              {/* x1 = fully zoomed out, xN (N = ZOOM_LEVELS.length) = most zoomed in - counts up toward more detail, opposite of zoomIndex's own 0-at-most-zoomed-in order, matching the usual camera-zoom "higher number = more magnification" convention. */}
+              <span
+                className="text-muted-foreground select-none font-mono text-[10px]"
+                aria-label={`Zoom x${ZOOM_LEVELS.length - zoomIndex} of x${ZOOM_LEVELS.length}`}
+              >
+                x{ZOOM_LEVELS.length - zoomIndex}
               </span>
               <Button
                 variant="outline"
