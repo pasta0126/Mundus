@@ -166,11 +166,11 @@ function App() {
     }
   }, [])
 
-  /** e.g. "mundus-6gzdh5ph-x-257-y334-2026年09月15日_18時30分.png" - seed and origin needed to reproduce this exact view, plus a timestamp (Japanese year-month-day order) so repeated downloads don't collide. */
+  /** e.g. "mundus-6gzdh5ph-x-257-y334-20260915_183042.png" - seed and origin needed to reproduce this exact view, plus a timestamp (Japanese YYYYMMDD_HHmmss convention) so repeated downloads don't collide. */
   function downloadFilename(view: ViewWindow): string {
     const now = new Date()
     const pad = (n: number) => String(n).padStart(2, "0")
-    const timestamp = `${now.getFullYear()}年${pad(now.getMonth() + 1)}月${pad(now.getDate())}日_${pad(now.getHours())}時${pad(now.getMinutes())}分`
+    const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
     return `mundus-${view.seed}-x${view.originX}-y${view.originY}-${timestamp}.png`
   }
 
