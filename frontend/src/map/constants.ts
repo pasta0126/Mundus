@@ -15,20 +15,18 @@ export interface ZoomLevel {
  * A small, discrete sequence of zoom steps - not a continuous/scroll-
  * wheel zoom - index 0 being the most zoomed-in level, ascending index
  * zooming out. See design.md ("full-viewport canvas, stepped zoom").
- * Only 4 levels: index 1 (displayed as "x3" - see DEFAULT_ZOOM_INDEX)
- * is the default, a wide continent-scale view at the documented 1px/
- * cell minimum; index 0 zooms in once from there (larger cellPx, more
- * detail, less world visible); indices 2-3 zoom out further by widening
- * `step` instead of shrinking cellPx below its 1px floor - going wider
- * this way keeps request/response size identical to the plain 1px/cell
- * step (same number of sampled cells, just spaced further apart in
- * world coordinates), so it costs nothing extra over the default level.
+ * `cellPx` stays fixed at its documented minimum of 1 throughout;
+ * zooming out widens `step` instead of shrinking cellPx further - this
+ * keeps request/response size identical at every level (same number of
+ * sampled cells, just spaced further apart in world coordinates), so
+ * going wider costs nothing extra. Only 4 levels, index 2 (displayed as
+ * "3" - see DEFAULT_ZOOM_INDEX) the default.
  */
 export const ZOOM_LEVELS: readonly ZoomLevel[] = [
-  { cellPx: 8, step: 1 },
   { cellPx: 1, step: 1 },
   { cellPx: 1, step: 2 },
   { cellPx: 1, step: 4 },
+  { cellPx: 1, step: 8 },
 ] as const
 
 /**

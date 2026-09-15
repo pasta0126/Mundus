@@ -29,7 +29,7 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 13;
+    public const int CurrentSpecVersion = 14;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 512;
@@ -103,6 +103,25 @@ public static class MapGenerator
     private const double PlateEdgeWidthFraction = 0.05;
 
     /// <summary>
+    /// A Voronoi/Worley diagram's own cell boundaries are mathematically
+    /// straight line segments - fine for abstract cellular texture, but a
+    /// "mountain range" made of dead-straight edges reads as an obvious
+    /// geometric artifact, not terrain. Domain warping - looking up the
+    /// plate field at a noise-displaced coordinate instead of the cell's
+    /// own - bends those straight seams into organic, winding curves;
+    /// this is the region scale of the warp noise itself (independent of
+    /// <see cref="PlateRegionScale"/>, deliberately a few times finer so
+    /// a single plate edge visibly wobbles more than once along its
+    /// length rather than just leaning at a slightly different angle).
+    /// </summary>
+    private const int PlateWarpRegionScale = 256;
+
+    private const int PlateWarpOctaves = 3;
+
+    /// <summary>How far (as a fraction of <see cref="PlateRegionScale"/>) the warp can displace a coordinate before it's handed to the plate field.</summary>
+    private const double PlateWarpAmplitudeFraction = 0.25;
+
+    /// <summary>
     /// Elevation floor below which a cell can never become Peak even
     /// sitting exactly on a plate seam - keeps mountain ranges confined
     /// to already-elevated terrain instead of clawing into Lowland.
@@ -115,7 +134,7 @@ public static class MapGenerator
     /// peninsula) commits to one style rather than flickering between
     /// styles cell to cell. See <see cref="CoastBiomeAt"/>.
     /// </summary>
-    private const int CoastRegionScale = 160;
+    private const int CoastRegionScale = 100;
 
     private const int CoastOctaves = 3;
 
@@ -183,8 +202,11 @@ public static class MapGenerator
         var elevationNoise = ElevationNoise(seed, step);
         var moistureNoise = MoistureNoise(seed, step);
         var plateField = PlateField(seed, step);
+        var warpXNoise = PlateWarpNoise(seed, step, axis: "x");
+        var warpYNoise = PlateWarpNoise(seed, step, axis: "y");
         var coastNoise = CoastNoise(seed, step);
         var plateEdgeWidth = PlateRegionScale * step * PlateEdgeWidthFraction;
+        var plateWarpAmplitude = PlateRegionScale * step * PlateWarpAmplitudeFraction;
         var cells = new List<Cell>(width * height);
         for (var j = 0; j < height; j++)
         {
@@ -235,8 +257,14 @@ public static class MapGenerator
                     {
                         // Plate-boundary proximity only matters for
                         // deciding whether elevated ground becomes a
-                        // mountain range - skip it for Lowland.
-                        var plateEdge = plateField.EdgeProximity(x, y, plateEdgeWidth);
+                        // mountain range - skip it for Lowland. Warp the
+                        // coordinate before querying the plate field (see
+                        // PlateWarpRegionScale) so the seam it traces
+                        // winds organically instead of following the
+                        // dead-straight edges a raw Voronoi diagram has.
+                        var warpedX = x + (int)Math.Round((warpXNoise.Sample(x, y, step) - 0.5) * 2 * plateWarpAmplitude);
+                        var warpedY = y + (int)Math.Round((warpYNoise.Sample(x, y, step) - 0.5) * 2 * plateWarpAmplitude);
+                        var plateEdge = plateField.EdgeProximity(warpedX, warpedY, plateEdgeWidth);
                         elevationBand = UpliftedBand(elevationBand, elevation, plateEdge);
                     }
 
@@ -265,9 +293,18 @@ public static class MapGenerator
     /// <summary>Sample the raw [0, 1) moisture value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
     public static double MoistureAt(string seed, int x, int y, int step = 1) => MoistureNoise(seed, step).Sample(x, y, step);
 
-    /// <summary>Sample the [0, 1] plate-boundary edge proximity at a coordinate - exposed for testing.</summary>
-    public static double PlateEdgeAt(string seed, int x, int y, int step = 1) =>
-        PlateField(seed, step).EdgeProximity(x, y, PlateRegionScale * step * PlateEdgeWidthFraction);
+    /// <summary>
+    /// Sample the [0, 1] plate-boundary edge proximity at a coordinate,
+    /// including the same domain warp <see cref="Generate"/> applies -
+    /// exposed for testing.
+    /// </summary>
+    public static double PlateEdgeAt(string seed, int x, int y, int step = 1)
+    {
+        var plateWarpAmplitude = PlateRegionScale * step * PlateWarpAmplitudeFraction;
+        var warpedX = x + (int)Math.Round((PlateWarpNoise(seed, step, axis: "x").Sample(x, y, step) - 0.5) * 2 * plateWarpAmplitude);
+        var warpedY = y + (int)Math.Round((PlateWarpNoise(seed, step, axis: "y").Sample(x, y, step) - 0.5) * 2 * plateWarpAmplitude);
+        return PlateField(seed, step).EdgeProximity(warpedX, warpedY, PlateRegionScale * step * PlateEdgeWidthFraction);
+    }
 
     private static InfiniteValueNoise2D ElevationNoise(string seed, int step) =>
         new(seed, ElevationRegionScale * step, ElevationOctaves, NoisePersistence);
@@ -281,6 +318,9 @@ public static class MapGenerator
 
     private static WorleyBoundaryField PlateField(string seed, int step) =>
         new($"{seed}:plate", PlateRegionScale * step);
+
+    private static InfiniteValueNoise2D PlateWarpNoise(string seed, int step, string axis) =>
+        new($"{seed}:plate-warp-{axis}", PlateWarpRegionScale * step, PlateWarpOctaves, NoisePersistence);
 
     private static InfiniteValueNoise2D CoastNoise(string seed, int step) =>
         new($"{seed}:coast", CoastRegionScale * step, CoastOctaves, NoisePersistence);
