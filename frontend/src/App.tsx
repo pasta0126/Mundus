@@ -250,19 +250,29 @@ function App() {
           <div className="fixed top-4 left-4 z-10 flex items-start gap-3">
             <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
               <div className="flex items-center justify-between gap-2">
-                <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-                  <img src={mundusIcon} alt="" className="size-6" />
-                  Mundus
+                <h1 className="text-lg font-semibold tracking-tight">
+                  <button
+                    type="button"
+                    onClick={regenerate}
+                    className="flex items-center gap-2 hover:opacity-80"
+                    aria-label="Back to home"
+                  >
+                    <img src={mundusIcon} alt="" className="size-6" />
+                    Mundus
+                  </button>
                 </h1>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setShowLegend((v) => !v)}
-                  aria-label="Toggle terrain legend"
-                  aria-expanded={showLegend}
-                >
-                  <Info />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setShowLegend((v) => !v)}
+                    aria-label="Toggle terrain legend"
+                    aria-expanded={showLegend}
+                  >
+                    <Info />
+                  </Button>
+                  <span className="text-muted-foreground font-mono text-xs">v{__APP_VERSION__}</span>
+                </div>
               </div>
               <MapParamsPanel
                 seed={viewWindow.seed}
