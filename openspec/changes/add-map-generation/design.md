@@ -4,104 +4,122 @@ See proposal.md - Why. This builds directly on `world-generation`'s `Rng`
 (`backend/src/Mundus.Core/Rng.cs`): named child streams, weighted picks,
 the determinism contract. No changes to `Rng` or `World` are needed.
 
-Two things make this harder than `world-generation`: it needs a
-deterministic *spatially coherent* value (elevation/biome vary smoothly
-across a grid, not independently per cell), and it needs to support two
-different coordinate systems behind one API.
+Revised from this change's first draft: biome is now per-*region*
+(a small number of contiguous patches), not an independent value per
+cell, and a "shape archetype" parameter controls the overall land/ocean
+silhouette (continent, island, archipelago). This is closer to what a
+real map (Middle-earth, Great Britain) looks like - a handful of
+recognizable regions on a recognizable landmass - than a texture of noise.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- A deterministic, dependency-free noise function suitable for elevation
-  and a second independent "moisture" channel that varies biome at a
-  given elevation.
-- One `Map` shape that works for both grid types without leaking
-  grid-specific logic into the HTTP layer.
+- A deterministic elevation noise field, optionally biased by a shape
+  archetype's "landmass mask", that produces the land/ocean layout
+  guarantees in the spec (one landmass for Continent/Island, several for
+  Archipelago, ocean-edged for Island).
+- A deterministic region partition (Voronoi from a small number of seed
+  points) so biome is uniform per region and the region count matches the
+  size preset's documented range.
+- One `Map` shape that works for both grid types.
 
 **Non-Goals:**
-- Rivers, roads, settlements, or any feature beyond biome + elevation.
-- Frontend rendering (separate future change, once this data shape
-  exists and is stable).
-- Arbitrary (non-rectangular) hex map shapes (radius-based hexagons,
-  irregular borders) - only a rectangular offset layout, matching the
-  "width x height requested explicitly" requirement.
+- Rivers, roads, settlements, or any feature beyond elevation + biome
+  regions.
+- The wizard UI (frontend, separate future change - see proposal.md).
+- Precise real-world silhouette matching ("looks exactly like Great
+  Britain") - shape archetypes produce a recognizable *category* of
+  landmass (island, continent, archipelago), not a traced coastline.
 
 ## Decisions
 
-- **Value noise, hand-implemented, seeded from `Rng` - no external noise
-  library.** Generate a lattice of random gradient values at integer
-  coordinates (spaced every `N` cells, `N` a small constant like 8) using
-  a child `Rng` stream, then bilinearly interpolate (with a smoothstep
-  easing curve, not linear, to avoid visible grid creases) between the 4
-  surrounding lattice points for every cell's continuous elevation value.
-  Alternative considered: pull in a Perlin/Simplex NuGet package. Rejected
-  to keep the generation engine dependency-free and fully self-owned -
-  this is a core product capability (the "how" of world generation *is*
-  the product), not incidental plumbing where an off-the-shelf dependency
-  is a reasonable shortcut.
-- **Two independent noise channels**: `elevation` and `moisture`, each
-  from its own named child `Rng` stream (`rng.Child("elevation-lattice")`,
-  `rng.Child("moisture-lattice")`), so changing one doesn't perturb the
-  other syncronization-wise. Biome is then a deterministic function of
-  `(elevation, moisture)` via a fixed lookup table (a simplified
-  Whittaker-diagram style mapping), not its own independent random draw -
-  this is what makes biome spatially coherent "for free", since it
-  inherits the coherence of the two noise fields it's derived from.
-- **Biome-from-(elevation, moisture) table** (documented here, not
-  normative in the spec - the spec only requires the *coherence property*
-  and *closed biome set*, not this exact table, so the table can be tuned
-  later without a spec change):
-  - `elevation < 0.3` -> `Ocean`
-  - `elevation >= 0.85` -> `Mountains`
-  - otherwise, by `moisture` band: low -> `Desert`, low-mid -> `Grassland`,
-    mid-high -> `Forest`, high -> `Swamp`; `Tundra` reserved for a future
-    latitude/temperature axis (not reachable in this change - acceptable
-    since the spec only requires biomes come from the fixed set, not that
-    every value is reachable by every algorithm version).
-- **Grid abstraction**: a `GridType` enum (`Square`, `Hex`). `Map` holds
-  `GridType`, `Width`, `Height`, and a flat `IReadOnlyList<Cell>` in
-  row-major order (`y * Width + x`), where `Cell` has `X`, `Y` (the
-  offset/array coordinates for both grid types - simplest thing that
-  works for a rectangular layout of either kind), `Biome`, `Elevation`.
-  Hex neighbor lookup (for the coherence property and for a future
-  renderer) uses the standard "even-r"/"odd-r" offset-coordinate neighbor
-  tables, kept as a small internal helper - not part of the wire format,
-  since the frontend only needs the flat cell list plus `GridType` to know
-  how to lay cells out visually.
-  Alternative considered: axial/cube coordinates for hex (the more common
-  choice for pure hex-grid work). Rejected here because the requirement
-  is a *rectangular width x height request* matching the square case
-  one-for-one in the API shape; offset coordinates map onto that directly,
-  axial coordinates would need a conversion layer at the API boundary for
-  no benefit given no diagonal/ring queries are in scope yet.
-- **Dimension limit**: reject width/height above 512 (so up to ~262k
-  cells) with a `400 Bad Request`. Chosen as a round number comfortably
-  above any near-term frontend rendering need, while bounding worst-case
-  generation cost and response payload size. Revisit if a real use case
-  needs larger.
+- **Elevation: value noise, hand-implemented, seeded from `Rng` - no
+  external noise library.** Same approach as this change's first draft:
+  a lattice of random values at spaced integer coordinates from a named
+  child `Rng` stream (`rng.Child("elevation-lattice")`), bilinearly
+  interpolated with a smoothstep easing curve per cell. Kept
+  dependency-free for the same reason as before - this generation logic
+  is a core product capability, not incidental plumbing.
+- **Shape archetype as a post-process mask on the elevation field**,
+  applied before biome-region assignment (so `Ocean` regions correctly
+  land on genuinely low terrain):
+  - `Unconstrained`: raw noise field, no mask.
+  - `Continent`: raw noise field with a single broad, low-frequency
+    "landmass bump" added (centered near the map's middle, gently
+    decaying outward) so noise variation still exists but overall trends
+    toward one dominant elevated mass. Ocean threshold is a fixed
+    elevation cutoff (e.g. `< 0.3`) as in the previous draft.
+  - `Island`: like `Continent`, but the decay is steep enough that the
+    outer ring of cells is guaranteed below the ocean threshold (mask
+    value at the edge forced to 0 exactly) - satisfies the spec's
+    "every edge cell is Ocean" requirement structurally, not
+    probabilistically.
+  - `Archipelago`: `K` broad landmass bumps (`K` derived from the size
+    preset, e.g. 3-6), each at a random center from a named child `Rng`
+    stream, each with a smaller radius than `Continent`'s single bump and
+    spaced apart (rejection-sampled minimum center distance) so they
+    don't merge into one connected landmass - satisfies "two or more
+    disjoint landmasses, not adjacent to each other."
+  - After masking, connectivity (one landmass vs. several, edge-ocean) is
+    verified by flood-fill in a unit test, not assumed from the mask
+    parameters alone - the mask makes the property overwhelmingly likely,
+    the test is what actually enforces the spec's SHALL.
+- **Biome regions via Voronoi partition**: pick `N` seed points inside
+  the grid from a named child `Rng` stream (`rng.Child("regions")`), `N`
+  chosen uniformly within the size preset's documented region-count range;
+  assign every cell to its nearest seed point (Euclidean distance for
+  `Square`, hex distance for `Hex`), giving contiguous regions by
+  construction. Each region's biome is then a deterministic function of
+  the *elevation at its seed point* (post-shape-mask) and a second,
+  independent "moisture" value sampled the same way
+  (`rng.Child("moisture-lattice")`), via the same elevation/moisture
+  lookup table from this change's first draft (low elevation -> `Ocean`,
+  very high -> `Mountains`, otherwise by moisture band). This both makes
+  biome regions coherent (they're Voronoi cells, contiguous by
+  construction) and keeps `Ocean` regions aligned with genuinely low
+  terrain.
+- **Grid abstraction**: unchanged from this change's first draft -
+  `GridType` enum (`Square`, `Hex`), `Map` holds `GridType`, `SizePreset`,
+  `Width`, `Height`, and a flat row-major `Cell` list (`X`, `Y`, `Biome`,
+  `Elevation`). Hex neighbor lookup uses offset-coordinate neighbor
+  tables (even-r/odd-r).
+- **Size presets are a closed enum with hardcoded dimensions**
+  (`Small`=32x32, `Medium`=64x64, `Large`=128x128, `Huge`=256x256) rather
+  than free integers - simpler API, and removes the need for a
+  dimension-limit validation rule entirely (every accepted value already
+  has a bounded, known cost).
 
 ## Risks / Trade-offs
 
+- [Risk] Structurally guaranteeing archetype properties via the mask
+  shape (rather than only checking it after the fact) still needs a
+  verification step, because noise variation on top of the mask could
+  theoretically break through the forced-zero edge ring or merge two
+  archipelago bumps. → Mitigation: generation includes a post-generation
+  connectivity check (flood-fill); if it fails the property for some
+  seed, that seed's map for that archetype needs a retry with a
+  derived/incremented seed (an implementation detail, not spec-visible -
+  the *output* the caller receives always satisfies the spec, the caller
+  never sees a failed attempt).
+- [Risk] Voronoi regions can produce slivers (very small regions) near
+  seed-point clusters. → Accepted for v1: the spec only requires
+  contiguity and a region count within range, not minimum region size;
+  revisit with minimum-distance seed placement if slivers look bad once
+  rendered.
 - [Risk] Hand-rolled noise is unlikely to be as visually pleasing as a
-  battle-tested Perlin/Simplex implementation. → Mitigation: the spec only
-  requires the coherence *property*, not a specific visual quality bar;
-  the lattice+smoothstep approach is simple enough to replace later
-  (bump `specVersion` on `Map` if the replacement changes existing seeds'
-  output) without touching the API shape.
-- [Risk] Offset hex coordinates make some algorithms (ring/spiral
-  traversal, hex distance) more awkward than axial/cube. → Accepted:
-  none of those are needed yet; revisit if a future change needs them.
-- [Risk] A 512x512 map is ~262k cells serialized as JSON, which is a
-  non-trivial payload. → Accepted for now (no pagination/tiling in this
-  change); revisit if real usage shows this is a problem.
+  battle-tested Perlin/Simplex implementation. → Same mitigation as the
+  first draft: the spec requires the coherence *property*, not a specific
+  visual quality bar, so the algorithm can be swapped later without an
+  API change.
 
 ## Migration Plan
 
 Greenfield - purely additive, no existing data or API surface changes.
-1. Add `GridType`, `Cell`, `Map` types and the noise-based generator to
+1. Add `GridType`, `ShapeArchetype`, `SizePreset`, `Cell`, `Map` types and
+   the elevation-noise + shape-mask + Voronoi-region generator to
    `Mundus.Core`.
-2. Add a `MapsController` (or extend an existing one) exposing it over
-   HTTP per the spec.
-3. Unit-test the coherence property statistically (average neighbor delta
-   < average random-pair delta) rather than pinning exact per-cell
-   values, since the *property* is what the spec requires.
+2. Add a controller endpoint exposing it over HTTP per the spec.
+3. Unit-test each spec requirement as its own property-based check
+   (determinism, region count range, contiguity, elevation coherence,
+   per-archetype connectivity) rather than pinning exact per-cell output
+   values.
