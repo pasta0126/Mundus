@@ -227,6 +227,26 @@
       window's origin (`x`, `y`) instead of seed and size preset, with
       copy support for reproducing the exact view.
 
+## 10a. Frontend: default to fully zoomed out, go-to-coordinates, richer downloads, icons everywhere
+
+- [x] 10a.1 Flip the default zoom step to the last `ZOOM_LEVELS_PX`
+      entry (`1px`, most zoomed-out) instead of index `0`: initial load
+      and Regenerate both start there; zoom-out is disabled and zoom-in
+      enabled at that step (bounds simply swap direction).
+- [x] 10a.2 Add a "go to coordinates" form to `MapParamsPanel` (X/Y
+      number inputs + submit button) that re-centers the current zoom
+      step's window on the entered point via the same `fetchTiled` path
+      used by zoom, without touching the seed or `cellPx`.
+- [x] 10a.3 Build the downloaded PNG's filename from the current view's
+      seed, origin, `cellPx`, and window size, plus a timestamp, instead
+      of a fixed `mundus-map.png`.
+- [x] 10a.4 Add an icon to every actionable control that didn't already
+      have one (Regenerate, Download, Copy seed, Retry, go-to submit),
+      and lay out Regenerate/Download as equal-width buttons.
+- [x] 10a.5 Verify in a browser: the page loads at the most-zoomed-out
+      step covering the full viewport, entering a coordinate jumps and
+      recenters correctly, and `npm run build`/`npm run lint` stay clean.
+
 ## 11. Verification
 
 - [x] 11.1 Run `dotnet build`, `dotnet test`, `npm run build`,

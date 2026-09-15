@@ -74,7 +74,11 @@ bounded card or leaving empty page background beside it.
 After a window is rendered, the system SHALL offer exactly two actions:
 Regenerate (generate a new window immediately, with a new random seed,
 centered back on `(0, 0)` at the default zoom level) and Download (save
-the currently rendered window as a PNG image file).
+the currently rendered window as a PNG image file). Both actions SHALL
+be shown as equally-prominent controls (e.g. filling the available
+width of their row rather than sizing to their label) and SHALL each
+carry an icon alongside their label, consistent with every other
+control in the UI (pan, zoom, copy seed, go to coordinates).
 
 #### Scenario: Regenerate produces a new map without leaving the result view
 - **WHEN** a user, after viewing a generated window, chooses "Regenerate"
@@ -89,7 +93,35 @@ the currently rendered window as a PNG image file).
 #### Scenario: Download saves the rendered map as an image
 - **WHEN** a user, after viewing a generated window, chooses "Download"
 - **THEN** a PNG image file of the currently rendered window is saved to
-  the user's device
+  the user's device, named with the values needed to reproduce that
+  exact view (seed, origin `x`/`y`, zoom step, window size) plus a
+  timestamp, rather than a fixed generic filename
+
+### Requirement: Jumping to a specific coordinate
+After a window is rendered, the system SHALL let the user enter a
+specific `x`/`y` world coordinate and jump directly there: the current
+zoom step's full viewport-covering window SHALL be recalculated,
+centered on the entered coordinate, using the same seed. This is
+independent of panning (which shifts by a fixed step) and of the
+default starting position (which SHALL remain `(0, 0)` on initial load
+and on Regenerate).
+
+#### Scenario: Going to a coordinate recenters the view there
+- **WHEN** a user, after viewing a generated window, enters an `x` and a
+  `y` value and confirms
+- **THEN** a new window request is made for the same seed and the
+  current zoom step's cell size, centered on the entered coordinate,
+  and the canvas updates to show the response
+
+#### Scenario: Going to a coordinate preserves the seed and zoom step
+- **WHEN** a user jumps to a coordinate
+- **THEN** the seed and the on-screen cell size used for the new window
+  request are unchanged from the current view
+
+#### Scenario: Initial load and Regenerate still default to the origin
+- **WHEN** the page loads, or a user chooses "Regenerate"
+- **THEN** the resulting window is centered on `(0, 0)`, regardless of
+  any coordinate previously jumped to
 
 ### Requirement: Progress and status feedback
 The system SHALL show visible progress and status feedback for every
@@ -163,29 +195,33 @@ and updating the canvas to show the newly returned cells once loaded.
 - **THEN** the seed used for the new window request is unchanged from
   the one used to generate the current window
 
-### Requirement: Zooming out through a fixed set of steps
-After a window is rendered, the system SHALL let the user zoom out
-through a small, fixed, documented sequence of steps - shrinking the
-on-screen cell size at each step, down to a documented minimum of 1
-pixel per cell - by requesting a new, larger-in-cells window centered on
-the same point using the same seed, sized to cover the full viewport at
-that step's cell size (see "Tiled, progressive window loading" for how
-a window that size is actually fetched). The system SHALL let the user
-zoom back in through the same steps, up to the default cell size, and
-SHALL NOT allow zooming in past the default or out past the smallest
-step. A window's cell count SHALL still be bounded by a documented
-safety maximum far larger than any real display's needs at the smallest
-step; only beyond that safety maximum MAY the rendered window cover less
-than the full viewport, centered rather than stretched.
+### Requirement: Zooming through a fixed set of steps
+The system SHALL default to the most zoomed-out step (the documented
+minimum of 1 pixel per cell) on initial load and on Regenerate, so the
+widest possible view of the world is what the user sees first. After a
+window is rendered, the system SHALL let the user zoom in through a
+small, fixed, documented sequence of steps - growing the on-screen cell
+size at each step, up to a documented maximum - by requesting a new,
+smaller-in-cells window centered on the same point using the same seed,
+sized to cover the full viewport at that step's cell size (see "Tiled,
+progressive window loading" for how a window that size is actually
+fetched). The system SHALL let the user zoom back out through the same
+steps, down to the default (most zoomed-out) cell size, and SHALL NOT
+allow zooming out past the default or in past the largest step. A
+window's cell count SHALL still be bounded by a documented safety
+maximum far larger than any real display's needs at the smallest cell
+size; only beyond that safety maximum MAY the rendered window cover
+less than the full viewport, centered rather than stretched.
 
-#### Scenario: Zooming out shows more of the map
-- **WHEN** a user zooms out after viewing a generated window
-- **THEN** a new window request is made for the same seed, covering more
-  cells than the current window, and the canvas updates to show the
-  response at a smaller on-screen cell size
+#### Scenario: Zooming in shows less of the map in more detail
+- **WHEN** a user zooms in after viewing a generated window
+- **THEN** a new window request is made for the same seed, covering
+  fewer cells than the current window, and the canvas updates to show
+  the response at a larger on-screen cell size
 
 #### Scenario: Zoomed-out views cover the full viewport
-- **WHEN** a user zooms out to any documented step on a real display
+- **WHEN** a user is at any documented zoom step, including the default
+  most-zoomed-out step, on a real display
 - **THEN** the rendered window covers the full browser viewport at that
   step's on-screen cell size, not a smaller square in the middle of an
   otherwise-empty page
@@ -197,10 +233,10 @@ than the full viewport, centered rather than stretched.
   centered on
 
 #### Scenario: Zoom range is bounded
-- **WHEN** a user is at the smallest on-screen cell size the system
-  offers
+- **WHEN** a user is at the default (most zoomed-out) cell size
 - **THEN** no further zoom-out action is available
-- **WHEN** a user is at the default (most zoomed-in) cell size
+- **WHEN** a user is at the largest (most zoomed-in) cell size the
+  system offers
 - **THEN** no further zoom-in action is available
 
 ### Requirement: Tiled, progressive window loading

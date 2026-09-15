@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react"
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, ZoomIn, ZoomOut } from "lucide-react"
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
@@ -34,11 +34,14 @@ function windowSizeForViewport(cellPx: number) {
   return { width, height }
 }
 
+/** Default zoom step: start fully zoomed out (the last, smallest cellPx step) so the whole world is visible, then zoom in from there. */
+const DEFAULT_ZOOM_INDEX = ZOOM_LEVELS_PX.length - 1
+
 function App() {
   const [phase, setPhase] = useState<Phase>("result")
   const [viewWindow, setViewWindow] = useState<ViewWindow | null>(null)
   const [chunks, setChunks] = useState<MapDto[]>([])
-  const [zoomIndex, setZoomIndex] = useState(0)
+  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX)
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState({ loaded: 0, total: 0 })
   const [errorMessage, setErrorMessage] = useState("")
@@ -100,13 +103,13 @@ function App() {
   // No user input is collected: the first map generates itself, for a
   // fresh random seed centered on (0, 0), the moment the page loads.
   useEffect(() => {
-    void fetchTiled(randomSeed(), 0, 0, ZOOM_LEVELS_PX[0])
+    void fetchTiled(randomSeed(), 0, 0, ZOOM_LEVELS_PX[DEFAULT_ZOOM_INDEX])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function regenerate() {
-    setZoomIndex(0)
-    void fetchTiled(randomSeed(), 0, 0, ZOOM_LEVELS_PX[0])
+    setZoomIndex(DEFAULT_ZOOM_INDEX)
+    void fetchTiled(randomSeed(), 0, 0, ZOOM_LEVELS_PX[DEFAULT_ZOOM_INDEX])
   }
 
   function pan(dx: number, dy: number) {
@@ -114,6 +117,13 @@ function App() {
     const stepX = Math.max(1, Math.round(viewWindow.width / 2))
     const stepY = Math.max(1, Math.round(viewWindow.height / 2))
     void fetchTiled(viewWindow.seed, viewWindow.originX + dx * stepX, viewWindow.originY + dy * stepY, viewWindow.cellPx)
+  }
+
+  /** Jumps straight to a given world coordinate, re-centering the current zoom level's full window on it - a full recalculation of the visible map, not a pan. */
+  function goToPosition(x: number, y: number) {
+    if (!viewWindow) return
+    const { width, height } = windowSizeForViewport(viewWindow.cellPx)
+    void fetchTiled(viewWindow.seed, x - Math.floor(width / 2), y - Math.floor(height / 2), viewWindow.cellPx)
   }
 
   function zoom(direction: 1 | -1) {
@@ -156,14 +166,23 @@ function App() {
     }
   }, [])
 
+  /** e.g. "mundus-6gzdh5ph-x-257-y334-zoom1px-1728x986-2026-09-15_1830.png" - every value needed to reproduce this exact view, plus a timestamp so repeated downloads don't collide. */
+  function downloadFilename(view: ViewWindow): string {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, "0")
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`
+    return `mundus-${view.seed}-x${view.originX}-y${view.originY}-zoom${view.cellPx}px-${view.width}x${view.height}-${timestamp}.png`
+  }
+
   function downloadMap() {
-    if (!canvasEl) return
+    if (!canvasEl || !viewWindow) return
+    const filename = downloadFilename(viewWindow)
     canvasEl.toBlob((blob) => {
       if (!blob) return
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.download = "mundus-map.png"
+      link.download = filename
       link.click()
       URL.revokeObjectURL(url)
     }, "image/png")
@@ -196,6 +215,7 @@ function App() {
             <div className="bg-card flex flex-col items-center gap-3 rounded-lg border p-6 shadow-lg">
               <p className="text-destructive text-sm">{errorMessage}</p>
               <Button variant="outline" onClick={regenerate}>
+                <RefreshCw />
                 Retry
               </Button>
             </div>
@@ -219,12 +239,14 @@ function App() {
           <div className="fixed top-4 left-4 z-10 space-y-3">
             <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
               <h1 className="text-lg font-semibold tracking-tight">Mundus</h1>
-              <MapParamsPanel seed={viewWindow.seed} originX={viewWindow.originX} originY={viewWindow.originY} />
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={regenerate}>
+              <MapParamsPanel seed={viewWindow.seed} originX={viewWindow.originX} originY={viewWindow.originY} onGoTo={goToPosition} />
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={regenerate} className="flex-1">
+                  <RefreshCw />
                   Regenerate
                 </Button>
-                <Button variant="outline" size="sm" onClick={downloadMap}>
+                <Button variant="outline" size="sm" onClick={downloadMap} className="flex-1">
+                  <Download />
                   Download
                 </Button>
               </div>

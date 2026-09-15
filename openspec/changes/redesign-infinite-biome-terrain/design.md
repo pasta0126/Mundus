@@ -243,22 +243,35 @@ The map is the page background: canvas width/height are set to the
 browser viewport's size (updated on resize), not a fixed card size.
 Cell size comes from a fixed, small array of steps,
 `ZOOM_LEVELS_PX = [24, 20, 16, 12, 8, 6, 4, 3, 2, 1]` (index `0`, `24px`,
-is the default/most-zoomed-in level, `1px` the maximum zoom-out); the
-desired window's `width`/`height` (in cells) are computed as
-`ceil(viewportPx / cellPx)` for each axis - see "Tiled, progressive
-window loading" for how that window (which at low `cellPx` values is far
-larger than any single request should cover) actually gets fetched.
-Zooming steps `cellPx` to the next array entry, re-fetching a window
-centered on the same point (current origin + half the current window,
-in cells) at the new `cellPx` - not a CSS/canvas-transform zoom, since
-the whole point is to reveal more *generated* cells, not stretch pixels.
-Panning shifts the origin by half the current window (in each axis, at
-the current zoom level) in the chosen direction and re-fetches - large
-enough to feel like real movement, small enough to keep on-screen
-continuity with the previous view (half the grid is cells the user has
-already seen). Every other UI element (params panel, pan/zoom controls)
-is positioned as an absolutely/fixed-positioned overlay on top of the
-canvas, never in a layout flow that shrinks or displaces it.
+is the largest/most-zoomed-in level; `1px`, the *last* index, is the
+default and the maximum zoom-out - the initial load and Regenerate both
+start there, showing the widest possible view of the world first, with
+zoom-in as the primary action from that point). The desired window's
+`width`/`height` (in cells) are computed as `ceil(viewportPx / cellPx)`
+for each axis - see "Tiled, progressive window loading" for how that
+window (which at low `cellPx` values is far larger than any single
+request should cover) actually gets fetched. Zooming steps `cellPx` to
+the next/previous array entry, re-fetching a window centered on the same
+point (current origin + half the current window, in cells) at the new
+`cellPx` - not a CSS/canvas-transform zoom, since the whole point is to
+reveal more *generated* cells, not stretch pixels. Panning shifts the
+origin by half the current window (in each axis, at the current zoom
+level) in the chosen direction and re-fetches - large enough to feel
+like real movement, small enough to keep on-screen continuity with the
+previous view (half the grid is cells the user has already seen). A
+"go to coordinates" form (two number inputs plus a submit control) lets
+the user instead re-center the current zoom step's window directly on
+an entered `(x, y)`, computed the same way as a zoom re-center
+(`entered - floor(window / 2)`), reusing the same `fetchTiled` path -
+distinct from panning's fixed half-window step, and independent of the
+default-origin behavior on load/Regenerate. Every other UI element
+(params panel, pan/zoom controls, go-to form) is positioned as an
+absolutely/fixed-positioned overlay on top of the canvas, never in a
+layout flow that shrinks or displaces it. Every actionable control
+(pan, zoom, copy seed, go-to, regenerate, download) pairs an icon with
+its label, and Regenerate/Download are laid out as equal-width
+(`flex-1`) buttons rather than sized to their text, so the two primary
+post-generation actions read as equally prominent.
 
 **Alternatives considered:** continuous/scroll-wheel zoom with a CSS
 transform on the canvas between re-fetches - rejected per proposal's
@@ -266,6 +279,12 @@ transform on the canvas between re-fetches - rejected per proposal's
 region-scale-32 noise field from ever being viewed at a scale where its
 smoothing becomes visually obvious, which an open-ended continuous zoom
 would risk.
+
+Downloaded PNGs are named
+`mundus-{seed}-x{originX}-y{originY}-zoom{cellPx}px-{width}x{height}-{YYYY-MM-DD_HHmm}.png`
+- every value needed to reproduce the exact view, plus a timestamp so
+repeated downloads of the same view don't silently overwrite one
+another in the browser's downloads folder.
 
 ### Tiled, progressive window loading
 At low `cellPx`, the window needed to cover a real viewport (e.g.
