@@ -191,9 +191,9 @@ public class MapGeneratorTests
         }
 
         // A lake-scale body (the old regionScale=32 behavior) would top
-        // out around a few hundred cells; a continent-scale ocean at
-        // regionScale=128 should comfortably exceed that within a
-        // 200x200 window.
+        // out around a few hundred cells; a continent-scale ocean at the
+        // current regionScale=512 should comfortably exceed that within
+        // a 200x200 window.
         Assert.True(visited.Count > 1000, $"connected Ocean region was only {visited.Count} cells");
     }
 }

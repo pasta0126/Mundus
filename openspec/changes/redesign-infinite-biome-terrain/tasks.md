@@ -247,6 +247,19 @@
       step covering the full viewport, entering a coordinate jumps and
       recenters correctly, and `npm run build`/`npm run lint` stay clean.
 
+## 10b. Backend: continent-scale elevation at the widest (1px) zoom
+
+- [x] 10b.1 Bump `MapGenerator`'s elevation field to
+      `regionScale: 512, octaves: 7` (up from `128, 5`), keeping the
+      same finest octave scale (`8`) so coastline/archipelago
+      raggedness isn't lost to the larger base scale.
+- [x] 10b.2 Bump `Map.CurrentSpecVersion`.
+- [x] 10b.3 Confirm `dotnet test` still passes (water-body flood-fill
+      test, neighbor-smoothness, all others).
+- [x] 10b.4 Spot-check via the API at a scale matching the 1px zoom
+      step (sampling a window many thousands of cells wide) that ocean
+      and land masses read as continents/archipelagos, not lakes/ponds.
+
 ## 11. Verification
 
 - [x] 11.1 Run `dotnet build`, `dotnet test`, `npm run build`,

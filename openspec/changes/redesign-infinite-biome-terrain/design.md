@@ -107,13 +107,18 @@ points with its own octave index folded into the seed
 
 Two such fields are sampled per cell, from two *independent* seeds (so
 they don't correlate with each other either):
-- **Elevation** - `InfiniteValueNoise2D(seed, regionScale: 128, octaves: 5,
-  persistence: 0.5)`. Region scales `128 -> 64 -> 32 -> 16 -> 8`; base
-  octave carries `1 / 1.9375 ≈ 52%` of the weight. `regionScale: 128`
-  (up from an earlier `32`) is what makes water bodies read as oceans
-  separating continents/islands instead of lake-sized ponds - the
-  *first* request confirmed `32` read as "lakes", not "an ocean", per
-  user feedback.
+- **Elevation** - `InfiniteValueNoise2D(seed, regionScale: 512, octaves: 7,
+  persistence: 0.5)`. Region scales `512 -> 256 -> 128 -> 64 -> 32 -> 16
+  -> 8`; base octave carries `1 / 1.9921875 ≈ 50%` of the weight.
+  `regionScale` went `32 -> 128 -> 512` across three rounds of feedback:
+  `32` read as "lakes", `128` was truer to an ocean/continent shape at
+  the default (most zoomed-in) view but still looked lake-sized once the
+  lowest zoom step (1px/cell, showing thousands of cells at once) shipped
+  - `512` is what a body of water needs to still read as ocean-scale
+  rather than pond-scale at that widest view. Two extra octaves (down to
+  the same finest `8` scale as before) keep the coastline/archipelago
+  raggedness the smaller `regionScale: 128` gave, instead of losing it
+  to the larger base's coarser detail.
 - **Moisture** - `InfiniteValueNoise2D($"{seed}:moisture", regionScale: 96,
   octaves: 4, persistence: 0.5)`. Region scales `96 -> 48 -> 24 -> 12`;
   base octave carries `1 / 1.875 ≈ 53%` of the weight. Deriving its seed

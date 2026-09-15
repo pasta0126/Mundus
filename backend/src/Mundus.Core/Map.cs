@@ -29,19 +29,27 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 7;
+    public const int CurrentSpecVersion = 8;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 512;
 
     /// <summary>
     /// Elevation's base region scale (cells per lattice unit at its
-    /// broadest octave) - large enough that a body of water reads as an
-    /// ocean separating continents/islands, not a lake. See design.md.
+    /// broadest octave) - large enough that, even zoomed all the way out
+    /// (1px/cell, the whole viewport spanning thousands of cells), water
+    /// and land read as ocean/continent/archipelago-scale masses instead
+    /// of lakes and ponds. See design.md.
     /// </summary>
-    private const int ElevationRegionScale = 128;
+    private const int ElevationRegionScale = 512;
 
-    private const int ElevationOctaves = 5;
+    /// <summary>
+    /// One octave per halving down to region scale 8, matching the
+    /// original (pre-continent-scale) finest octave - so raising the
+    /// base scale for bigger continents doesn't also erase the
+    /// small-scale coastline/island raggedness that scale gave.
+    /// </summary>
+    private const int ElevationOctaves = 7;
 
     /// <summary>Moisture's base region scale - broad climate zones, independent of elevation's.</summary>
     private const int MoistureRegionScale = 96;
