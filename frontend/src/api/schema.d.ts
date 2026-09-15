@@ -37,6 +37,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/Maps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    seed?: string;
+                    gridType?: components["schemas"]["GridType"];
+                    sizePreset?: components["schemas"]["SizePreset"];
+                    shapeArchetype?: components["schemas"]["ShapeArchetype"];
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Map"];
+                        "application/json": components["schemas"]["Map"];
+                        "text/json": components["schemas"]["Map"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/Worlds/{seed}": {
         parameters: {
             query?: never;
@@ -82,6 +124,33 @@ export interface components {
     schemas: {
         /** @enum {unknown} */
         Biome: "Forest" | "Desert" | "Tundra" | "Grassland" | "Swamp" | "Mountains" | "Ocean";
+        Cell: {
+            /** Format: int32 */
+            x: number | string;
+            /** Format: int32 */
+            y: number | string;
+            biome: components["schemas"]["Biome"];
+            /** Format: double */
+            elevation: number | string;
+        };
+        /** @enum {unknown} */
+        GridType: "Square" | "Hex";
+        Map: {
+            /** Format: int32 */
+            specVersion: number | string;
+            seed: string;
+            gridType: components["schemas"]["GridType"];
+            sizePreset: components["schemas"]["SizePreset"];
+            /** Format: int32 */
+            width: number | string;
+            /** Format: int32 */
+            height: number | string;
+            cells: components["schemas"]["Cell"][];
+        };
+        /** @enum {unknown} */
+        ShapeArchetype: "Continent" | "Island" | "Archipelago" | "Peninsula" | "IsthmusLandBridge" | "InlandSea" | "Unconstrained" | null;
+        /** @enum {unknown} */
+        SizePreset: "Small" | "Medium" | "Large" | "Huge";
         World: {
             /** Format: int32 */
             specVersion: number | string;
