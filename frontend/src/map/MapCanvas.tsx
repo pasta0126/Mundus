@@ -11,12 +11,18 @@ const BORDER = 18
 const PARCHMENT = "#e9dfc3"
 const COASTLINE = "rgba(40, 34, 24, 0.75)"
 
-export function MapCanvas({ map }: { map: MapDto }) {
+interface MapCanvasProps {
+  map: MapDto
+  onCanvasReady?: (canvas: HTMLCanvasElement) => void
+}
+
+export function MapCanvas({ map, onCanvasReady }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
+    onCanvasReady?.(canvas)
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
@@ -40,9 +46,9 @@ export function MapCanvas({ map }: { map: MapDto }) {
     ctx.translate(BORDER, BORDER)
 
     if (map.gridType === "Hex") {
-      renderHex(ctx, grid, cellAt, isLand, width, height, inner)
+      renderHex(ctx, cellAt, isLand, width, height, inner)
     } else {
-      renderSquare(ctx, grid, cellAt, isLand, width, height, inner)
+      renderSquare(ctx, cellAt, isLand, width, height, inner)
     }
 
     ctx.restore()
@@ -88,7 +94,6 @@ function shadedColor(cellAt: (x: number, y: number) => CellDto | undefined, x: n
 
 function renderSquare(
   ctx: CanvasRenderingContext2D,
-  grid: (CellDto | undefined)[][],
   cellAt: (x: number, y: number) => CellDto | undefined,
   isLand: (x: number, y: number) => boolean,
   width: number,
@@ -135,7 +140,6 @@ function renderSquare(
       ctx.fillRect(x * cellSize, y * cellSize, cellSize + 0.5, cellSize + 0.5)
     }
   }
-  drawIcons(ctx, grid, (x, y) => ({ cx: (x + 0.5) * cellSize, cy: (y + 0.5) * cellSize }), cellSize)
   ctx.restore()
 
   ctx.strokeStyle = COASTLINE
@@ -190,7 +194,6 @@ function hexPath(cx: number, cy: number, radius: number): Path2D {
 
 function renderHex(
   ctx: CanvasRenderingContext2D,
-  grid: (CellDto | undefined)[][],
   cellAt: (x: number, y: number) => CellDto | undefined,
   isLand: (x: number, y: number) => boolean,
   width: number,
@@ -222,11 +225,7 @@ function renderHex(
       ctx.stroke(hexPath(cx, cy, layout.radius))
     }
   }
-
-  drawIcons(ctx, grid, (x, y) => layout.position(x, y), layout.radius)
 }
-
-// ---------- Icons ----------
 
 /**
  * Deterministic hash-based subsample (not random, so the same map always
@@ -238,89 +237,6 @@ function hashPercent(x: number, y: number): number {
   h = (h ^ (h >>> 13)) * 1274126177
   h = h ^ (h >>> 16)
   return (h >>> 0) % 100
-}
-
-function drawIcons(
-  ctx: CanvasRenderingContext2D,
-  grid: (CellDto | undefined)[][],
-  positionOf: (x: number, y: number) => { cx: number; cy: number },
-  cellRadius: number,
-) {
-  const height = grid.length
-  const width = grid[0]?.length ?? 0
-  const iconSize = cellRadius * 1.9
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const cell = grid[y][x]
-      if (!cell) continue
-      const roll = hashPercent(x, y)
-      if (cell.biome === "Mountains" && roll < 35) {
-        const { cx, cy } = positionOf(x, y)
-        drawMountainRange(ctx, cx, cy, iconSize, hashPercent(x + 1, y))
-      } else if (cell.biome === "Forest" && roll < 55) {
-        const { cx, cy } = positionOf(x, y)
-        drawTreeCluster(ctx, cx, cy, iconSize, hashPercent(x, y + 1))
-      }
-    }
-  }
-}
-
-function drawMountainRange(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, variant: number) {
-  const baseY = cy + size * 0.32
-  const jitter = ((variant % 10) / 10 - 0.5) * size * 0.15
-  const peaks: [number, number][] = [
-    [-size * 0.32, size * 0.5],
-    [0, size * 0.72],
-    [size * 0.32, size * 0.46],
-  ]
-
-  ctx.strokeStyle = "rgba(50, 40, 30, 0.6)"
-  ctx.lineWidth = Math.max(0.6, size * 0.05)
-
-  for (const [dx, height] of peaks) {
-    const apexX = cx + dx + jitter
-    const apexY = baseY - height
-    ctx.fillStyle = "rgba(80, 70, 60, 0.55)"
-    ctx.beginPath()
-    ctx.moveTo(apexX, apexY)
-    ctx.lineTo(apexX + size * 0.28, baseY)
-    ctx.lineTo(apexX - size * 0.28, baseY)
-    ctx.closePath()
-    ctx.fill()
-    ctx.stroke()
-
-    // Snow cap.
-    ctx.fillStyle = "rgba(245, 245, 240, 0.6)"
-    ctx.beginPath()
-    ctx.moveTo(apexX, apexY)
-    ctx.lineTo(apexX + size * 0.1, apexY + height * 0.28)
-    ctx.lineTo(apexX - size * 0.1, apexY + height * 0.28)
-    ctx.closePath()
-    ctx.fill()
-  }
-}
-
-function drawTreeCluster(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, variant: number) {
-  const r = size / 5
-  const jitter = (variant % 10) / 10 - 0.5
-  const offsets: [number, number][] = [
-    [0, -r * 0.7 + jitter * r * 0.3],
-    [-r * 0.9, r * 0.4],
-    [r * 0.9, r * 0.4],
-    [-r * 0.3 + jitter * r, -r * 0.1],
-    [r * 0.3 - jitter * r, r * 0.7],
-  ]
-  for (const [dx, dy] of offsets) {
-    ctx.beginPath()
-    ctx.arc(cx + dx, cy + dy, r, 0, Math.PI * 2)
-    ctx.fillStyle = "rgba(25, 40, 20, 0.55)"
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(cx + dx - r * 0.25, cy + dy - r * 0.25, r * 0.4, 0, Math.PI * 2)
-    ctx.fillStyle = "rgba(120, 150, 90, 0.5)"
-    ctx.fill()
-  }
 }
 
 // ---------- Ocean texture ----------

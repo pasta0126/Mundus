@@ -9,7 +9,6 @@ export function ReviewStep({ state }: ReviewStepProps) {
     ["Seed", state.seed.trim() || "(random)"],
     ["Grid type", state.gridType ?? "-"],
     ["Size", state.sizePreset ?? "-"],
-    ["Shape", state.shapeArchetype ?? "-"],
   ]
 
   return (

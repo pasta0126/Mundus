@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button"
 import { GridTypeStep } from "@/wizard/steps/GridTypeStep"
 import { ReviewStep } from "@/wizard/steps/ReviewStep"
 import { SeedStep } from "@/wizard/steps/SeedStep"
-import { ShapeArchetypeStep } from "@/wizard/steps/ShapeArchetypeStep"
 import { SizePresetStep } from "@/wizard/steps/SizePresetStep"
 import { WIZARD_STEPS, type WizardState } from "@/wizard/types"
 
@@ -26,8 +25,7 @@ export function MapCreationWizard({
 
   const canAdvance =
     (step !== "gridType" || state.gridType !== null) &&
-    (step !== "sizePreset" || state.sizePreset !== null) &&
-    (step !== "shapeArchetype" || state.shapeArchetype !== null)
+    (step !== "sizePreset" || state.sizePreset !== null)
 
   const isFirst = stepIndex === 0
   const isLast = step === "review"
@@ -66,15 +64,13 @@ export function MapCreationWizard({
               onChange={(sizePreset) => onChange({ ...state, sizePreset })}
             />
           )}
-          {step === "shapeArchetype" && (
-            <ShapeArchetypeStep
-              value={state.shapeArchetype}
-              onChange={(shapeArchetype) => onChange({ ...state, shapeArchetype })}
-            />
-          )}
           {step === "review" && <ReviewStep state={state} />}
         </motion.div>
       </AnimatePresence>
+
+      {!canAdvance && (
+        <p className="text-muted-foreground text-center text-xs">Select an option to continue</p>
+      )}
 
       <div className="flex justify-between">
         <Button variant="outline" disabled={isFirst} onClick={() => onStepIndexChange(stepIndex - 1)}>

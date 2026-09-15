@@ -9,10 +9,10 @@ public enum SizePreset
 }
 
 /// <summary>
-/// Fixed dimensions and biome-region-count ranges per preset - see
-/// specs/map-generation/spec.md ("Fixed size presets", "Biome regions,
-/// not per-cell biome"). Changing these values changes what an existing
-/// seed generates - treat as a breaking change to Map.SpecVersion.
+/// Fixed dimensions per preset - see specs/map-generation/spec.md
+/// ("Fixed size presets"). Changing these values changes what an
+/// existing seed generates - treat as a breaking change to
+/// Map.SpecVersion.
 /// </summary>
 public static class SizePresetExtensions
 {
@@ -25,12 +25,13 @@ public static class SizePresetExtensions
         _ => throw new ArgumentOutOfRangeException(nameof(preset)),
     };
 
-    public static (int Min, int Max) RegionCountRange(this SizePreset preset) => preset switch
+    /// <summary>Grain count range for the silhouette generator - see design.md.</summary>
+    public static (int Min, int Max) GrainCountRange(this SizePreset preset) => preset switch
     {
-        SizePreset.Small => (1, 3),
-        SizePreset.Medium => (3, 6),
-        SizePreset.Large => (6, 12),
-        SizePreset.Huge => (10, 20),
+        SizePreset.Small => (4, 7),
+        SizePreset.Medium => (6, 10),
+        SizePreset.Large => (10, 16),
+        SizePreset.Huge => (16, 24),
         _ => throw new ArgumentOutOfRangeException(nameof(preset)),
     };
 }

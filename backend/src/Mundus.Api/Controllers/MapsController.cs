@@ -12,19 +12,18 @@ public sealed class MapsController : ControllerBase
     public ActionResult<Map> Get(
         [FromQuery] string? seed,
         [FromQuery] GridType? gridType,
-        [FromQuery] SizePreset? sizePreset,
-        [FromQuery] ShapeArchetype? shapeArchetype)
+        [FromQuery] SizePreset? sizePreset)
     {
         if (string.IsNullOrWhiteSpace(seed))
         {
             return BadRequest("seed is required");
         }
 
-        if (gridType is null || sizePreset is null || shapeArchetype is null)
+        if (gridType is null || sizePreset is null)
         {
-            return BadRequest("gridType, sizePreset, and shapeArchetype are all required");
+            return BadRequest("gridType and sizePreset are both required");
         }
 
-        return Ok(MapGenerator.Generate(seed, gridType.Value, sizePreset.Value, shapeArchetype.Value));
+        return Ok(MapGenerator.Generate(seed, gridType.Value, sizePreset.Value));
     }
 }

@@ -50,7 +50,6 @@ export interface paths {
                     seed?: string;
                     gridType?: components["schemas"]["GridType"];
                     sizePreset?: components["schemas"]["SizePreset"];
-                    shapeArchetype?: components["schemas"]["ShapeArchetype"];
                 };
                 header?: never;
                 path?: never;
@@ -147,8 +146,6 @@ export interface components {
             height: number | string;
             cells: components["schemas"]["Cell"][];
         };
-        /** @enum {unknown} */
-        ShapeArchetype: "Continent" | "Island" | "Archipelago" | "Peninsula" | "IsthmusLandBridge" | "InlandSea" | "Unconstrained" | null;
         /** @enum {unknown} */
         SizePreset: "Small" | "Medium" | "Large" | "Huge";
         World: {
