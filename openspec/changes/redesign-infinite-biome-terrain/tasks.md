@@ -164,6 +164,28 @@
       biomes (Desert, Swamp, Rainforest, Mountains) actually appear
       across a sample of seeds.
 
+## 9d. Zoom down to 1px + perf to support it
+
+- [x] 9d.1 Cache lattice values per `InfiniteValueNoise2D` instance
+      (`(octave, latticeX, latticeY) -> value`), scoped to one field's
+      one generation call, so a window's cells stop re-deriving the same
+      shared lattice points from scratch.
+- [x] 9d.2 Bump `MapGenerator.MaxWindowDimension` to `512`, the largest
+      size that stays fast after 9d.1 (~300ms measured; `1024` and
+      `2048` measured too slow) and update `MapsController`'s error
+      messages/validation to match.
+- [x] 9d.3 Extend `ZOOM_LEVELS_PX` to
+      `[24, 20, 16, 12, 8, 6, 4, 3, 2, 1]` and bump the frontend's
+      `MAX_WINDOW_DIMENSION` constant to `512` to match.
+- [x] 9d.4 `MapCanvas` centers the drawn window within the canvas
+      instead of anchoring at `(0, 0)`, so a capped window at extreme
+      zoom-out (covers less than the viewport) reads as centered, not
+      stretched or stuck in a corner.
+- [x] 9d.5 Confirm via `dotnet test` that existing tests (determinism,
+      overlap, water-body size) still pass with the new cache and cap,
+      and spot-check a `512x512` request's latency stays in the
+      "loading" UI's comfortable range.
+
 ## 10. Frontend: params panel
 
 - [x] 10.1 Update `MapParamsPanel.tsx` to show the seed and the current

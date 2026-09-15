@@ -27,6 +27,18 @@ public sealed class InfiniteValueNoise2D
     private readonly int _octaves;
     private readonly double _persistence;
 
+    // Neighboring cells - and every cell within the same lattice square -
+    // share the same 4 surrounding lattice points, so a whole window's
+    // worth of cells re-hits a tiny number of distinct (octave, x, y)
+    // triples. Caching per-instance turns a window request from
+    // O(cells * octaves) lattice hashes into O(lattice points actually
+    // touched * octaves), which is what makes windows in the hundreds of
+    // thousands of cells fast: this cache is scoped to one
+    // InfiniteValueNoise2D instance (one field, for one Map.Generate
+    // call), never shared across requests, so it can't leak
+    // location-dependence between them.
+    private readonly Dictionary<(int Octave, int X, int Y), double> _latticeCache = [];
+
     /// <param name="regionScale">Cells per lattice unit at the base (largest, first) octave - roughly how large the broadest terrain features read as.</param>
     /// <param name="octaves">How many layers to sum, each halving both region scale (doubling frequency) and amplitude versus the last.</param>
     /// <param name="persistence">Amplitude multiplier per octave (0, 1) - higher means finer octaves contribute more local detail relative to the base shape.</param>
@@ -88,8 +100,18 @@ public sealed class InfiniteValueNoise2D
         return (index, fraction);
     }
 
-    private double LatticeValue(int latticeX, int latticeY, int octave) =>
-        new Rng($"{_seed}:lattice:{octave}:{latticeX}:{latticeY}").Float();
+    private double LatticeValue(int latticeX, int latticeY, int octave)
+    {
+        var key = (octave, latticeX, latticeY);
+        if (_latticeCache.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        var value = new Rng($"{_seed}:lattice:{octave}:{latticeX}:{latticeY}").Float();
+        _latticeCache[key] = value;
+        return value;
+    }
 
     private static double Smoothstep(double t) => t * t * (3 - 2 * t);
 

@@ -35,11 +35,20 @@ export function MapCanvas({ map, cellPx, onCanvasReady }: MapCanvasProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, cssWidth, cssHeight)
 
+    // At extreme zoom-out the requested window is capped (see
+    // MAX_WINDOW_DIMENSION) and can cover less on-screen area than the
+    // viewport - center the drawn cells rather than stretching them or
+    // leaving them stuck in a corner.
+    const windowWidthPx = Number(map.width) * cellPx
+    const windowHeightPx = Number(map.height) * cellPx
+    const offsetX = (cssWidth - windowWidthPx) / 2
+    const offsetY = (cssHeight - windowHeightPx) / 2
+
     const originX = Number(map.originX)
     const originY = Number(map.originY)
     for (const cell of map.cells) {
-      const px = (Number(cell.x) - originX) * cellPx
-      const py = (Number(cell.y) - originY) * cellPx
+      const px = offsetX + (Number(cell.x) - originX) * cellPx
+      const py = offsetY + (Number(cell.y) - originY) * cellPx
       ctx.fillStyle = BIOME_COLORS[cell.biome]
       ctx.fillRect(px, py, cellPx + 0.5, cellPx + 0.5)
     }

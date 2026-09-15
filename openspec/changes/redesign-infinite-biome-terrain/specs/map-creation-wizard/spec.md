@@ -152,20 +152,33 @@ and updating the canvas to show the newly returned cells once loaded.
 - **THEN** the seed used for the new window request is unchanged from
   the one used to generate the current window
 
-### Requirement: Zooming out a limited amount
+### Requirement: Zooming out through a fixed set of steps
 After a window is rendered, the system SHALL let the user zoom out
-through a small, fixed number of steps (at most four steps beyond the
-default) by shrinking the on-screen cell size, requesting a new,
-larger-in-cells window centered on the same point using the same seed.
-The system SHALL let the user zoom back in through the same steps, up
-to the default cell size, and SHALL NOT allow zooming in past the
-default or out past the last step.
+through a small, fixed, documented sequence of steps - shrinking the
+on-screen cell size at each step, down to a documented minimum of 1
+pixel per cell - by requesting a new, larger-in-cells window centered on
+the same point using the same seed. The system SHALL let the user zoom
+back in through the same steps, up to the default cell size, and SHALL
+NOT allow zooming in past the default or out past the smallest step.
+Because the window's cell count is itself bounded (see `map-generation`'s
+windowed query requirement), a window requested at the smallest step MAY
+cover less on-screen area than the full viewport on a sufficiently wide
+screen; the system SHALL center the rendered window within the viewport
+in that case rather than distorting cell size to fill it.
 
 #### Scenario: Zooming out shows more of the map
 - **WHEN** a user zooms out after viewing a generated window
 - **THEN** a new window request is made for the same seed, covering more
   cells than the current window, and the canvas updates to show the
   response at a smaller on-screen cell size
+
+#### Scenario: A capped window at extreme zoom-out is centered, not stretched
+- **WHEN** the window requested at the current zoom step is capped by
+  the per-request cell-count maximum and, at that step's on-screen cell
+  size, covers less area than the viewport
+- **THEN** the rendered window is centered within the viewport at its
+  correct on-screen cell size, rather than stretched or tiled to fill
+  the remaining space
 
 #### Scenario: Zooming preserves the seed and view center
 - **WHEN** a user zooms in or out

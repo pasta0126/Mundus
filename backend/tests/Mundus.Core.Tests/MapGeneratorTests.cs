@@ -54,8 +54,8 @@ public class MapGeneratorTests
     [Theory]
     [InlineData(0, 1)]
     [InlineData(1, 0)]
-    [InlineData(257, 10)]
-    [InlineData(10, 257)]
+    [InlineData(513, 10)]
+    [InlineData(10, 513)]
     public void OutOfRangeWindowDimensionsAreRejected(int width, int height)
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => MapGenerator.Generate("bad-window", 0, 0, width, height));

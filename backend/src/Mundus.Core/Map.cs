@@ -32,7 +32,7 @@ public static class MapGenerator
     public const int CurrentSpecVersion = 7;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
-    public const int MaxWindowDimension = 256;
+    public const int MaxWindowDimension = 512;
 
     /// <summary>
     /// Elevation's base region scale (cells per lattice unit at its

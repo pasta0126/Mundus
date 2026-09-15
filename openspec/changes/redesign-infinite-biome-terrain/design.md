@@ -179,14 +179,40 @@ high value was always `Snow`.
 ### Window query API
 `GET /api/Maps?seed=<string>&x=<int>&y=<int>&width=<int>&height=<int>`.
 `x`/`y` name the window's origin (top-left cell, inclusive); `width`/
-`height` are cell counts, each validated to `1..256` (256 chosen to
-match the old `Huge` preset's proven-fast per-request cost - see the
-`generation freeze` fix in this repo's history for why that number is
-already known to render/fetch acceptably). Response: `{ specVersion,
-seed, originX, originY, width, height, cells: [{ x, y, biome }] }`
-- `x`/`y` on each cell are absolute world coordinates, not
-window-relative, so the client never has to add an offset to reason
-about a cell's identity.
+`height` are cell counts, each validated to `1..512`. Response:
+`{ specVersion, seed, originX, originY, width, height,
+cells: [{ x, y, biome }] }` - `x`/`y` on each cell are absolute world
+coordinates, not window-relative, so the client never has to add an
+offset to reason about a cell's identity.
+
+`512` (up from an earlier `256`, itself carried over from the old
+`Huge` preset) is set by measured cost, not a round number: a `512x512`
+window (262,144 cells, each sampling 5 elevation + 4 moisture octaves)
+takes ~300ms of in-process generation after the lattice-value cache
+below, ~800ms end-to-end over HTTP once JSON-serializing and
+transferring its ~9MB response is included - the largest size that
+stays comfortably inside the existing "generating..." loading state's
+expected latency. `1024x1024` measured ~1.2s of generation alone and
+`2048x2048` ~5s - both rejected as too slow to request routinely just
+from zooming out. See "Lattice value caching" below for why this number
+moved at all once fBm/moisture made per-cell sampling far more
+expensive than the original single-octave field.
+
+#### Lattice value caching (perf)
+Naively, every cell independently re-derives all 4 of its surrounding
+lattice points *per octave* via a fresh `Rng` (string-formats a key,
+then runs `Xmur3` over it) - but neighboring cells, and every cell
+within the same lattice square, share those same lattice points. A
+`512x512` window hit this hard enough to matter (measured ~800ms+
+uncached for a smaller `256x256` window, once elevation/moisture's 9
+combined octaves were added) purely from redundant hashing of points
+that had already been computed for an earlier cell in the same window.
+`InfiniteValueNoise2D` now caches each `(octave, latticeX, latticeY) ->
+value` the first time it's derived, scoped to that instance (one field,
+one `Map.Generate` call) - never shared across requests, so it can't
+leak location-dependence between them, the same guarantee the
+lazy-hashing design started with. This cut `256x256` from ~800ms to
+~170ms and is what makes `512x512` viable at all.
 
 ### No wizard: generate automatically on load
 The seed/start-position wizard (three steps: Seed, Start Position,
@@ -212,27 +238,30 @@ user must click through before seeing anything is exactly the
 friction being removed, and Regenerate already covers "I want a
 different seed" for anyone who wants one.
 
-### Frontend: full-viewport canvas, stepped zoom, pan by half a window
+### Frontend: full-viewport canvas, stepped zoom down to 1px, pan by half a window
 The map is the page background: canvas width/height are set to the
 browser viewport's size (updated on resize), not a fixed card size.
-Cell size comes from a fixed, small array of steps, `ZOOM_LEVELS_PX =
-[24, 20, 16, 12, 8]` (index `0`, `24px`, is the default/most-zoomed-in
-level, `8px` the maximum zoom-out);
-the requested window's `width`/`height` (in cells) are computed as
-`ceil(viewportPx / cellPx)` for each axis, clamped to the API's
-documented `1..256` max per axis (only relevant on very large viewports
-- e.g. an ultra-wide monitor - where the request is capped at 256 cells
-wide and the rightmost sliver of the viewport simply isn't covered by a
-cell rather than over-requesting). Zooming steps `cellPx` to the next
-array entry, re-fetching a window centered on the same point (current
-origin + half the current window, in cells) at the new `cellPx` - not a
-CSS/canvas-transform zoom, since the whole point is to reveal more
-*generated* cells, not stretch pixels. Panning shifts the origin by half
-the current window (in each axis, at the current zoom level) in the
-chosen direction and re-fetches - large enough to feel like real
-movement, small enough to keep on-screen continuity with the previous
-view (half the grid is cells the user has already seen). Every other UI
-element (params panel, pan/zoom controls) is positioned as an
+Cell size comes from a fixed, small array of steps,
+`ZOOM_LEVELS_PX = [24, 20, 16, 12, 8, 6, 4, 3, 2, 1]` (index `0`, `24px`,
+is the default/most-zoomed-in level, `1px` the maximum zoom-out); the
+requested window's `width`/`height` (in cells) are computed as
+`ceil(viewportPx / cellPx)` for each axis, clamped to the API's `1..512`
+max per axis. At the low end (`cellPx` `1`-`4`) that cap binds on any
+screen wider than ~512-2048px, so the returned window covers less than
+the full viewport; `MapCanvas` centers the drawn cells within the canvas
+(`offset = (canvasPx - windowCellCount * cellPx) / 2` per axis) rather
+than stretching them, leaving the page's own background showing at the
+margins - see `map-creation-wizard`'s "A capped window at extreme
+zoom-out is centered, not stretched" scenario. Zooming steps `cellPx` to
+the next array entry, re-fetching a window centered on the same point
+(current origin + half the current window, in cells) at the new
+`cellPx` - not a CSS/canvas-transform zoom, since the whole point is to
+reveal more *generated* cells, not stretch pixels. Panning shifts the
+origin by half the current window (in each axis, at the current zoom
+level) in the chosen direction and re-fetches - large enough to feel
+like real movement, small enough to keep on-screen continuity with the
+previous view (half the grid is cells the user has already seen). Every
+other UI element (params panel, pan/zoom controls) is positioned as an
 absolutely/fixed-positioned overlay on top of the canvas, never in a
 layout flow that shrinks or displaces it.
 
