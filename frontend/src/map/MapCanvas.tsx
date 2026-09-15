@@ -5,9 +5,17 @@ import { BIOME_COLORS } from "@/map/biomeColors"
 type MapDto = components["schemas"]["Map"]
 
 interface MapCanvasProps {
-  map: MapDto
+  /** Chunk responses for the current view, in arrival order - only ever appended to within a generation. */
+  chunks: MapDto[]
+  /** Overall target window this view is filling in (for canvas sizing/centering), not any one chunk's own shape. */
+  originX: number
+  originY: number
+  width: number
+  height: number
   /** On-screen size of one cell in CSS pixels - see map/constants.ts's ZOOM_LEVELS_PX. */
   cellPx: number
+  /** Bumped by the caller every time a brand new fetch cycle starts - resets the canvas and drawn-chunk tracking. */
+  generation: number
   onCanvasReady?: (canvas: HTMLCanvasElement) => void
 }
 
@@ -16,9 +24,19 @@ interface MapCanvasProps {
  * the full viewport and every cell is a flat pastel fill by biome - no
  * shading, texture, or frame. UI elements render above it as an overlay
  * (see App.tsx), never displacing it.
+ *
+ * A view's cells can arrive as many chunk responses over time (see
+ * design.md "Tiled, progressive window loading"), so drawing is split
+ * into two effects: one resets the canvas when `generation` changes
+ * (a brand new view starting), the other draws only chunks not yet
+ * drawn whenever `chunks` grows - so a whole progressive load draws
+ * every cell exactly once, not the whole accumulated picture redrawn
+ * on every chunk arrival.
  */
-export function MapCanvas({ map, cellPx, onCanvasReady }: MapCanvasProps) {
+export function MapCanvas({ chunks, originX, originY, width, height, cellPx, generation, onCanvasReady }: MapCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const drawnCountRef = useRef(0)
+  const offsetRef = useRef({ x: 0, y: 0 })
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -35,24 +53,36 @@ export function MapCanvas({ map, cellPx, onCanvasReady }: MapCanvasProps) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, cssWidth, cssHeight)
 
-    // At extreme zoom-out the requested window is capped (see
-    // MAX_WINDOW_DIMENSION) and can cover less on-screen area than the
-    // viewport - center the drawn cells rather than stretching them or
-    // leaving them stuck in a corner.
-    const windowWidthPx = Number(map.width) * cellPx
-    const windowHeightPx = Number(map.height) * cellPx
-    const offsetX = (cssWidth - windowWidthPx) / 2
-    const offsetY = (cssHeight - windowHeightPx) / 2
-
-    const originX = Number(map.originX)
-    const originY = Number(map.originY)
-    for (const cell of map.cells) {
-      const px = offsetX + (Number(cell.x) - originX) * cellPx
-      const py = offsetY + (Number(cell.y) - originY) * cellPx
-      ctx.fillStyle = BIOME_COLORS[cell.biome]
-      ctx.fillRect(px, py, cellPx + 0.5, cellPx + 0.5)
+    // Chunk requests can be capped short of the full desired window on
+    // pathological viewport/zoom combinations (see MAX_TOTAL_DIMENSION);
+    // center what we did get rather than leaving it pinned to a corner.
+    const windowWidthPx = width * cellPx
+    const windowHeightPx = height * cellPx
+    offsetRef.current = {
+      x: (cssWidth - windowWidthPx) / 2,
+      y: (cssHeight - windowHeightPx) / 2,
     }
-  }, [map, cellPx])
+    drawnCountRef.current = 0
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generation])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+    const { x: offsetX, y: offsetY } = offsetRef.current
+
+    for (let i = drawnCountRef.current; i < chunks.length; i++) {
+      for (const cell of chunks[i].cells) {
+        const px = offsetX + (Number(cell.x) - originX) * cellPx
+        const py = offsetY + (Number(cell.y) - originY) * cellPx
+        ctx.fillStyle = BIOME_COLORS[cell.biome]
+        ctx.fillRect(px, py, cellPx + 0.5, cellPx + 0.5)
+      }
+    }
+    drawnCountRef.current = chunks.length
+  }, [chunks, cellPx, originX, originY])
 
   return <canvas ref={canvasRef} className="fixed inset-0 -z-10 h-screen w-screen" />
 }

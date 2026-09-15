@@ -1,11 +1,10 @@
 import { useState } from "react"
-import type { components } from "@/api/schema"
 import { Button } from "@/components/ui/button"
 
-type MapDto = components["schemas"]["Map"]
-
 interface MapParamsPanelProps {
-  map: MapDto
+  seed: string
+  originX: number
+  originY: number
 }
 
 /**
@@ -14,15 +13,15 @@ interface MapParamsPanelProps {
  * reproduce this exact view - same seed + coordinate always generates
  * the same terrain.
  */
-export function MapParamsPanel({ map }: MapParamsPanelProps) {
+export function MapParamsPanel({ seed, originX, originY }: MapParamsPanelProps) {
   const [copied, setCopied] = useState(false)
   const rows: [string, string][] = [
-    ["Seed", map.seed],
-    ["Position", `(${map.originX}, ${map.originY})`],
+    ["Seed", seed],
+    ["Position", `(${originX}, ${originY})`],
   ]
 
   async function copySeed() {
-    await navigator.clipboard.writeText(map.seed)
+    await navigator.clipboard.writeText(seed)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }

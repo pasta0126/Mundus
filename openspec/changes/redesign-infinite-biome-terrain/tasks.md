@@ -186,6 +186,41 @@
       and spot-check a `512x512` request's latency stays in the
       "loading" UI's comfortable range.
 
+## 9e. Tiled, progressive window loading (fixes low-zoom "small square" bug)
+
+- [x] 9e.1 Add `CHUNK_SIZE = 256` and `MAX_TOTAL_DIMENSION = 4096` to
+      `map/constants.ts`; retire the frontend's `MAX_WINDOW_DIMENSION`
+      clamp on the logical window (still relevant only as the backend's
+      own per-request cap, referenced implicitly via `CHUNK_SIZE`
+      staying under it).
+- [x] 9e.2 Add a chunk-grid helper (origin/width/height/chunkSize ->
+      list of sub-window specs, partial last row/column handled) and a
+      small concurrency-limited task runner (worker-pool `Promise`
+      pattern, `CONCURRENCY = 6`).
+- [x] 9e.3 Rework `App.tsx`'s fetch into `fetchTiled`: compute the
+      logical window (uncapped by the old 512 limit, capped only by
+      `MAX_TOTAL_DIMENSION`), split into chunks, fetch concurrently,
+      and on the *first* successful chunk swap over to the new
+      generation (reset chunks, set new `viewWindow`); subsequent
+      chunks append. Track progress as `{ loaded, total }`. On total
+      failure, show the error screen only if no view has ever loaded
+      (`hasViewRef`); otherwise just stop loading and keep the old view.
+- [x] 9e.4 Rework `MapCanvas` to take `chunks: MapDto[]` plus the
+      overall window shape and a `generation` number instead of one
+      `Map`: a `generation` change clears the canvas and resets a
+      `drawnCount` ref; chunk-array growth draws only the chunks from
+      `drawnCount` onward (each chunk's cells drawn exactly once across
+      a whole progressive load).
+- [x] 9e.5 Update `MapParamsPanel` to take `{ seed, originX, originY }`
+      directly instead of a full `MapDto`.
+- [x] 9e.6 Wire the progress bar's `value` to `loaded / total * 100`
+      instead of a fixed placeholder.
+- [x] 9e.7 Spot-check in a browser: zoom out to the lowest step and
+      confirm the map covers the full viewport (not a small centered
+      square), fills in progressively rather than appearing all at
+      once, and that panning/zooming while a load is in flight doesn't
+      blank the page or crash.
+
 ## 10. Frontend: params panel
 
 - [x] 10.1 Update `MapParamsPanel.tsx` to show the seed and the current
@@ -196,11 +231,11 @@
 
 - [x] 11.1 Run `dotnet build`, `dotnet test`, `npm run build`,
       `npm run lint` and confirm all pass.
-- [ ] 11.2 Manually verify in a browser: loading the page generates a
+- [x] 11.2 Manually verify in a browser: loading the page generates a
       map with no user input, panning in each of the four directions,
       zooming out through all four extra steps and back in, Download and
       Regenerate still work.
-- [ ] 11.3 Manually verify determinism end to end: via the API, note a
+- [x] 11.3 Manually verify determinism end to end: via the API, note a
       cell's biome at a specific `(x, y)` for a fixed seed, request a
       different window for the same seed that includes that `(x, y)`,
       and confirm the biome matches (already spot-checked once via curl

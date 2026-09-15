@@ -244,33 +244,85 @@ browser viewport's size (updated on resize), not a fixed card size.
 Cell size comes from a fixed, small array of steps,
 `ZOOM_LEVELS_PX = [24, 20, 16, 12, 8, 6, 4, 3, 2, 1]` (index `0`, `24px`,
 is the default/most-zoomed-in level, `1px` the maximum zoom-out); the
-requested window's `width`/`height` (in cells) are computed as
-`ceil(viewportPx / cellPx)` for each axis, clamped to the API's `1..512`
-max per axis. At the low end (`cellPx` `1`-`4`) that cap binds on any
-screen wider than ~512-2048px, so the returned window covers less than
-the full viewport; `MapCanvas` centers the drawn cells within the canvas
-(`offset = (canvasPx - windowCellCount * cellPx) / 2` per axis) rather
-than stretching them, leaving the page's own background showing at the
-margins - see `map-creation-wizard`'s "A capped window at extreme
-zoom-out is centered, not stretched" scenario. Zooming steps `cellPx` to
-the next array entry, re-fetching a window centered on the same point
-(current origin + half the current window, in cells) at the new
-`cellPx` - not a CSS/canvas-transform zoom, since the whole point is to
-reveal more *generated* cells, not stretch pixels. Panning shifts the
-origin by half the current window (in each axis, at the current zoom
-level) in the chosen direction and re-fetches - large enough to feel
-like real movement, small enough to keep on-screen continuity with the
-previous view (half the grid is cells the user has already seen). Every
-other UI element (params panel, pan/zoom controls) is positioned as an
-absolutely/fixed-positioned overlay on top of the canvas, never in a
-layout flow that shrinks or displaces it.
+desired window's `width`/`height` (in cells) are computed as
+`ceil(viewportPx / cellPx)` for each axis - see "Tiled, progressive
+window loading" for how that window (which at low `cellPx` values is far
+larger than any single request should cover) actually gets fetched.
+Zooming steps `cellPx` to the next array entry, re-fetching a window
+centered on the same point (current origin + half the current window,
+in cells) at the new `cellPx` - not a CSS/canvas-transform zoom, since
+the whole point is to reveal more *generated* cells, not stretch pixels.
+Panning shifts the origin by half the current window (in each axis, at
+the current zoom level) in the chosen direction and re-fetches - large
+enough to feel like real movement, small enough to keep on-screen
+continuity with the previous view (half the grid is cells the user has
+already seen). Every other UI element (params panel, pan/zoom controls)
+is positioned as an absolutely/fixed-positioned overlay on top of the
+canvas, never in a layout flow that shrinks or displaces it.
 
 **Alternatives considered:** continuous/scroll-wheel zoom with a CSS
 transform on the canvas between re-fetches - rejected per proposal's
 "not too much" zoom ask: a small, discrete step count keeps the
 region-scale-32 noise field from ever being viewed at a scale where its
-smoothing (or a window's cell-count cap) becomes visually obvious, which
-an open-ended continuous zoom would risk.
+smoothing becomes visually obvious, which an open-ended continuous zoom
+would risk.
+
+### Tiled, progressive window loading
+At low `cellPx`, the window needed to cover a real viewport (e.g.
+`1920x1080` at `1px/cell` = 1080x1080+ cells) is well past what one
+request should return (see the `512` cap's own cost measurements
+above) - and simply capping the *logical* window at 512, as an earlier
+version of this design did, meant a "square in the middle of the page"
+at the lowest zoom steps instead of the whole point of zooming out
+(seeing more of the map). Instead, the frontend splits the desired
+window into a grid of `CHUNK_SIZE = 256`-cell-per-axis chunk requests
+(safely under the `512` per-request cap, ~170ms/~400ms end-to-end each),
+fires them with `CONCURRENCY = 6` in flight at a time (a plain
+queue-of-workers `Promise` pool - matches a typical browser's
+same-origin connection limit; no library needed for something this
+small), and draws each chunk's cells onto the canvas the moment that
+chunk's response arrives, rather than waiting for the whole grid.
+
+The *logical* (pre-tiling) window is still capped, at
+`MAX_TOTAL_DIMENSION = 4096` cells per axis - generous enough that no
+real display binds it (a `4096px`-wide viewport at `1px/cell` would need
+exactly `4096`; nothing on the market is wider) - purely as a sanity net
+against a pathological viewport/zoom combination triggering an
+unbounded number of chunk requests, not as a routine constraint. Only
+past that net does `MapCanvas` fall back to centering a smaller-than-
+viewport result, same idea as the single-request design's centering,
+now just unreachable in practice.
+
+`MapCanvas` takes an array of chunk responses plus the overall target
+window's shape (for canvas sizing/centering) and a `generation` counter
+instead of one `Map`. A `generation` change (a brand new fetch cycle
+starting) resets a `drawnCount` ref and clears the canvas; each time the
+chunk array grows, a second effect draws only the chunks from
+`drawnCount` onward and advances it - so total draw work across a whole
+progressive load is `O(cells)` once, not `O(cells)` repeated per chunk
+arrival (which a naive "redraw everything every update" approach would
+cost). The *previous* view's chunks/generation aren't touched until the
+*new* generation's first chunk actually arrives - `App.tsx` only calls
+`setChunks`/`setViewWindow` (which is what flips `MapCanvas.generation`)
+at that point, not when the fetch starts - so panning/zooming/
+regenerating never blanks the page while only the network is pending;
+it stays on the last good view until real new data is ready to replace
+it. If every chunk of a re-fetch fails, that last good view simply
+stays (loading just stops); only a first-ever load with zero successful
+chunks shows the error screen, tracked via a `hasViewRef` boolean rather
+than component state to avoid a stale-closure check inside the
+concurrent chunk loop.
+
+The loading progress bar's value is `chunksLoaded / totalChunks`, not a
+fixed placeholder - meaningful now that a view can be dozens of chunks
+and several seconds end-to-end at the lowest zoom step.
+
+**Alternatives considered:** raising `MaxWindowDimension` itself instead
+of tiling - rejected, `1024x1024`/`2048x2048` measured ~1.2s/~5s of
+*generation alone* (before network/serialization), both too slow for a
+single request a user might trigger just by scrolling out; tiling keeps
+every individual request in the fast, already-proven `~256-512` range
+while still covering an arbitrarily large logical window.
 
 `MapCanvas.tsx` becomes a direct per-cell `fillRect` loop (biome ->
 pastel color) with no contour tracer; `contour.ts` is deleted entirely

@@ -96,13 +96,24 @@ The system SHALL show visible progress and status feedback for every
 asynchronous action (the automatic initial load, panning, zooming,
 regenerating, downloading), so the user is never left without an
 indication of what is currently happening. Feedback SHALL include both
-a progress indicator and a descriptive status message.
+a progress indicator and a descriptive status message. When a view is
+loaded from more than one underlying request (see "Tiled, progressive
+window loading"), the progress indicator SHALL reflect the fraction of
+those requests completed so far, not just an indeterminate "in
+progress" state.
 
 #### Scenario: Generating shows progress and a status message
 - **WHEN** a window request (initial load, a pan, a zoom, or a
   regenerate) is in flight
 - **THEN** a progress indicator is visible along with a message
   describing that the map is loading
+
+#### Scenario: Progress reflects completed chunks, not just in-flight/done
+- **WHEN** a view's window is being loaded as several chunk requests and
+  some, but not all, have completed
+- **THEN** the progress indicator's value reflects the completed
+  fraction (e.g. roughly half-full at the halfway point), rather than
+  staying at a fixed placeholder value until everything finishes
 
 #### Scenario: Rendering shows a status message
 - **WHEN** a returned window is being drawn to the canvas
@@ -157,14 +168,15 @@ After a window is rendered, the system SHALL let the user zoom out
 through a small, fixed, documented sequence of steps - shrinking the
 on-screen cell size at each step, down to a documented minimum of 1
 pixel per cell - by requesting a new, larger-in-cells window centered on
-the same point using the same seed. The system SHALL let the user zoom
-back in through the same steps, up to the default cell size, and SHALL
-NOT allow zooming in past the default or out past the smallest step.
-Because the window's cell count is itself bounded (see `map-generation`'s
-windowed query requirement), a window requested at the smallest step MAY
-cover less on-screen area than the full viewport on a sufficiently wide
-screen; the system SHALL center the rendered window within the viewport
-in that case rather than distorting cell size to fill it.
+the same point using the same seed, sized to cover the full viewport at
+that step's cell size (see "Tiled, progressive window loading" for how
+a window that size is actually fetched). The system SHALL let the user
+zoom back in through the same steps, up to the default cell size, and
+SHALL NOT allow zooming in past the default or out past the smallest
+step. A window's cell count SHALL still be bounded by a documented
+safety maximum far larger than any real display's needs at the smallest
+step; only beyond that safety maximum MAY the rendered window cover less
+than the full viewport, centered rather than stretched.
 
 #### Scenario: Zooming out shows more of the map
 - **WHEN** a user zooms out after viewing a generated window
@@ -172,13 +184,11 @@ in that case rather than distorting cell size to fill it.
   cells than the current window, and the canvas updates to show the
   response at a smaller on-screen cell size
 
-#### Scenario: A capped window at extreme zoom-out is centered, not stretched
-- **WHEN** the window requested at the current zoom step is capped by
-  the per-request cell-count maximum and, at that step's on-screen cell
-  size, covers less area than the viewport
-- **THEN** the rendered window is centered within the viewport at its
-  correct on-screen cell size, rather than stretched or tiled to fill
-  the remaining space
+#### Scenario: Zoomed-out views cover the full viewport
+- **WHEN** a user zooms out to any documented step on a real display
+- **THEN** the rendered window covers the full browser viewport at that
+  step's on-screen cell size, not a smaller square in the middle of an
+  otherwise-empty page
 
 #### Scenario: Zooming preserves the seed and view center
 - **WHEN** a user zooms in or out
@@ -192,3 +202,30 @@ in that case rather than distorting cell size to fill it.
 - **THEN** no further zoom-out action is available
 - **WHEN** a user is at the default (most zoomed-in) cell size
 - **THEN** no further zoom-in action is available
+
+### Requirement: Tiled, progressive window loading
+When the window needed to cover the viewport (at the current zoom
+step) exceeds what a single `map-generation` request can efficiently
+return, the system SHALL split it into multiple smaller chunk requests
+covering the same overall area, issue them concurrently, and render
+each chunk onto the canvas as it individually completes, rather than
+waiting for every chunk before showing anything. A previously-rendered
+view SHALL remain visible while a new one's chunks are still arriving,
+only being replaced once the new view's first chunk has arrived.
+
+#### Scenario: Chunks render as they arrive, not all at once
+- **WHEN** a window is being loaded as multiple chunk requests
+- **THEN** cells from a chunk that has already completed are visible on
+  the canvas before every other chunk has completed
+
+#### Scenario: The previous view persists until new data arrives
+- **WHEN** a pan, zoom, or regenerate is triggered while a previous
+  view is displayed
+- **THEN** the previous view remains visible, unchanged, until the new
+  view's first chunk arrives
+
+#### Scenario: A total loading failure falls back to the last good view
+- **WHEN** every chunk request for a pan, zoom, or regenerate fails, and
+  a previously-rendered view exists
+- **THEN** loading stops and the previous view remains displayed, rather
+  than replacing it with an error screen
