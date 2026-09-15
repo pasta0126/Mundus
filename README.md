@@ -11,7 +11,8 @@ Live at [mundus.northernarchive.com](https://mundus.northernarchive.com).
 - `backend/` - .NET solution (`net10.0`, ASP.NET Core Controllers)
   - `src/Mundus.Api` - HTTP API, controllers, OpenAPI document
   - `src/Mundus.Core` - deterministic generation engine (seeded RNG,
-    `World` generator); no ASP.NET/EF Core dependencies
+    per-cell infinite terrain noise, `MapGenerator`); no ASP.NET/EF Core
+    dependencies
   - `src/Mundus.Infrastructure` - EF Core `DbContext` (Npgsql/PostgreSQL)
   - `tests/Mundus.Core.Tests` - xUnit tests for the generation engine
 - `frontend/` - React + Vite + TypeScript, Tailwind CSS, shadcn/ui, Framer

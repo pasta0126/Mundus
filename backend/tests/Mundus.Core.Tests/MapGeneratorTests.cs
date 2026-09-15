@@ -5,138 +5,141 @@ namespace Mundus.Core.Tests;
 
 public class MapGeneratorTests
 {
-    private static readonly SizePreset[] AllPresets =
-        [SizePreset.Small, SizePreset.Medium, SizePreset.Large, SizePreset.Huge];
-
     [Fact]
-    public void SameSeedAndParametersProduceIdenticalMaps()
+    public void SameSeedAndWindowProduceIdenticalMaps()
     {
-        var a = MapGenerator.Generate("middle-earth", GridType.Square, SizePreset.Small);
-        var b = MapGenerator.Generate("middle-earth", GridType.Square, SizePreset.Small);
+        var a = MapGenerator.Generate("middle-earth", 0, 0, 32, 32);
+        var b = MapGenerator.Generate("middle-earth", 0, 0, 32, 32);
         Assert.Equal(a.Cells, b.Cells);
     }
 
     [Fact]
     public void DifferentSeedsProduceDifferentMaps()
     {
-        var a = MapGenerator.Generate("seed-a", GridType.Square, SizePreset.Small);
-        var b = MapGenerator.Generate("seed-b", GridType.Square, SizePreset.Small);
+        var a = MapGenerator.Generate("seed-a", 0, 0, 32, 32);
+        var b = MapGenerator.Generate("seed-b", 0, 0, 32, 32);
         Assert.NotEqual(a.Cells, b.Cells);
     }
 
-    [Theory]
-    [InlineData(SizePreset.Small, 32, 32)]
-    [InlineData(SizePreset.Medium, 64, 64)]
-    [InlineData(SizePreset.Large, 128, 128)]
-    [InlineData(SizePreset.Huge, 256, 256)]
-    public void SizePresetDeterminesDimensions(SizePreset preset, int width, int height)
+    [Fact]
+    public void AWindowReturnsExactlyItsRequestedCells()
     {
-        var map = MapGenerator.Generate("dimensions", GridType.Square, preset);
-        Assert.Equal(width, map.Width);
-        Assert.Equal(height, map.Height);
+        const int originX = 10;
+        const int originY = -20;
+        const int width = 8;
+        const int height = 5;
+        var map = MapGenerator.Generate("window-shape", originX, originY, width, height);
+
         Assert.Equal(width * height, map.Cells.Count);
+        var coords = map.Cells.Select(c => (c.X, c.Y)).ToHashSet();
+        for (var x = originX; x < originX + width; x++)
+        {
+            for (var y = originY; y < originY + height; y++)
+            {
+                Assert.Contains((x, y), coords);
+            }
+        }
     }
 
     [Fact]
-    public void EveryCellHasValidElevation()
+    public void NegativeOriginIsValid()
     {
-        var map = MapGenerator.Generate("elevation-bounds", GridType.Square, SizePreset.Medium);
-        Assert.All(map.Cells, cell => Assert.InRange(cell.Elevation, 0.0, 1.0));
+        var map = MapGenerator.Generate("negative-origin", -50, -50, 4, 4);
+        Assert.Equal(-50, map.OriginX);
+        Assert.Equal(-50, map.OriginY);
+        Assert.All(map.Cells, c => Assert.InRange(c.X, -50, -47));
+        Assert.All(map.Cells, c => Assert.InRange(c.Y, -50, -47));
     }
 
     [Theory]
-    [InlineData(GridType.Square)]
-    [InlineData(GridType.Hex)]
-    public void NeighboringCellsHaveCloserElevationsThanRandomCells(GridType gridType)
+    [InlineData(0, 1)]
+    [InlineData(1, 0)]
+    [InlineData(257, 10)]
+    [InlineData(10, 257)]
+    public void OutOfRangeWindowDimensionsAreRejected(int width, int height)
     {
-        var map = MapGenerator.Generate($"coherence-{gridType}", gridType, SizePreset.Medium);
-        var byCoord = map.Cells.ToDictionary(c => (c.X, c.Y));
+        Assert.Throws<ArgumentOutOfRangeException>(() => MapGenerator.Generate("bad-window", 0, 0, width, height));
+    }
+
+    [Fact]
+    public void ACellsBiomeIsIndependentOfWhichWindowRequestedIt()
+    {
+        // A cell far from the origin, requested with no prior request for
+        // this seed, must match the same cell as seen inside a larger
+        // window that contains it - see map-generation spec,
+        // "Location-independent generation".
+        const string seed = "location-independence";
+        var farWindow = MapGenerator.Generate(seed, 10_000, -10_000, 16, 16);
+        var containingWindow = MapGenerator.Generate(seed, 9_990, -10_010, 40, 40);
+
+        var containingByCoord = containingWindow.Cells.ToDictionary(c => (c.X, c.Y));
+        foreach (var cell in farWindow.Cells)
+        {
+            Assert.Equal(cell.Biome, containingByCoord[(cell.X, cell.Y)].Biome);
+        }
+    }
+
+    [Fact]
+    public void OverlappingWindowsAgreeOnTheirOverlap()
+    {
+        const string seed = "overlap-agreement";
+        var a = MapGenerator.Generate(seed, 0, 0, 20, 20);
+        var b = MapGenerator.Generate(seed, 10, 10, 20, 20);
+
+        var aByCoord = a.Cells.ToDictionary(c => (c.X, c.Y));
+        var overlapping = b.Cells.Where(c => c.X < 20 && c.Y < 20);
+        foreach (var cell in overlapping)
+        {
+            Assert.Equal(cell.Biome, aByCoord[(cell.X, cell.Y)].Biome);
+        }
+    }
+
+    [Fact]
+    public void EveryCellHasABiomeFromTheDocumentedSet()
+    {
+        var map = MapGenerator.Generate("biome-set", 0, 0, 64, 64);
+        var allowed = new[] { Biome.Ocean, Biome.Beach, Biome.Grassland, Biome.Forest, Biome.Tundra, Biome.Snow };
+        Assert.All(map.Cells, c => Assert.Contains(c.Biome, allowed));
+    }
+
+    [Fact]
+    public void NeighboringCellsHaveCloserTerrainValuesThanRandomCells()
+    {
+        const string seed = "coherence";
+        const int width = 64;
+        const int height = 64;
         var rng = new Rng("coherence-sampler");
 
         double neighborDeltaSum = 0;
         var neighborCount = 0;
-        foreach (var cell in map.Cells)
+        var coords = new List<(int X, int Y)>();
+        for (var x = 0; x < width; x++)
         {
-            foreach (var (nx, ny) in GridNeighborsForTest(gridType, cell.X, cell.Y, map.Width, map.Height))
+            for (var y = 0; y < height; y++)
             {
-                neighborDeltaSum += Math.Abs(cell.Elevation - byCoord[(nx, ny)].Elevation);
-                neighborCount++;
+                coords.Add((x, y));
+                var value = MapGenerator.TerrainValueAt(seed, x, y);
+                foreach (var (dx, dy) in new[] { (1, 0), (0, 1) })
+                {
+                    var (nx, ny) = (x + dx, y + dy);
+                    if (nx >= width || ny >= height) continue;
+                    var neighborValue = MapGenerator.TerrainValueAt(seed, nx, ny);
+                    neighborDeltaSum += Math.Abs(value - neighborValue);
+                    neighborCount++;
+                }
             }
         }
 
         double randomDeltaSum = 0;
-        var cellsList = map.Cells.ToList();
         for (var i = 0; i < neighborCount; i++)
         {
-            var a = cellsList[rng.Int(0, cellsList.Count - 1)];
-            var b = cellsList[rng.Int(0, cellsList.Count - 1)];
-            randomDeltaSum += Math.Abs(a.Elevation - b.Elevation);
+            var a = coords[rng.Int(0, coords.Count - 1)];
+            var b = coords[rng.Int(0, coords.Count - 1)];
+            randomDeltaSum += Math.Abs(MapGenerator.TerrainValueAt(seed, a.X, a.Y) - MapGenerator.TerrainValueAt(seed, b.X, b.Y));
         }
 
         var neighborAverage = neighborDeltaSum / neighborCount;
         var randomAverage = randomDeltaSum / neighborCount;
         Assert.True(neighborAverage < randomAverage, $"neighbor avg {neighborAverage} was not less than random avg {randomAverage}");
-    }
-
-    [Fact]
-    public void EveryLandCellSharesTheSameBiome()
-    {
-        var map = MapGenerator.Generate("uniform-land-biome", GridType.Square, SizePreset.Large);
-        var landBiomes = map.Cells.Where(c => c.Biome != Biome.Ocean).Select(c => c.Biome).Distinct().ToList();
-        Assert.True(landBiomes.Count <= 1, $"expected at most one land biome, found: {string.Join(',', landBiomes)}");
-    }
-
-    [Fact]
-    public void GeneratedMapsTypicallyContainBothLandAndOcean()
-    {
-        // Not a hard guarantee (see design.md Risks) - but with the
-        // configured grain counts, a large sample of seeds should
-        // overwhelmingly produce both land and ocean cells.
-        var withLand = 0;
-        var withOcean = 0;
-        const int sampleSize = 20;
-        for (var i = 0; i < sampleSize; i++)
-        {
-            var map = MapGenerator.Generate($"sample-{i}", GridType.Square, SizePreset.Medium);
-            if (map.Cells.Any(c => c.Biome != Biome.Ocean)) withLand++;
-            if (map.Cells.Any(c => c.Biome == Biome.Ocean)) withOcean++;
-        }
-
-        Assert.True(withLand >= sampleSize - 2, $"only {withLand}/{sampleSize} samples had land");
-        Assert.True(withOcean >= sampleSize - 2, $"only {withOcean}/{sampleSize} samples had ocean");
-    }
-
-    [Theory]
-    [InlineData(GridType.Square)]
-    [InlineData(GridType.Hex)]
-    public void PresetsProduceReasonableGrainCounts(GridType gridType)
-    {
-        // Sanity check that every preset is wired up (no exceptions,
-        // valid dimensions) rather than pinning exact grain counts.
-        foreach (var preset in AllPresets)
-        {
-            var map = MapGenerator.Generate($"grain-sanity-{gridType}-{preset}", gridType, preset);
-            var (width, height) = preset.Dimensions();
-            Assert.Equal(width * height, map.Cells.Count);
-        }
-    }
-
-    private static IEnumerable<(int X, int Y)> GridNeighborsForTest(GridType gridType, int x, int y, int width, int height)
-    {
-        (int Dx, int Dy)[] offsets = gridType == GridType.Square
-            ? [(1, 0), (-1, 0), (0, 1), (0, -1)]
-            : y % 2 == 0
-                ? [(1, 0), (0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1)]
-                : [(1, 0), (1, -1), (0, -1), (-1, 0), (0, 1), (1, 1)];
-
-        foreach (var (dx, dy) in offsets)
-        {
-            var nx = x + dx;
-            var ny = y + dy;
-            if (nx >= 0 && nx < width && ny >= 0 && ny < height)
-            {
-                yield return (nx, ny);
-            }
-        }
     }
 }

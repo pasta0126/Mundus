@@ -9,15 +9,16 @@ interface MapParamsPanelProps {
 }
 
 /**
- * The values that produced this map, so they can be copied and pasted
- * back into the Seed field to reproduce it exactly - same seed + size
- * always generates the same map.
+ * The values that produced the currently viewed window, so they can be
+ * copied and pasted back into the Seed/Start Position fields to
+ * reproduce this exact view - same seed + coordinate always generates
+ * the same terrain.
  */
 export function MapParamsPanel({ map }: MapParamsPanelProps) {
   const [copied, setCopied] = useState(false)
   const rows: [string, string][] = [
     ["Seed", map.seed],
-    ["Size", map.sizePreset],
+    ["Position", `(${map.originX}, ${map.originY})`],
   ]
 
   async function copySeed() {
@@ -27,11 +28,10 @@ export function MapParamsPanel({ map }: MapParamsPanelProps) {
   }
 
   return (
-    <div className="w-full max-w-xs space-y-2">
-      <div className="text-sm font-medium">Used to generate this map</div>
+    <div className="w-56 space-y-2">
       <dl className="divide-border divide-y rounded-lg border text-sm">
         {rows.map(([label, val]) => (
-          <div key={label} className="flex items-center justify-between gap-2 px-4 py-2">
+          <div key={label} className="flex items-center justify-between gap-2 px-3 py-1.5">
             <dt className="text-muted-foreground">{label}</dt>
             <dd className="truncate font-mono font-medium">{val}</dd>
           </div>

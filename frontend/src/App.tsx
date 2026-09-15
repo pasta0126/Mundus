@@ -1,78 +1,123 @@
 import { AnimatePresence, motion } from "motion/react"
-import { useState } from "react"
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { CELL_PX, MAX_WINDOW_DIMENSION } from "@/map/constants"
 import { MapCanvas } from "@/map/MapCanvas"
 import { MapParamsPanel } from "@/map/MapParamsPanel"
 import { MapCreationWizard } from "@/wizard/MapCreationWizard"
 import { INITIAL_WIZARD_STATE, type WizardState } from "@/wizard/types"
 
 type MapDto = components["schemas"]["Map"]
-type ViewState =
-  | { kind: "wizard" }
-  | { kind: "generating" }
-  | { kind: "rendering"; map: MapDto }
-  | { kind: "error"; message: string }
-  | { kind: "result"; map: MapDto }
+type Phase = "wizard" | "result" | "error"
 
 function randomSeed(): string {
   return Math.random().toString(36).slice(2, 10)
 }
 
+function parseCoordinate(raw: string): number {
+  const trimmed = raw.trim()
+  if (trimmed === "") return 0
+  const n = Number.parseInt(trimmed, 10)
+  return Number.isFinite(n) ? n : 0
+}
+
+/** How many cells (per axis) are needed to cover the current viewport at CELL_PX each, capped at the API's max window dimension. */
+function windowSizeForViewport() {
+  const width = Math.min(MAX_WINDOW_DIMENSION, Math.max(1, Math.ceil(window.innerWidth / CELL_PX)))
+  const height = Math.min(MAX_WINDOW_DIMENSION, Math.max(1, Math.ceil(window.innerHeight / CELL_PX)))
+  return { width, height }
+}
+
 function App() {
   const [wizardState, setWizardState] = useState<WizardState>(INITIAL_WIZARD_STATE)
   const [stepIndex, setStepIndex] = useState(0)
-  const [view, setView] = useState<ViewState>({ kind: "wizard" })
+  const [phase, setPhase] = useState<Phase>("wizard")
+  const [map, setMap] = useState<MapDto | null>(null)
+  const [seed, setSeed] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [errorMessage, setErrorMessage] = useState("")
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
 
-  async function generate(sizePreset: WizardState["sizePreset"], seed: string) {
-    if (!sizePreset) return
-
-    setView({ kind: "generating" })
-    // gridType no longer affects how the map is drawn (see MapCanvas), so
-    // it's not exposed as a wizard choice - always send the API's default.
+  async function fetchWindow(nextSeed: string, x: number, y: number) {
+    setLoading(true)
+    const { width, height } = windowSizeForViewport()
     const { data, error } = await api.GET("/api/Maps", {
-      params: { query: { seed, gridType: "Square", sizePreset } },
+      params: { query: { seed: nextSeed, x, y, width, height } },
     })
+    setLoading(false)
 
     if (error !== undefined || !data) {
-      setView({ kind: "error", message: "Failed to generate the map. Please try again." })
+      // Only the very first generation (no map yet) gets a full error
+      // screen - a failed pan/regenerate/resize re-fetch just leaves the
+      // last good map on screen so exploring the world never blanks out.
+      if (!map) {
+        setErrorMessage("Failed to generate the map. Please try again.")
+        setPhase("error")
+      }
       return
     }
 
-    // Brief "rendering" status so contour extraction (synchronous, can
-    // take a moment on Huge maps) always shows feedback instead of the
-    // UI appearing to freeze - see design.md ("Progress/status feedback").
-    // Uses setTimeout rather than requestAnimationFrame: rAF callbacks
-    // can be throttled for a long time (seconds, sometimes much more)
-    // once a tab loses foreground/visibility priority, which turned this
-    // "brief" transition into an indefinite-looking freeze - see bug
-    // report. setTimeout still yields a tick for the browser to paint
-    // the "Rendering..." status first, without that hazard.
-    setView({ kind: "rendering", map: data })
-    setTimeout(() => setView({ kind: "result", map: data }), 0)
+    setSeed(nextSeed)
+    setMap(data)
+    setPhase("result")
   }
 
   function handleConfirm() {
-    const seed = wizardState.seed.trim() || randomSeed()
-    void generate(wizardState.sizePreset, seed)
+    const nextSeed = wizardState.seed.trim() || randomSeed()
+    void fetchWindow(nextSeed, parseCoordinate(wizardState.x), parseCoordinate(wizardState.y))
   }
 
   function regenerate() {
-    void generate(wizardState.sizePreset, randomSeed())
+    void fetchWindow(randomSeed(), 0, 0)
   }
 
   function restartWizard() {
     setWizardState(INITIAL_WIZARD_STATE)
     setStepIndex(0)
-    setView({ kind: "wizard" })
+    setPhase("wizard")
   }
 
   function backToWizardAfterError() {
-    setView({ kind: "wizard" })
+    setPhase("wizard")
   }
+
+  function pan(dx: number, dy: number) {
+    if (!map) return
+    const stepX = Math.max(1, Math.round(Number(map.width) / 2))
+    const stepY = Math.max(1, Math.round(Number(map.height) / 2))
+    void fetchWindow(seed, Number(map.originX) + dx * stepX, Number(map.originY) + dy * stepY)
+  }
+
+  // Re-fetch the same origin at the new viewport-derived window size on
+  // resize, so the map keeps covering the full page background. Refs
+  // (not state) so the resize listener always reads the latest map/seed
+  // without needing to be torn down and re-added on every fetch.
+  const mapRef = useRef(map)
+  const seedRef = useRef(seed)
+  useEffect(() => {
+    mapRef.current = map
+    seedRef.current = seed
+  }, [map, seed])
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>
+    function onResize() {
+      clearTimeout(timeout)
+      timeout = setTimeout(() => {
+        const current = mapRef.current
+        if (!current) return
+        void fetchWindow(seedRef.current, Number(current.originX), Number(current.originY))
+      }, 200)
+    }
+    window.addEventListener("resize", onResize)
+    return () => {
+      window.removeEventListener("resize", onResize)
+      clearTimeout(timeout)
+    }
+  }, [])
 
   function downloadMap() {
     if (!canvasEl) return
@@ -88,90 +133,99 @@ function App() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl flex-col items-center justify-center gap-6 p-6">
-      <h1 className="text-3xl font-semibold tracking-tight">Mundus</h1>
+    <main className="bg-background relative min-h-screen w-full overflow-hidden">
+      {map && <MapCanvas map={map} onCanvasReady={setCanvasEl} />}
 
       <AnimatePresence mode="wait">
-        {view.kind === "wizard" && (
+        {phase === "wizard" && (
           <motion.div
             key="wizard"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex w-full justify-center"
+            className="fixed inset-0 z-10 flex items-center justify-center p-6"
           >
-            <MapCreationWizard
-              state={wizardState}
-              onChange={setWizardState}
-              stepIndex={stepIndex}
-              onStepIndexChange={setStepIndex}
-              onConfirm={handleConfirm}
-            />
-          </motion.div>
-        )}
-
-        {view.kind === "generating" && (
-          <motion.div
-            key="generating"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex w-full max-w-sm flex-col items-center gap-3"
-          >
-            <p className="text-sm">Generating your map…</p>
-            <Progress value={60} className="w-full" />
-          </motion.div>
-        )}
-
-        {(view.kind === "rendering" || view.kind === "result") && (
-          <motion.div
-            key="result"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="flex w-full flex-col items-center gap-3"
-          >
-            {view.kind === "rendering" && (
-              <div className="flex w-full max-w-sm flex-col items-center gap-3">
-                <p className="text-sm">Rendering map…</p>
-                <Progress value={90} className="w-full" />
-              </div>
-            )}
-            <div className={view.kind === "rendering" ? "hidden" : "flex w-full flex-col items-center gap-6 md:flex-row md:items-start md:justify-center"}>
-              <div className="w-full max-w-md space-y-3">
-                <MapCanvas map={view.map} onCanvasReady={setCanvasEl} />
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={regenerate}>
-                    Regenerate
-                  </Button>
-                  <Button variant="outline" onClick={restartWizard}>
-                    Restart wizard
-                  </Button>
-                  <Button variant="outline" onClick={downloadMap}>
-                    Download
-                  </Button>
-                </div>
-              </div>
-              <MapParamsPanel map={view.map} />
+            <div className="bg-card w-full max-w-md space-y-4 rounded-lg border p-6 shadow-lg">
+              <h1 className="text-center text-2xl font-semibold tracking-tight">Mundus</h1>
+              <MapCreationWizard
+                state={wizardState}
+                onChange={setWizardState}
+                stepIndex={stepIndex}
+                onStepIndexChange={setStepIndex}
+                onConfirm={handleConfirm}
+              />
             </div>
           </motion.div>
         )}
 
-        {view.kind === "error" && (
+        {phase === "error" && (
           <motion.div
             key="error"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex flex-col items-center gap-3"
+            className="fixed inset-0 z-10 flex items-center justify-center p-6"
           >
-            <p className="text-destructive text-sm">{view.message}</p>
-            <Button variant="outline" onClick={backToWizardAfterError}>
-              Back to wizard
-            </Button>
+            <div className="bg-card flex flex-col items-center gap-3 rounded-lg border p-6 shadow-lg">
+              <p className="text-destructive text-sm">{errorMessage}</p>
+              <Button variant="outline" onClick={backToWizardAfterError}>
+                Back to wizard
+              </Button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
+
+      {loading && (
+        <div className="fixed inset-x-0 top-0 z-20 flex flex-col items-center gap-2 p-4">
+          <div className="bg-card w-full max-w-xs space-y-2 rounded-lg border p-3 shadow-lg">
+            <p className="text-center text-sm">Loading map…</p>
+            <Progress value={60} className="w-full" />
+          </div>
+        </div>
+      )}
+
+      {phase === "result" && map && (
+        <>
+          <div className="fixed top-4 left-4 z-10 space-y-3">
+            <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
+              <h1 className="text-lg font-semibold tracking-tight">Mundus</h1>
+              <MapParamsPanel map={map} />
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={regenerate}>
+                  Regenerate
+                </Button>
+                <Button variant="outline" size="sm" onClick={restartWizard}>
+                  Restart wizard
+                </Button>
+                <Button variant="outline" size="sm" onClick={downloadMap}>
+                  Download
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="fixed right-4 bottom-4 z-10 grid grid-cols-3 grid-rows-3 gap-1">
+            <div />
+            <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(0, -1)} aria-label="Pan north">
+              <ArrowUp />
+            </Button>
+            <div />
+            <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(-1, 0)} aria-label="Pan west">
+              <ArrowLeft />
+            </Button>
+            <div />
+            <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(1, 0)} aria-label="Pan east">
+              <ArrowRight />
+            </Button>
+            <div />
+            <Button variant="outline" size="icon" className="bg-card shadow-lg" onClick={() => pan(0, 1)} aria-label="Pan south">
+              <ArrowDown />
+            </Button>
+            <div />
+          </div>
+        </>
+      )}
     </main>
   )
 }

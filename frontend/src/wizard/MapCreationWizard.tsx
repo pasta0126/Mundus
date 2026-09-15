@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { ReviewStep } from "@/wizard/steps/ReviewStep"
 import { SeedStep } from "@/wizard/steps/SeedStep"
-import { SizePresetStep } from "@/wizard/steps/SizePresetStep"
+import { StartPositionStep } from "@/wizard/steps/StartPositionStep"
 import { WIZARD_STEPS, type WizardState } from "@/wizard/types"
 
 interface MapCreationWizardProps {
@@ -21,8 +21,6 @@ export function MapCreationWizard({
   onConfirm,
 }: MapCreationWizardProps) {
   const step = WIZARD_STEPS[stepIndex]
-
-  const canAdvance = step !== "sizePreset" || state.sizePreset !== null
 
   const isFirst = stepIndex === 0
   const isLast = step === "review"
@@ -49,19 +47,16 @@ export function MapCreationWizard({
           {step === "seed" && (
             <SeedStep value={state.seed} onChange={(seed) => onChange({ ...state, seed })} />
           )}
-          {step === "sizePreset" && (
-            <SizePresetStep
-              value={state.sizePreset}
-              onChange={(sizePreset) => onChange({ ...state, sizePreset })}
+          {step === "startPosition" && (
+            <StartPositionStep
+              x={state.x}
+              y={state.y}
+              onChange={({ x, y }) => onChange({ ...state, x, y })}
             />
           )}
           {step === "review" && <ReviewStep state={state} />}
         </motion.div>
       </AnimatePresence>
-
-      {!canAdvance && (
-        <p className="text-muted-foreground text-center text-xs">Select an option to continue</p>
-      )}
 
       <div className="flex justify-between">
         <Button variant="outline" disabled={isFirst} onClick={() => onStepIndexChange(stepIndex - 1)}>
@@ -70,9 +65,7 @@ export function MapCreationWizard({
         {isLast ? (
           <Button onClick={onConfirm}>Generate map</Button>
         ) : (
-          <Button disabled={!canAdvance} onClick={() => onStepIndexChange(stepIndex + 1)}>
-            Next
-          </Button>
+          <Button onClick={() => onStepIndexChange(stepIndex + 1)}>Next</Button>
         )}
       </div>
     </div>

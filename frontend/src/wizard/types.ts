@@ -1,17 +1,16 @@
-import type { components } from "@/api/schema"
-
-export type SizePreset = components["schemas"]["SizePreset"]
-
 export interface WizardState {
   seed: string
-  sizePreset: SizePreset | null
+  /** Raw text input for the start position, parsed with a "0" fallback when blank - see App.tsx's parseCoordinate. */
+  x: string
+  y: string
 }
 
 export const INITIAL_WIZARD_STATE: WizardState = {
   seed: "",
-  sizePreset: null,
+  x: "",
+  y: "",
 }
 
-export const WIZARD_STEPS = ["seed", "sizePreset", "review"] as const
+export const WIZARD_STEPS = ["seed", "startPosition", "review"] as const
 
 export type WizardStep = (typeof WIZARD_STEPS)[number]

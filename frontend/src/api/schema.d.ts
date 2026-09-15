@@ -48,8 +48,10 @@ export interface paths {
             parameters: {
                 query?: {
                     seed?: string;
-                    gridType?: components["schemas"]["GridType"];
-                    sizePreset?: components["schemas"]["SizePreset"];
+                    x?: number | string;
+                    y?: number | string;
+                    width?: number | string;
+                    height?: number | string;
                 };
                 header?: never;
                 path?: never;
@@ -78,85 +80,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/Worlds/{seed}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    seed: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description OK */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "text/plain": components["schemas"]["World"];
-                        "application/json": components["schemas"]["World"];
-                        "text/json": components["schemas"]["World"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {unknown} */
-        Biome: "Forest" | "Desert" | "Tundra" | "Grassland" | "Swamp" | "Mountains" | "Ocean";
+        Biome: "Ocean" | "Beach" | "Grassland" | "Forest" | "Tundra" | "Snow";
         Cell: {
             /** Format: int32 */
             x: number | string;
             /** Format: int32 */
             y: number | string;
             biome: components["schemas"]["Biome"];
-            /** Format: double */
-            elevation: number | string;
         };
-        /** @enum {unknown} */
-        GridType: "Square" | "Hex";
         Map: {
             /** Format: int32 */
             specVersion: number | string;
             seed: string;
-            gridType: components["schemas"]["GridType"];
-            sizePreset: components["schemas"]["SizePreset"];
+            /** Format: int32 */
+            originX: number | string;
+            /** Format: int32 */
+            originY: number | string;
             /** Format: int32 */
             width: number | string;
             /** Format: int32 */
             height: number | string;
             cells: components["schemas"]["Cell"][];
         };
-        /** @enum {unknown} */
-        SizePreset: "Small" | "Medium" | "Large" | "Huge";
-        World: {
-            /** Format: int32 */
-            specVersion: number | string;
-            seed: string;
-            size: components["schemas"]["WorldSize"];
-            biome: components["schemas"]["Biome"];
-        };
-        /** @enum {unknown} */
-        WorldSize: "Small" | "Medium" | "Large";
     };
     responses: never;
     parameters: never;

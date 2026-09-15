@@ -5,9 +5,11 @@ interface ReviewStepProps {
 }
 
 export function ReviewStep({ state }: ReviewStepProps) {
+  const x = state.x.trim() || "0"
+  const y = state.y.trim() || "0"
   const rows: [string, string][] = [
     ["Seed", state.seed.trim() || "(random)"],
-    ["Size", state.sizePreset ?? "-"],
+    ["Start Position", `(${x}, ${y})`],
   ]
 
   return (

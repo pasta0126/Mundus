@@ -5,109 +5,74 @@ public sealed record Cell
     public required int X { get; init; }
     public required int Y { get; init; }
     public required Biome Biome { get; init; }
-    public required double Elevation { get; init; }
 }
 
 public sealed record Map
 {
     public required int SpecVersion { get; init; }
     public required string Seed { get; init; }
-    public required GridType GridType { get; init; }
-    public required SizePreset SizePreset { get; init; }
+    public required int OriginX { get; init; }
+    public required int OriginY { get; init; }
     public required int Width { get; init; }
     public required int Height { get; init; }
     public required IReadOnlyList<Cell> Cells { get; init; }
 }
 
 /// <summary>
-/// Generates a deterministic <see cref="Map"/> silhouette using the
-/// classic "scatter grains on paper, trace around them" worldbuilding
-/// technique: a handful of circular "grains" of varying size (evoking
-/// rice/lentils/chickpeas) are scattered across the grid; a cell is land
-/// if it falls within any grain's radius, so overlapping grains merge
-/// into one landmass "for free". See specs/map-generation/spec.md and
-/// this change's design.md. Biome variety, elevation texture, and shape
-/// archetypes are deliberately not part of this generator yet - see
-/// design.md Non-Goals.
+/// Generates terrain for an unbounded, explorable world: a cell's biome
+/// at any coordinate depends only on the seed and that cell's own
+/// `(x, y)` - never on which other cells were requested before it, or
+/// where it sits within the requested window - so panning into
+/// unexplored territory never changes previously-seen terrain, and a
+/// window far from the origin generates exactly as if it were the only
+/// request ever made. See openspec/specs/map-generation/spec.md.
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 4;
+    public const int CurrentSpecVersion = 5;
 
-    /// <summary>Below this elevation, a cell is Ocean. Also hardcoded on
-    /// the frontend for contour extraction - see MapCanvas.tsx.</summary>
-    private const double OceanThreshold = 0.3;
+    /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
+    public const int MaxWindowDimension = 256;
 
-    private const Biome LandBiome = Biome.Grassland;
-
-    /// <summary>Radius bands (as a fraction of grid width) for the big base grains that establish each landmass - roughly chickpea/lentil scale.</summary>
-    private static readonly double[] BaseGrainRadiusFractions = [0.06, 0.10, 0.16];
+    /// <summary>Cells per lattice unit for the terrain noise - roughly how large a biome region reads as.</summary>
+    private const int RegionScale = 32;
 
     /// <summary>
-    /// Radius bands for the fine detail grains scattered along each base
-    /// grain's rim - true grain-of-rice-on-a-sheet-of-paper scale relative
-    /// to the grid, an order of magnitude smaller than the base grains.
-    /// Alone they'd be too small and sparse to ever merge into a
-    /// landmass, but layered onto the base grains' edges they rough up an
-    /// otherwise-smooth circle into the gulfs/capes/inlets a real
-    /// coastline has - see design.md.
+    /// Ascending thresholds mapping a [0, 1) terrain value to a
+    /// <see cref="Biome"/> band, in <see cref="Biome"/>'s declared order.
+    /// A value below a band's threshold falls in the band before it (the
+    /// first band, Ocean, has no lower bound).
     /// </summary>
-    private static readonly double[] DetailGrainRadiusFractions = [0.008, 0.014, 0.020];
+    private static readonly (Biome Biome, double UpperBound)[] BiomeBands =
+    [
+        (Biome.Ocean, 0.35),
+        (Biome.Beach, 0.40),
+        (Biome.Grassland, 0.62),
+        (Biome.Forest, 0.78),
+        (Biome.Tundra, 0.90),
+        (Biome.Snow, double.PositiveInfinity),
+    ];
 
-    public static Map Generate(string seed, GridType gridType, SizePreset sizePreset)
+    public static Map Generate(string seed, int originX, int originY, int width, int height)
     {
-        var (width, height) = sizePreset.Dimensions();
-        var rng = new Rng(seed);
-
-        var (minBase, maxBase) = sizePreset.BaseGrainCountRange();
-        var baseCount = rng.Child("base-grain-count").Int(minBase, maxBase);
-        var baseGrains = PlaceBaseGrains(rng.Child("base-grains"), baseCount, width, height);
-
-        var (minDetail, maxDetail) = sizePreset.DetailGrainCountRange();
-        var detailCount = rng.Child("detail-grain-count").Int(minDetail, maxDetail);
-        var detailGrains = PlaceDetailGrains(rng.Child("detail-grains"), detailCount, baseGrains, width);
-
-        var grains = new List<Grain>(baseGrains.Count + detailGrains.Count);
-        grains.AddRange(baseGrains);
-        grains.AddRange(detailGrains);
-
-        var elevation = new double[width * height];
-        // Splat each grain only over its own bounding box rather than
-        // scanning every cell against every grain - at hundreds of tiny
-        // grains, a naive width*height*grainCount scan gets slow, while
-        // this stays proportional to each grain's (small) footprint.
-        foreach (var grain in grains)
+        if (width < 1 || width > MaxWindowDimension)
         {
-            var minX = Math.Max(0, (int)Math.Floor(grain.X - grain.Radius));
-            var maxX = Math.Min(width - 1, (int)Math.Ceiling(grain.X + grain.Radius));
-            var minY = Math.Max(0, (int)Math.Floor(grain.Y - grain.Radius));
-            var maxY = Math.Min(height - 1, (int)Math.Ceiling(grain.Y + grain.Radius));
-
-            for (var y = minY; y <= maxY; y++)
-            {
-                for (var x = minX; x <= maxX; x++)
-                {
-                    var dx = x - grain.X;
-                    var dy = y - grain.Y;
-                    var distance = Math.Sqrt((dx * dx) + (dy * dy));
-                    var falloff = Math.Clamp(1 - (distance / grain.Radius), 0, 1);
-                    var index = (y * width) + x;
-                    if (falloff > elevation[index])
-                    {
-                        elevation[index] = falloff;
-                    }
-                }
-            }
+            throw new ArgumentOutOfRangeException(nameof(width), $"width must be between 1 and {MaxWindowDimension}");
         }
 
-        var cells = new List<Cell>(width * height);
-        for (var y = 0; y < height; y++)
+        if (height < 1 || height > MaxWindowDimension)
         {
-            for (var x = 0; x < width; x++)
+            throw new ArgumentOutOfRangeException(nameof(height), $"height must be between 1 and {MaxWindowDimension}");
+        }
+
+        var noise = new InfiniteValueNoise2D(seed, RegionScale);
+        var cells = new List<Cell>(width * height);
+        for (var y = originY; y < originY + height; y++)
+        {
+            for (var x = originX; x < originX + width; x++)
             {
-                var e = elevation[(y * width) + x];
-                var biome = e >= OceanThreshold ? LandBiome : Biome.Ocean;
-                cells.Add(new Cell { X = x, Y = y, Biome = biome, Elevation = e });
+                var value = noise.Sample(x, y);
+                cells.Add(new Cell { X = x, Y = y, Biome = BiomeAt(value) });
             }
         }
 
@@ -115,53 +80,27 @@ public static class MapGenerator
         {
             SpecVersion = CurrentSpecVersion,
             Seed = seed,
-            GridType = gridType,
-            SizePreset = sizePreset,
+            OriginX = originX,
+            OriginY = originY,
             Width = width,
             Height = height,
             Cells = cells,
         };
     }
 
-    private readonly record struct Grain(double X, double Y, double Radius);
+    /// <summary>Sample the raw [0, 1) terrain value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
+    public static double TerrainValueAt(string seed, int x, int y) => new InfiniteValueNoise2D(seed, RegionScale).Sample(x, y);
 
-    private static List<Grain> PlaceBaseGrains(Rng rng, int count, int width, int height)
+    private static Biome BiomeAt(double value)
     {
-        var grains = new List<Grain>(count);
-        for (var i = 0; i < count; i++)
+        foreach (var (biome, upperBound) in BiomeBands)
         {
-            var x = rng.Float() * width;
-            var y = rng.Float() * height;
-            var fraction = rng.Pick(BaseGrainRadiusFractions);
-            var radius = fraction * width;
-            grains.Add(new Grain(x, y, radius));
+            if (value < upperBound)
+            {
+                return biome;
+            }
         }
 
-        return grains;
-    }
-
-    /// <summary>
-    /// Scatters each detail grain near the rim of a random base grain
-    /// (0.5x-1.4x its radius out from the center), rather than uniformly
-    /// across the whole grid, so the fine texture lands where a coastline
-    /// actually is instead of producing unrelated confetti islands far
-    /// from any landmass.
-    /// </summary>
-    private static List<Grain> PlaceDetailGrains(Rng rng, int count, List<Grain> baseGrains, int width)
-    {
-        var grains = new List<Grain>(count);
-        for (var i = 0; i < count; i++)
-        {
-            var anchor = rng.Pick(baseGrains);
-            var angle = rng.Float() * Math.Tau;
-            var distance = anchor.Radius * (0.5 + (rng.Float() * 0.9));
-            var x = anchor.X + (Math.Cos(angle) * distance);
-            var y = anchor.Y + (Math.Sin(angle) * distance);
-            var fraction = rng.Pick(DetailGrainRadiusFractions);
-            var radius = fraction * width;
-            grains.Add(new Grain(x, y, radius));
-        }
-
-        return grains;
+        return BiomeBands[^1].Biome;
     }
 }
