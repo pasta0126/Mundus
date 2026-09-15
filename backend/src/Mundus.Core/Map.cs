@@ -29,7 +29,7 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 8;
+    public const int CurrentSpecVersion = 9;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 512;
@@ -51,10 +51,25 @@ public static class MapGenerator
     /// </summary>
     private const int ElevationOctaves = 7;
 
-    /// <summary>Moisture's base region scale - broad climate zones, independent of elevation's.</summary>
-    private const int MoistureRegionScale = 96;
+    /// <summary>
+    /// Moisture's base region scale - broad climate zones, independent of
+    /// elevation's own field. Kept close to elevation's scale (though not
+    /// identical, so climate zones don't just trace elevation's own
+    /// contours) so that within one elevation band (e.g. Lowland),
+    /// moisture carves out large, coherent Desert/Grassland/Swamp regions
+    /// instead of a fine patchwork of small ones - a small moisture scale
+    /// relative to elevation was fragmenting what should read as one
+    /// grassland or one forest into many disconnected slivers.
+    /// </summary>
+    private const int MoistureRegionScale = 320;
 
-    private const int MoistureOctaves = 4;
+    /// <summary>
+    /// One octave per halving down to region scale 10, close to
+    /// elevation's own finest octave (8) so moisture-driven biome borders
+    /// (e.g. Forest's edge) still get comparable fine detail/raggedness,
+    /// not a smoother or coarser edge than the coastline.
+    /// </summary>
+    private const int MoistureOctaves = 6;
 
     private const double NoisePersistence = 0.5;
 
