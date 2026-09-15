@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate:api-types": "openapi-typescript http://localhost:5253/api/openapi/v1.json -o src/api/schema.d.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
@@ -15,6 +16,7 @@
     "cn": "^0.3.0",
     "lucide-react": "^1.46.0",
     "motion": "^13.3.0",
+    "openapi-fetch": "^0.17.0",
     "radix-ui": "^1.6.7",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
@@ -27,6 +29,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
+    "openapi-typescript": "^7.13.0",
     "oxlint": "^1.81.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",

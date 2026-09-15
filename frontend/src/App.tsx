@@ -1,13 +1,10 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
+import { api } from '@/api/client'
+import type { components } from '@/api/schema'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-type World = {
-  specVersion: number
-  seed: string
-  size: 'Small' | 'Medium' | 'Large'
-  biome: string
-}
+type World = components['schemas']['World']
 
 function App() {
   const [seed, setSeed] = useState('northern-archive')
@@ -16,14 +13,15 @@ function App() {
 
   async function generate() {
     setError(null)
-    try {
-      const res = await fetch(`/api/worlds/${encodeURIComponent(seed)}`)
-      if (!res.ok) throw new Error(`API returned ${res.status}`)
-      setWorld((await res.json()) as World)
-    } catch (err) {
+    const { data, error: apiError } = await api.GET('/api/Worlds/{seed}', {
+      params: { path: { seed } },
+    })
+    if (apiError !== undefined || !data) {
       setWorld(null)
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      setError('Failed to generate world')
+      return
     }
+    setWorld(data)
   }
 
   return (

@@ -6,6 +6,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+// The OpenAPI document generator reads Http.Json.JsonOptions, a separate
+// options type from Mvc.JsonOptions above - without this, the generated
+// schema (and any client generated from it) says enums are numbers even
+// though the actual response bodies serialize them as strings.
+builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(
+    options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddOpenApi();
 
 // DATABASE_URL is a standard postgres:// URI (matches the platform's
