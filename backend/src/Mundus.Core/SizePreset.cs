@@ -28,10 +28,10 @@ public static class SizePresetExtensions
     /// <summary>Grain count range for the silhouette generator - see design.md.</summary>
     public static (int Min, int Max) GrainCountRange(this SizePreset preset) => preset switch
     {
-        SizePreset.Small => (4, 7),
-        SizePreset.Medium => (6, 10),
-        SizePreset.Large => (10, 16),
-        SizePreset.Huge => (16, 24),
+        SizePreset.Small => (14, 20),
+        SizePreset.Medium => (24, 34),
+        SizePreset.Large => (40, 56),
+        SizePreset.Huge => (64, 90),
         _ => throw new ArgumentOutOfRangeException(nameof(preset)),
     };
 }

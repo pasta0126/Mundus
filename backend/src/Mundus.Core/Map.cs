@@ -32,7 +32,7 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 2;
+    public const int CurrentSpecVersion = 3;
 
     /// <summary>Below this elevation, a cell is Ocean. Also hardcoded on
     /// the frontend for contour extraction - see MapCanvas.tsx.</summary>
