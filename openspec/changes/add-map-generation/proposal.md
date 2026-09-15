@@ -28,8 +28,11 @@ archived - revised in place, not superseded by a new change).
   64x64, `Large` 128x128, `Huge` 256x256) - not a freeform width/height.
 - **Shape archetype**: `Continent` (one large landmass), `Island` (one
   landmass surrounded by ocean, map edges are ocean), `Archipelago`
-  (several separate landmasses), or `Unconstrained` (no shape guarantee,
-  purely emergent from noise).
+  (several separate landmasses), `Peninsula` (one landmass attached to
+  exactly one map edge), `IsthmusLandBridge` (one landmass touching two
+  opposite map edges, bridging across the map), `InlandSea` (land
+  encloses a body of ocean that has no path to the map's outer edge), or
+  `Unconstrained` (no shape guarantee, purely emergent from noise).
 - **Biome regions**: the map is partitioned into a small number of
   contiguous regions (count determined by size preset, e.g. a `Small` map
   gets 1-3 regions, a `Huge` map gets 10-20), each with one biome - not one

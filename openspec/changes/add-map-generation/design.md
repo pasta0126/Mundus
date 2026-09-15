@@ -60,7 +60,26 @@ recognizable regions on a recognizable landmass - than a texture of noise.
     spaced apart (rejection-sampled minimum center distance) so they
     don't merge into one connected landmass - satisfies "two or more
     disjoint landmasses, not adjacent to each other."
-  - After masking, connectivity (one landmass vs. several, edge-ocean) is
+  - `Peninsula`: like `Continent`'s single bump, but the bump center is
+    placed near one randomly-chosen edge (from a named child `Rng`
+    stream: top/bottom/left/right) instead of the map's middle, and the
+    falloff is steep enough that the three other edges are forced below
+    the ocean threshold (same "force the ring to zero" technique as
+    `Island`, applied to three sides instead of all four).
+  - `IsthmusLandBridge`: two bumps, one near each of one randomly-chosen
+    pair of opposite edges (both left+right, or both top+bottom - picked
+    from a named child `Rng` stream), plus a raised connecting band
+    between them along that axis so the two bumps merge into one
+    contiguous region rather than becoming a two-landmass Archipelago;
+    the two perpendicular edges are not constrained (may be land or
+    ocean).
+  - `InlandSea`: like `Continent` (or a full-map-covering bump so land
+    reaches every edge), with one additional, smaller *inverted* bump
+    (a depression, subtracted rather than added) placed away from all
+    edges (rejection-sampled minimum distance from the border) so it
+    carves out a below-threshold pocket fully surrounded by land.
+  - After masking, connectivity (one landmass vs. several, edge-ocean,
+    enclosed water) is
     verified by flood-fill in a unit test, not assumed from the mask
     parameters alone - the mask makes the property overwhelmingly likely,
     the test is what actually enforces the spec's SHALL.

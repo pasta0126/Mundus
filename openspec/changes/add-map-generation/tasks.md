@@ -5,7 +5,7 @@
 
 ## 2. Grid and map model
 
-- [ ] 2.1 Add `GridType` (`Square`, `Hex`), `ShapeArchetype` (`Continent`, `Island`, `Archipelago`, `Unconstrained`), `SizePreset` (`Small` 32x32, `Medium` 64x64, `Large` 128x128, `Huge` 256x256), `Cell` record (`X`, `Y`, `Biome`, `Elevation`), and `Map` record (`SpecVersion`, `Seed`, `GridType`, `SizePreset`, `Width`, `Height`, cell list) to `Mundus.Core`
+- [ ] 2.1 Add `GridType` (`Square`, `Hex`), `ShapeArchetype` (`Continent`, `Island`, `Archipelago`, `Peninsula`, `IsthmusLandBridge`, `InlandSea`, `Unconstrained`), `SizePreset` (`Small` 32x32, `Medium` 64x64, `Large` 128x128, `Huge` 256x256), `Cell` record (`X`, `Y`, `Biome`, `Elevation`), and `Map` record (`SpecVersion`, `Seed`, `GridType`, `SizePreset`, `Width`, `Height`, cell list) to `Mundus.Core`
 - [ ] 2.2 Implement hex neighbor lookup (offset-coordinate, even-r or odd-r) and square neighbor lookup as internal helpers, verify with a unit test that an interior hex cell has exactly 6 neighbors and an interior square cell has exactly 4
 
 ## 3. Shape archetype masks
@@ -13,8 +13,11 @@
 - [ ] 3.1 Implement the `Continent` mask (single broad landmass bump added to the elevation noise field), verify with a unit test that non-Ocean cells form exactly one connected region (flood-fill) across several seeds
 - [ ] 3.2 Implement the `Island` mask (steeper falloff, edge ring forced below the ocean threshold), verify with a unit test that every outer-edge cell is `Ocean` and non-Ocean cells form exactly one connected region, across several seeds
 - [ ] 3.3 Implement the `Archipelago` mask (K spaced landmass bumps, K derived from size preset), verify with a unit test that non-Ocean cells form 2+ disjoint connected regions with no two adjacent, across several seeds
-- [ ] 3.4 Implement `Unconstrained` (no mask, raw noise field) as the baseline case
-- [ ] 3.5 Add a retry-with-derived-seed fallback for the rare case a mask's guarantee doesn't hold after generation, verify it never surfaces a map violating the archetype's property to the caller
+- [ ] 3.4 Implement `Peninsula` (single edge-anchored bump, three other edges forced below the ocean threshold), verify with a unit test that non-Ocean cells form exactly one connected region touching exactly one side's edge cells, across several seeds
+- [ ] 3.5 Implement `IsthmusLandBridge` (two opposite-edge bumps plus a connecting raised band), verify with a unit test that non-Ocean cells form exactly one connected region touching both edges of one opposite pair, across several seeds
+- [ ] 3.6 Implement `InlandSea` (full-coverage landmass with one interior depression carved below the ocean threshold, kept a minimum distance from all edges), verify with a unit test that at least one Ocean region exists with no edge cell and no path to any edge cell, across several seeds
+- [ ] 3.7 Implement `Unconstrained` (no mask, raw noise field) as the baseline case
+- [ ] 3.8 Add a retry-with-derived-seed fallback for the rare case a mask's guarantee doesn't hold after generation, verify it never surfaces a map violating the archetype's property to the caller
 
 ## 4. Biome regions
 

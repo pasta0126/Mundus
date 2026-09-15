@@ -97,16 +97,28 @@ uniformly at random from the same map.
 - **THEN** the neighbor average is smaller
 
 ### Requirement: Shape archetype
-The system SHALL support four shape archetypes selected explicitly by the
-caller, each guaranteeing an observable property of the resulting map's
-land/ocean layout (land = any non-`Ocean` biome cell):
+The system SHALL support seven shape archetypes selected explicitly by
+the caller, each guaranteeing an observable property of the resulting
+map's land/ocean layout (land = any non-`Ocean` biome cell; an "edge
+cell" is any cell on the outer boundary of the map):
 
 - `Continent`: land cells SHALL form exactly one contiguous connected
   region (ocean may or may not touch the map edges).
 - `Island`: land cells SHALL form exactly one contiguous connected
-  region, AND every cell on the map's outer edge SHALL be `Ocean`.
+  region, AND every edge cell SHALL be `Ocean`.
 - `Archipelago`: land cells SHALL form two or more disjoint contiguous
   connected regions, each separated from the others by `Ocean` cells.
+- `Peninsula`: land cells SHALL form exactly one contiguous connected
+  region, that region SHALL include at least one edge cell from exactly
+  one of the map's four sides, and every edge cell on the other three
+  sides SHALL be `Ocean`.
+- `IsthmusLandBridge`: land cells SHALL form exactly one contiguous
+  connected region, and that region SHALL include at least one edge cell
+  from each of exactly one pair of opposite sides (left-right, or
+  top-bottom).
+- `InlandSea`: the map SHALL contain at least one contiguous `Ocean`
+  region that includes no edge cell (i.e. fully enclosed by land, with no
+  path of `Ocean` cells connecting it to the map's outer boundary).
 - `Unconstrained`: no guarantee on land/ocean layout beyond the other
   requirements in this spec (region count, contiguity of biome regions,
   elevation coherence).
@@ -119,13 +131,31 @@ land/ocean layout (land = any non-`Ocean` biome cell):
 #### Scenario: Island archetype produces one landmass with ocean edges
 - **WHEN** a map is generated with shape archetype `Island`
 - **THEN** the set of non-`Ocean` cells forms exactly one contiguous
-  connected region, and every cell on the outer edge of the map is
-  `Ocean`
+  connected region, and every edge cell of the map is `Ocean`
 
 #### Scenario: Archipelago archetype produces multiple landmasses
 - **WHEN** a map is generated with shape archetype `Archipelago`
 - **THEN** the set of non-`Ocean` cells forms two or more contiguous
   connected regions, with no two of them adjacent to each other
+
+#### Scenario: Peninsula archetype attaches land to one side only
+- **WHEN** a map is generated with shape archetype `Peninsula`
+- **THEN** the set of non-`Ocean` cells forms exactly one contiguous
+  connected region, edge cells on exactly one of the four sides include
+  at least one land cell, and every edge cell on the other three sides is
+  `Ocean`
+
+#### Scenario: IsthmusLandBridge archetype spans two opposite sides
+- **WHEN** a map is generated with shape archetype `IsthmusLandBridge`
+- **THEN** the set of non-`Ocean` cells forms exactly one contiguous
+  connected region, and that region includes at least one edge cell on
+  each side of one pair of opposite sides (both left and right, or both
+  top and bottom)
+
+#### Scenario: InlandSea archetype encloses a body of water
+- **WHEN** a map is generated with shape archetype `InlandSea`
+- **THEN** at least one contiguous `Ocean` region exists that has no
+  edge cell and no path of `Ocean` cells to any edge cell
 
 ### Requirement: Map generation over HTTP
 The system SHALL expose map generation over HTTP, accepting seed, grid
