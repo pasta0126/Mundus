@@ -7,7 +7,6 @@ interface ReviewStepProps {
 export function ReviewStep({ state }: ReviewStepProps) {
   const rows: [string, string][] = [
     ["Seed", state.seed.trim() || "(random)"],
-    ["Grid type", state.gridType ?? "-"],
     ["Size", state.sizePreset ?? "-"],
   ]
 

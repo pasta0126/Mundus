@@ -26,12 +26,14 @@ function App() {
   const [view, setView] = useState<ViewState>({ kind: "wizard" })
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
 
-  async function generate(gridType: WizardState["gridType"], sizePreset: WizardState["sizePreset"], seed: string) {
-    if (!gridType || !sizePreset) return
+  async function generate(sizePreset: WizardState["sizePreset"], seed: string) {
+    if (!sizePreset) return
 
     setView({ kind: "generating" })
+    // gridType no longer affects how the map is drawn (see MapCanvas), so
+    // it's not exposed as a wizard choice - always send the API's default.
     const { data, error } = await api.GET("/api/Maps", {
-      params: { query: { seed, gridType, sizePreset } },
+      params: { query: { seed, gridType: "Square", sizePreset } },
     })
 
     if (error !== undefined || !data) {
@@ -42,19 +44,23 @@ function App() {
     // Brief "rendering" status so contour extraction (synchronous, can
     // take a moment on Huge maps) always shows feedback instead of the
     // UI appearing to freeze - see design.md ("Progress/status feedback").
+    // Uses setTimeout rather than requestAnimationFrame: rAF callbacks
+    // can be throttled for a long time (seconds, sometimes much more)
+    // once a tab loses foreground/visibility priority, which turned this
+    // "brief" transition into an indefinite-looking freeze - see bug
+    // report. setTimeout still yields a tick for the browser to paint
+    // the "Rendering..." status first, without that hazard.
     setView({ kind: "rendering", map: data })
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => setView({ kind: "result", map: data }))
-    })
+    setTimeout(() => setView({ kind: "result", map: data }), 0)
   }
 
   function handleConfirm() {
     const seed = wizardState.seed.trim() || randomSeed()
-    void generate(wizardState.gridType, wizardState.sizePreset, seed)
+    void generate(wizardState.sizePreset, seed)
   }
 
   function regenerate() {
-    void generate(wizardState.gridType, wizardState.sizePreset, randomSeed())
+    void generate(wizardState.sizePreset, randomSeed())
   }
 
   function restartWizard() {

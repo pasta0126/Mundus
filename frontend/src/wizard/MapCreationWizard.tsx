@@ -1,6 +1,5 @@
 import { AnimatePresence, motion } from "motion/react"
 import { Button } from "@/components/ui/button"
-import { GridTypeStep } from "@/wizard/steps/GridTypeStep"
 import { ReviewStep } from "@/wizard/steps/ReviewStep"
 import { SeedStep } from "@/wizard/steps/SeedStep"
 import { SizePresetStep } from "@/wizard/steps/SizePresetStep"
@@ -23,9 +22,7 @@ export function MapCreationWizard({
 }: MapCreationWizardProps) {
   const step = WIZARD_STEPS[stepIndex]
 
-  const canAdvance =
-    (step !== "gridType" || state.gridType !== null) &&
-    (step !== "sizePreset" || state.sizePreset !== null)
+  const canAdvance = step !== "sizePreset" || state.sizePreset !== null
 
   const isFirst = stepIndex === 0
   const isLast = step === "review"
@@ -51,12 +48,6 @@ export function MapCreationWizard({
         >
           {step === "seed" && (
             <SeedStep value={state.seed} onChange={(seed) => onChange({ ...state, seed })} />
-          )}
-          {step === "gridType" && (
-            <GridTypeStep
-              value={state.gridType}
-              onChange={(gridType) => onChange({ ...state, gridType })}
-            />
           )}
           {step === "sizePreset" && (
             <SizePresetStep
