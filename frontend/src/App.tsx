@@ -3,6 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, RefreshCw, ZoomIn,
 import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
+import mundusIcon from "@/assets/mundus-icon-header.png"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS_PX } from "@/map/constants"
@@ -238,7 +239,10 @@ function App() {
         <>
           <div className="fixed top-4 left-4 z-10 space-y-3">
             <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
-              <h1 className="text-lg font-semibold tracking-tight">Mundus</h1>
+              <h1 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+                <img src={mundusIcon} alt="" className="size-6" />
+                Mundus
+              </h1>
               <MapParamsPanel seed={viewWindow.seed} originX={viewWindow.originX} originY={viewWindow.originY} onGoTo={goToPosition} />
               <div className="flex gap-2">
                 <Button variant="outline" size="sm" onClick={regenerate} className="flex-1">
