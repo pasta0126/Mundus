@@ -1,0 +1,205 @@
+## Context
+
+The backend (`Mundus.Core.MapGenerator`) has no stored heightmap: a cell's
+elevation, moisture, and mountain-belt status are pure functions of
+`(seed, x, y)`, sampled on demand (`ElevationAt`, `MoistureAt`,
+`PlateEdgeAt` are already public for this reason). Mountain ranges are
+already a deterministic Worley/plate-boundary field
+(`WorleyBoundaryField`, `PlateField` in `Map.cs`) warped by noise for an
+organic look - the same pattern this change reuses for regions. Every
+seed-derived sub-system already forks its own independent stream off the
+parent seed, either via string suffixing (`$"{seed}:moisture"`) or
+`Rng.Child(name)`; the frozen-order-of-derivation contract on `Rng.Child`
+(design.md comment: "always append new child streams, never insert them")
+is the mechanism this change's north bearing, rivers, POIs, regions, and
+routes all reuse for their own independent determinism.
+
+The frontend (`MapCanvas.tsx`) draws the biome grid onto one full-viewport
+`<canvas>`; `App.tsx.downloadMap()` calls `canvasEl.toBlob(...)` directly on
+that element. See proposal.md for why this needs to grow into a layered,
+toggleable, composited-on-download picture.
+
+## Goals / Non-Goals
+
+**Goals:**
+- Establish the seeding/determinism pattern each new overlay generator
+  follows, consistent with the existing invariants in `map-generation`
+  (same seed+coordinate always agrees; overlapping/unbounded windows agree).
+- Decide how overlay data reaches the frontend without coupling it to the
+  existing biome-grid response or forcing computation of hidden layers.
+- Decide how the canvas/download pipeline composites independently
+  toggleable layers.
+- Produce the concrete icon inventory (category x type) engineering and
+  art can build against.
+
+**Non-Goals:**
+- Actual icon artwork - the user supplies it later; this change only fixes
+  the enumerated set it must cover.
+- Naming of regions, settlements, or routes - out of scope until a later
+  change.
+- Full graph-based trade-route pathfinding (roads around terrain
+  obstacles) - v1 routes are direct links between nearby settlements.
+
+## Decisions
+
+### One seed-derived sub-stream per overlay generator
+Each new generator (north bearing, river sources, POI scatter, region
+partition, route graph) derives its own child stream via
+`seed.Child("<name>")` (or an equivalent seed-suffix), following the
+existing `Rng.Child` contract: appended once, in a fixed order, never
+inserted between existing streams. This is what keeps regenerating "the
+same" seed's north, rivers, and POIs stable even as more overlay types are
+added later - exactly the property `map-generation`'s biome field already
+guarantees for terrain.
+
+**Alternative considered**: deriving every overlay from the same single
+`Rng` sequence in call order. Rejected - the frozen-order contract makes
+adding a *new* overlay type shift every subsequent draw, silently
+reshuffling already-shipped overlays for existing seeds.
+
+### North bearing: one hashed value per seed, no coordinate dependence
+The compass bearing is a single `Rng.Child("north-bearing")` draw per seed
+(`Float() * 360`), computed once and independent of `(x, y)` - unlike every
+other field in this system, it is not a spatial function. This matches the
+spec's requirement that panning/zooming never changes it.
+
+### Rivers: deterministic lattice sources + downhill trace + domain-warped meander
+Candidate river sources are enumerated the same way `WorleyBoundaryField`
+enumerates cell seeds: a coarse deterministic lattice (one candidate per
+block of a documented size) hashed from `seed.Child("river-sources")` plus
+the block coordinate, kept only if that point's `ElevationAt` falls in the
+`Peak` band. From a kept source, the path is traced step-by-step following
+the local downhill gradient of `ElevationAt`, with the sampled coordinate
+domain-warped each step (reusing the existing `PlateWarpNoise` technique)
+so the path meanders instead of taking the single steepest direction.
+Tracing stops at an `Ocean` cell, a lake cell (see below), or the
+documented maximum path length (in which case the candidate is discarded).
+Tributary confluence is detected when two traced paths pass within one
+cell of each other - the shorter (or later-sourced, to keep the rule
+order-independent) path is truncated and rewritten to continue along the
+other's remaining path.
+
+**Lakes**: the current biome model has only `Ocean` for water; there is no
+enclosed-basin detection over an unbounded, unstored heightmap (a true
+flood fill isn't feasible at world scale). This change adds lakes as their
+own small, deterministic feature - not derived from existing elevation
+noise - using the same lattice-hash scatter as river sources
+(`seed.Child("lakes")`), placing circular lake basins at low-elevation
+lattice points far enough from the coast, which both rivers and the biome
+renderer treat as a terminal/large water body. Region and biome rendering
+of lakes themselves (beyond being a valid river terminus) is out of scope
+for this change.
+
+**Alternative considered**: computing a windowed heightmap and running a
+real flood-fill/watershed algorithm. Rejected for this change - it would
+require materializing and caching a heightmap per region (a significant
+data-model change) purely to support lakes, versus the existing
+"everything is a pure function of coordinates" model. Revisit if future
+features need real hydrology.
+
+**Windowing**: because a river can be sourced far outside a small requested
+window, a window's river query traces every candidate source within the
+documented maximum river length of that window's bounds (not just sources
+inside it), then returns only the path segments that fall within the
+window. This mirrors `map-generation`'s "a distant window generates as if
+it were the only request" invariant, at the cost of retracing some path
+prefix on every request touching it - acceptable since tracing is O(path
+length) and cached per chunk request, not per cell.
+
+### Points of interest: deterministic blue-noise scatter per category, filtered by biome
+Each category gets its own lattice-hash scatter (`seed.Child("poi-<category>")`,
+mirroring the "scattering circular grains" approach already used for
+landmass shaping), at a documented density. A candidate point is kept only
+if the biome at its coordinate (from the existing `map-generation` field)
+satisfies that icon type's placement rule (e.g. mountain icons only on
+`Mountains`/`Snow`, sea icons only on `Ocean`). This keeps POI placement a
+pure function of `(seed, x, y)` per category, so windowing agrees exactly
+like biomes already do.
+
+### Regions: a second, coarser Worley/plate-style partition
+Region boundaries reuse the exact `WorleyBoundaryField` + domain-warp
+pattern already proven for mountain ranges (`PlateField`/`PlateWarpNoise`),
+seeded independently (`seed.Child("regions")`) and at a coarser scale, so
+the "region" partition is a distinct, non-mountain-aligned Voronoi-like
+tessellation. A cell's region ID is whichever Worley cell it falls in;
+boundaries render wherever `EdgeProximity` is nonzero, exactly as plate
+seams already do, but as a dashed stroke instead of uplifted terrain.
+
+### Trade routes: nearest-neighbor links between settlement POIs, not global pathfinding
+Once settlement/seaport POIs exist (previous decision), each settlement
+deterministically links to its `k` nearest settlement/seaport POIs
+(documented `k`, e.g. 2-3), by seed-hashed selection among candidates
+within a bounded radius - not a shortest-path road network avoiding
+terrain. This keeps routes a local, bounded computation per window rather
+than a global graph search over an unbounded world.
+
+### API shape: one endpoint per overlay capability, mirroring `MapsController`
+Each overlay is served by its own endpoint (e.g. `GET /api/rivers`,
+`/api/points-of-interest`, `/api/regions`, `/api/routes`, `/api/compass`),
+taking the same `seed` + window/`step` query contract as `MapsController`,
+rather than folding overlay data into the `Map` response.
+
+**Alternative considered**: extending `Map`/`MapsController` to always
+include overlay data. Rejected - it would force the backend to compute
+every overlay on every request even when its layer is hidden (defeating
+the point of per-layer toggles), bloat the response the biome grid alone
+needs, and couple five independently-evolving capabilities into one
+contract.
+
+### Frontend: one overlay `<canvas>` per layer, composited only on download
+Each layer (compass rose, rivers, each POI category, region borders, trade
+routes) draws into its own `<canvas>`, stacked above `MapCanvas`'s biome
+canvas and below the UI panels, shown/hidden via the layer toggles.
+`downloadMap()` is rewritten to draw the biome canvas plus every currently
+visible overlay canvas onto one offscreen canvas, in a fixed stacking
+order, before calling `toBlob` on that composite - so hidden layers are
+simply never drawn to it.
+
+## Icon Inventory (for later art production)
+
+| Category | Icon types |
+| --- | --- |
+| Geology & relief | mountain peak, mountain range, volcano, cave |
+| Settlements | village, city, seaport, castle, landmark building, ruins |
+| Nature | forest |
+| History & scenic | historic site, scenic site |
+| Sacred & mystical | place of worship, portal |
+| Sea legends | sea monster, treasure, shipwreck, singular event |
+| Mythological beings | mythological creature |
+
+Plus one non-POI icon: the **compass rose** itself.
+
+This is the exact set `points-of-interest`'s spec fixes as the documented
+icon-type inventory; icon artwork for any of these can be supplied and
+wired in independently of the others.
+
+## Risks / Trade-offs
+
+- [Retracing river paths on every window request that touches them is
+  extra compute per request] → bounded by the documented maximum river
+  length, and only sources within that radius of the window are ever
+  traced; revisit with server-side caching if this proves too slow in
+  practice.
+- [Lakes as an authored feature, not derived from real elevation minima,
+  can occasionally sit somewhere a heightmap-literate viewer wouldn't
+  expect a basin] → acceptable for a stylized, not physically-simulated,
+  fantasy map; documented as a deliberate simplification.
+- [Five new endpoints instead of one enriched response adds frontend
+  request-orchestration complexity, layered on top of the existing tiled
+  biome-loading logic] → each overlay endpoint is only called for
+  currently-visible layers, and follows the exact same chunking pattern
+  `tiling.ts` already implements for the biome grid.
+- [Icon inventory is fixed before any artwork exists, and a real design
+  pass on the icons could reveal a missing or redundant type] → the
+  documented set lives in `points-of-interest`'s spec as the single source
+  of truth; adding or removing a type later is a normal spec change, not a
+  rework of the placement/rendering mechanism.
+
+## Open Questions
+
+- Exact per-category POI density and per-overlay documented constants
+  (lattice block size for rivers/lakes, `k` for route nearest-neighbors,
+  max river length) - tunable implementation details, not spec-level
+  behavior; pick reasonable defaults during implementation and document
+  them next to the code, the way `PlateRegionScale` etc. are documented
+  today.
