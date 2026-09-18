@@ -34,12 +34,13 @@ read as travel/trade links between places rather than arbitrary lines.
 
 ### Requirement: Routes render as dotted lines
 A route SHALL render as a dotted line (evenly spaced dots along its path),
-visually distinct from rivers (solid) and region borders (dashed).
+visually distinct from rivers (solid) and region borders (thin solid, in
+a different color) by dot pattern alone.
 
 #### Scenario: A route is visually distinct from a region border
 - **WHEN** a route and a region border are both rendered in the same view
 - **THEN** the route is drawn with a dotted stroke and the border with a
-  dashed stroke
+  solid stroke
 
 ### Requirement: Trade routes render as a toggleable layer
 Routes SHALL be hidden entirely when the trade-routes layer is hidden (see

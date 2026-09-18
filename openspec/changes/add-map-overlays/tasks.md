@@ -30,9 +30,9 @@
 ## 5. Region borders (backend)
 
 - [x] 5.1 Implement a second `WorleyBoundaryField`-style partition seeded via `$"{seed}:regions"`, independent scale/warp from the existing plate field (`RegionGenerator` in `Regions.cs`) - matches the string-suffix convention every other spatial field in `Map.cs` actually uses, not the `Rng.Child` placeholder design.md sketched (that stays reserved for one-off, non-spatial draws like the compass bearing)
-- [x] 5.2 Expose region ID lookup (`RegionGenerator.RegionIdAt`) and boundary edge-proximity per cell/window (`WorleyBoundaryField.Sample`, extended with a seam tangent/coordinate for dashing)
-- [x] 5.3 Add a `RegionsController` (or equivalent) endpoint mirroring `MapsController`'s contract, returning boundary segments for a window - returns only dash-visible boundary points, not a full per-cell grid
-- [x] 5.4 Add backend tests: determinism across repeated calls; overlapping-window agreement - plus a regression test for a tangent-continuity bug found while implementing (seam coordinate discontinuity right at the boundary threshold)
+- [x] 5.2 Expose region ID lookup (`RegionGenerator.RegionIdAt`) and boundary edge-proximity per cell/window (`WorleyBoundaryField.EdgeProximity`)
+- [x] 5.3 Add a `RegionsController` (or equivalent) endpoint mirroring `MapsController`'s contract, returning boundary segments for a window - returns only the boundary points to render (on the threshold, excluding `Ocean`), not a full per-cell grid
+- [x] 5.4 Add backend tests: determinism across repeated calls; overlapping-window agreement; no boundary point falls on ocean across many seeds
 
 ## 6. Trade routes (backend)
 
@@ -46,7 +46,7 @@
 - [x] 7.2 Add per-layer visibility state that persists across pan/zoom/coordinate-jump but resets on full reload
 - [x] 7.3 Add one overlay `<canvas>` per layer, stacked above the biome `MapCanvas` and below UI panels, shown/hidden per the layer state - done for region borders (`RegionBordersLayer.tsx`); compass stays a fixed-position `<img>`, not a world-space canvas
 - [ ] 7.4 Fetch and render rivers, POIs (per visible category only), and trade routes into their respective canvases, following the existing chunked/tiled fetch pattern from `tiling.ts` - region borders already does this
-- [x] 7.5 Render rivers as solid strokes, region borders as dashed strokes, trade routes as dotted strokes, and POI/compass as icons (placeholder icons until real artwork is supplied) - region borders' dashing is a backend-computed periodic function of position along the seam (not a client-side stroke-dash on a traced path), so each returned point is already dash-visible or not; compass icon already in place
+- [x] 7.5 Render rivers as solid strokes, region borders as a thin solid stroke, trade routes as dotted strokes, and POI/compass as icons (placeholder icons until real artwork is supplied) - region borders and rivers need a distinguishing color once rivers exist, since both are solid; compass icon already in place
 
 ## 8. Icon legend (frontend)
 

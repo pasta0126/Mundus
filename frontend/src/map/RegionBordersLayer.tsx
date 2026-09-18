@@ -18,13 +18,12 @@ interface RegionBordersLayerProps {
 const BORDER_COLOR = "#8a5a3d"
 
 /**
- * Dashed region-boundary overlay: the backend only returns points already
- * on a visible dash (see RegionGenerator's seam-coordinate dash pattern),
- * so this just plots each one - no path-following/stroke-dashing needed
- * client-side. Mirrors MapCanvas's own generation-reset/progressive-draw
- * split and tiled fetch, but keeps its own canvas per the layer-system
- * design (map/layers.ts) - each overlay draws independently, shown/hidden
- * by its own visibility toggle.
+ * Solid, thin region-boundary overlay: the backend already excludes any
+ * point that falls on open water (RegionGenerator), so this just plots
+ * every point it returns. Mirrors MapCanvas's own generation-reset/
+ * progressive-draw split and tiled fetch, but keeps its own canvas per
+ * the layer-system design (map/layers.ts) - each overlay draws
+ * independently, shown/hidden by its own visibility toggle.
  */
 export function RegionBordersLayer({
   seed,

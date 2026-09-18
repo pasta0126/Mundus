@@ -119,11 +119,18 @@ like biomes already do.
 ### Regions: a second, coarser Worley/plate-style partition
 Region boundaries reuse the exact `WorleyBoundaryField` + domain-warp
 pattern already proven for mountain ranges (`PlateField`/`PlateWarpNoise`),
-seeded independently (`seed.Child("regions")`) and at a coarser scale, so
-the "region" partition is a distinct, non-mountain-aligned Voronoi-like
-tessellation. A cell's region ID is whichever Worley cell it falls in;
-boundaries render wherever `EdgeProximity` is nonzero, exactly as plate
-seams already do, but as a dashed stroke instead of uplifted terrain.
+seeded independently (`$"{seed}:regions"`, the same string-suffix
+convention every other spatial field in `Map.cs` uses - `Rng.Child` stays
+reserved for one-off, non-spatial draws like the compass bearing) and at
+a coarser scale, so the "region" partition is a distinct, non-mountain-
+aligned Voronoi-like tessellation. A cell's region ID is whichever Worley
+cell it falls in; boundaries render wherever `EdgeProximity` is nonzero,
+exactly as plate seams already do, but as a thin solid stroke instead of
+uplifted terrain - and only where the underlying cell isn't `Ocean`
+(`MapGenerator.IsOceanAt`, applying the same isolated-single-cell-pond
+suppression `Generate` itself uses, so tiny noise-artifact ponds don't
+fragment the line): a visualization-only omission, not a change to the
+partition or boundary calculation itself.
 
 ### Trade routes: nearest-neighbor links between settlement POIs, not global pathfinding
 Once settlement/seaport POIs exist (previous decision), each settlement

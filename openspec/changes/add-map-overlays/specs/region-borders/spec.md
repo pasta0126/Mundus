@@ -1,8 +1,8 @@
 ## Purpose
 
 Partitions the world into seed-deterministic regions and renders their
-boundaries as dashed lines, so a map can carry a political or territorial
-structure without needing named regions yet.
+boundaries as thin solid lines, so a map can carry a political or
+territorial structure without needing named regions yet.
 
 ## ADDED Requirements
 
@@ -23,14 +23,33 @@ through.
   requested windows for the same seed
 - **THEN** that stretch's rendered path is identical in both
 
-### Requirement: Boundaries render as dashed lines
-A region boundary SHALL render as a dashed line (alternating drawn and gap
-segments), visually distinct from rivers (solid) and trade routes (dotted).
+### Requirement: Boundaries render as thin solid lines
+A region boundary SHALL render as a thin solid line.
 
-#### Scenario: A region boundary is visually distinct from a river
-- **WHEN** a region boundary and a river are both rendered in the same view
-- **THEN** the boundary is drawn with a dashed stroke and the river with a
-  solid stroke
+#### Scenario: A boundary renders as a continuous line
+- **WHEN** a region boundary is rendered
+- **THEN** it appears as an unbroken, thin stroke rather than a series of
+  dashes or dots
+
+### Requirement: Boundaries never render over open water
+A region boundary point SHALL be omitted from rendering wherever it falls
+on open water (the `Ocean` biome, excluding isolated single-cell noise
+artifacts already suppressed by the map-generation layer's own pond
+suppression - see `map-generation`) - this only changes what gets drawn,
+not the underlying region partition or boundary calculation itself. Very
+small, artifact-scale water dips MAY still have a boundary drawn across
+them; only a real, regionally-inland water body suppresses the line.
+Irregular boundary shapes, isolated point-like fragments, and stretches
+that happen to be straight are all acceptable outcomes of this omission.
+
+#### Scenario: A boundary does not cross the ocean
+- **WHEN** a region seam passes through an area of `Ocean`
+- **THEN** no boundary point is rendered on top of that ocean area
+
+#### Scenario: A tiny suppressed pond does not fragment the line
+- **WHEN** a region seam passes over an isolated single-cell elevation dip
+  that map-generation's own pond suppression already treats as land
+- **THEN** the boundary still renders across that point
 
 ### Requirement: Region borders render as a toggleable layer
 Region borders SHALL be hidden entirely when the region-borders layer is

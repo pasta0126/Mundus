@@ -35,78 +35,35 @@ public sealed class WorleyBoundaryField
     /// either plate's own interior). `edgeWidth` controls the eventual
     /// mountain belt's width.
     /// </summary>
-    public double EdgeProximity(int x, int y, double edgeWidth) => Sample(x, y, edgeWidth).Proximity;
-
-    /// <summary>
-    /// `Proximity`: see <see cref="EdgeProximity"/>. `TangentX`/`TangentY`
-    /// is the unit direction of the seam itself (perpendicular to the
-    /// line joining the two nearest feature points) - lets a caller walk
-    /// or dash along the boundary rather than just knowing it's nearby.
-    /// `SeamCoordinate` is `(x, y)`'s signed position projected onto that
-    /// tangent, relative to the seam's local midpoint - a 1-D coordinate
-    /// along the boundary, suitable for a periodic dash-pattern test,
-    /// that agrees for any two points sampled near the same seam
-    /// regardless of which window either was requested through.
-    /// </summary>
-    public readonly record struct EdgeSample(double Proximity, double TangentX, double TangentY, double SeamCoordinate);
-
-    public EdgeSample Sample(int x, int y, double edgeWidth)
+    public double EdgeProximity(int x, int y, double edgeWidth)
     {
         var cellX = (int)Math.Floor(x / _cellSize);
         var cellY = (int)Math.Floor(y / _cellSize);
 
         var nearest = double.MaxValue;
         var secondNearest = double.MaxValue;
-        (double X, double Y) nearestPoint = default;
-        (double X, double Y) secondNearestPoint = default;
         for (var dy = -1; dy <= 1; dy++)
         {
             for (var dx = -1; dx <= 1; dx++)
             {
-                var point = FeaturePoint(cellX + dx, cellY + dy);
-                var ddx = x - point.X;
-                var ddy = y - point.Y;
+                var (px, py) = FeaturePoint(cellX + dx, cellY + dy);
+                var ddx = x - px;
+                var ddy = y - py;
                 var distance = Math.Sqrt((ddx * ddx) + (ddy * ddy));
                 if (distance < nearest)
                 {
                     secondNearest = nearest;
-                    secondNearestPoint = nearestPoint;
                     nearest = distance;
-                    nearestPoint = point;
                 }
                 else if (distance < secondNearest)
                 {
                     secondNearest = distance;
-                    secondNearestPoint = point;
                 }
             }
         }
 
         var gap = secondNearest - nearest;
-        var proximity = Math.Clamp(1 - (gap / edgeWidth), 0, 1);
-
-        // Order the pair canonically (not "nearest, then second-nearest")
-        // before deriving the tangent: which of the two is actually
-        // closer flips right as (x, y) crosses the seam between them -
-        // exactly the region a boundary threshold cares about - and
-        // that flip would otherwise negate the tangent (and so
-        // SeamCoordinate) at the one place continuity matters most.
-        // Sorting by the points' own coordinates keeps the tangent's
-        // sign fixed for a given pair regardless of which side of the
-        // seam (x, y) falls on.
-        var (p1, p2) = (nearestPoint.X, nearestPoint.Y).CompareTo((secondNearestPoint.X, secondNearestPoint.Y)) <= 0
-            ? (nearestPoint, secondNearestPoint)
-            : (secondNearestPoint, nearestPoint);
-        var seamDx = p2.X - p1.X;
-        var seamDy = p2.Y - p1.Y;
-        var seamLength = Math.Sqrt((seamDx * seamDx) + (seamDy * seamDy));
-        var tangentX = seamLength > 0 ? -seamDy / seamLength : 0;
-        var tangentY = seamLength > 0 ? seamDx / seamLength : 0;
-        var midX = (p1.X + p2.X) / 2;
-        var midY = (p1.Y + p2.Y) / 2;
-        var seamCoordinate = ((x - midX) * tangentX) + ((y - midY) * tangentY);
-
-        return new EdgeSample(proximity, tangentX, tangentY, seamCoordinate);
+        return Math.Clamp(1 - (gap / edgeWidth), 0, 1);
     }
 
     /// <summary>

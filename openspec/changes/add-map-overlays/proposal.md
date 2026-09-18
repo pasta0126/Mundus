@@ -29,7 +29,7 @@ the concrete icon list this change produces is what they'll design against.
   labels yet. Produces the concrete icon inventory the user will design and
   provide later. Each category is independently toggleable via the layer
   system.
-- Add **region borders**: dashed lines delimiting seed-deterministic regions.
+- Add **region borders**: thin solid lines delimiting seed-deterministic regions, never drawn over open water.
 - Add **trade routes**: dotted lines connecting settlements/ports, seed-
   deterministic.
 - Modify `map-creation-wizard`: add a layers panel, an icon legend, and
@@ -45,7 +45,7 @@ the concrete icon list this change produces is what they'll design against.
 - `rivers`: deterministic river/tributary generation and rendering.
 - `points-of-interest`: deterministic POI placement, icon categories, and
   legend.
-- `region-borders`: deterministic region boundaries rendered as dashed lines.
+- `region-borders`: deterministic region boundaries rendered as thin solid lines, omitted over open water.
 - `trade-routes`: deterministic route lines rendered as dotted lines.
 
 ### Modified Capabilities
@@ -61,9 +61,9 @@ the concrete icon list this change produces is what they'll design against.
   response data (or new endpoints) carrying this overlay data alongside the
   existing cell grid.
 - **Frontend**: new layer-toggle panel, new icon legend component, new
-  overlay-rendering code (compass rose, rivers, POI icons, dashed region
-  borders, dotted routes), and changes to the canvas/download pipeline so
-  the exported image composites only the visible layers.
+  overlay-rendering code (compass rose, rivers, POI icons, thin solid
+  region borders, dotted routes), and changes to the canvas/download
+  pipeline so the exported image composites only the visible layers.
 - **Assets**: a defined icon inventory (this change's spec/design output)
   that the user will produce and supply afterward; no icon artwork is
   shipped by this change itself.

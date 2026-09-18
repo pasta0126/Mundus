@@ -394,6 +394,35 @@ public static class MapGenerator
     }
 
     /// <summary>
+    /// Whether the elevation band at a coordinate is Ocean - the only
+    /// water biome - without needing this field's full biome computation
+    /// (moisture, coast style, plate uplift). Exposed for overlays (e.g.
+    /// region borders) that need to avoid drawing across water. Applies
+    /// the same isolated-single-cell-pond suppression as <see cref="Generate"/>
+    /// (see <see cref="InlandFloor"/>), so a tiny fine-detail noise dip
+    /// that Generate itself wouldn't render as Ocean doesn't count as
+    /// water here either - only real, regionally-inland water bodies do.
+    /// </summary>
+    public static bool IsOceanAt(string seed, int x, int y, int step = 1)
+    {
+        var amplitude = ElevationWarpRegionScale * step * ElevationWarpAmplitudeFraction;
+        var elevationNoise = ElevationNoise(seed, step);
+        var (warpedX, warpedY) = WarpedCoordinate(ElevationWarpNoise(seed, step, axis: "x"), ElevationWarpNoise(seed, step, axis: "y"), x, y, step, amplitude);
+        var elevation = elevationNoise.Sample(warpedX, warpedY, step);
+
+        if (elevation < InlandFloor)
+        {
+            var regionalElevation = elevationNoise.Sample(warpedX, warpedY, minRegionScale: ElevationRegionScale * step);
+            if (regionalElevation >= InlandFloor)
+            {
+                elevation = InlandFloor;
+            }
+        }
+
+        return BandOf(elevation, ElevationBands) == "Ocean";
+    }
+
+    /// <summary>
     /// Sample the [0, 1] plate-boundary edge proximity at a coordinate,
     /// including the same domain warp <see cref="Generate"/> applies -
     /// exposed for testing.

@@ -55,6 +55,20 @@ public class RegionGeneratorTests
     }
 
     [Fact]
+    public void NoBoundaryPointFallsOnOcean()
+    {
+        // A wider scan across many seeds, not just BoundarySeed - a
+        // border should never visibly cross open water, regardless of
+        // where a seam happens to fall relative to the coastline.
+        for (var i = 0; i < 20; i++)
+        {
+            var seed = $"ocean-avoidance-{i}";
+            var boundaries = RegionGenerator.GenerateBoundaries(seed, -1000, -1000, 512, 512, BoundaryStep);
+            Assert.All(boundaries.Points, p => Assert.False(MapGenerator.IsOceanAt(seed, p.X, p.Y, BoundaryStep)));
+        }
+    }
+
+    [Fact]
     public void EveryBoundaryPointFallsWithinTheRequestedWindow()
     {
         var boundaries = RegionGenerator.GenerateBoundaries(BoundarySeed, BoundaryOriginX, BoundaryOriginY, BoundaryWidth, BoundaryHeight, BoundaryStep);
