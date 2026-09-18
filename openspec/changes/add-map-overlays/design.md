@@ -63,32 +63,51 @@ The compass bearing is a single `Rng.Child("north-bearing")` draw per seed
 other field in this system, it is not a spatial function. This matches the
 spec's requirement that panning/zooming never changes it.
 
-### Rivers: deterministic lattice sources + downhill trace + domain-warped meander
+### Rivers: deterministic lattice sources + downhill trace + angle-perturbed meander
 Candidate river sources are enumerated the same way `WorleyBoundaryField`
 enumerates cell seeds: a coarse deterministic lattice (one candidate per
-block of a documented size) hashed from `seed.Child("river-sources")` plus
-the block coordinate, kept only if that point's `ElevationAt` falls in the
-`Peak` band. From a kept source, the path is traced step-by-step following
-the local downhill gradient of `ElevationAt`, with the sampled coordinate
-domain-warped each step (reusing the existing `PlateWarpNoise` technique)
-so the path meanders instead of taking the single steepest direction.
-Tracing stops at an `Ocean` cell, a lake cell (see below), or the
-documented maximum path length (in which case the candidate is discarded).
-Tributary confluence is detected when two traced paths pass within one
-cell of each other - the shorter (or later-sourced, to keep the rule
-order-independent) path is truncated and rewritten to continue along the
-other's remaining path.
+block of a documented size, string-suffixed as `$"{seed}:river-sources"` -
+see the region-borders note above on why this change uses that convention
+rather than `Rng.Child` for spatial fields) plus the block coordinate,
+kept only if that point's `ElevationAt` falls in the `Peak` band. From a
+kept source, the path is traced step-by-step: at each step, the steepest-
+descent direction is found by sampling `ElevationAt` at 8 compass
+directions, then perturbed by an angle drawn from a smoothly-drifting
+noise field (rather than warping the sampled coordinate itself, as
+mountain/region seams do - simpler to compute per step, same organic-
+meander effect) - the perturbed step is taken only if it's still downhill
+or flat, otherwise the trace falls back to the unperturbed steepest-
+descent step. This guarantees the required "never uphill" invariant
+regardless of how the meander perturbs direction, while still meandering
+in practice. Tracing stops at an `Ocean` cell, a lake cell (see below), or
+the documented maximum path length (in which case the candidate is
+discarded); it's also discarded immediately if it reaches a local minimum
+with no downhill neighbor that isn't already water.
+
+Tributary confluence is detected when two traced paths pass within a
+documented distance of each other (not literally "one cell" - see
+`RiverGenerator.ConfluenceThreshold`'s doc comment for why). Which path is
+truncated and redirected onto the other's suffix is decided by elevation,
+not path length: only the direction that doesn't require an uphill jump
+at the splice point is valid, so the "never uphill" invariant holds across
+a merged seam too. (An earlier length-based version - "the shorter
+remaining path is truncated" - produced physically-impossible uphill
+jumps whenever the shorter-remaining path happened to be the lower one at
+the confluence; elevation-based selection was needed regardless of the
+spec's own phrasing.)
 
 **Lakes**: the current biome model has only `Ocean` for water; there is no
 enclosed-basin detection over an unbounded, unstored heightmap (a true
 flood fill isn't feasible at world scale). This change adds lakes as their
 own small, deterministic feature - not derived from existing elevation
 noise - using the same lattice-hash scatter as river sources
-(`seed.Child("lakes")`), placing circular lake basins at low-elevation
-lattice points far enough from the coast, which both rivers and the biome
+(`$"{seed}:lakes"`), placing circular lake basins at low-elevation
+lattice points far enough from the coast (checked via a ring of sample
+points around each candidate basin), which both rivers and the biome
 renderer treat as a terminal/large water body. Region and biome rendering
 of lakes themselves (beyond being a valid river terminus) is out of scope
-for this change.
+for this change - `RiverGenerator.IsLakeAt` is internal, with no endpoint
+of its own.
 
 **Alternative considered**: computing a windowed heightmap and running a
 real flood-fill/watershed algorithm. Rejected for this change - it would

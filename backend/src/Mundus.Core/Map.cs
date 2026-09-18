@@ -394,16 +394,18 @@ public static class MapGenerator
     }
 
     /// <summary>
-    /// Whether the elevation band at a coordinate is Ocean - the only
-    /// water biome - without needing this field's full biome computation
-    /// (moisture, coast style, plate uplift). Exposed for overlays (e.g.
-    /// region borders) that need to avoid drawing across water. Applies
-    /// the same isolated-single-cell-pond suppression as <see cref="Generate"/>
+    /// The elevation band at a coordinate ("Ocean", "Beach", "Lowland",
+    /// "Highland", or "Peak"), without needing this field's full biome
+    /// computation (moisture, coast style, plate uplift). Applies the
+    /// same isolated-single-cell-pond suppression as <see cref="Generate"/>
     /// (see <see cref="InlandFloor"/>), so a tiny fine-detail noise dip
-    /// that Generate itself wouldn't render as Ocean doesn't count as
+    /// that Generate itself wouldn't render as Ocean doesn't read as
     /// water here either - only real, regionally-inland water bodies do.
+    /// Exposed for overlays (region borders avoiding water, rivers
+    /// finding Peak-band sources and Ocean termini) that need a band
+    /// classification without the rest of biome generation.
     /// </summary>
-    public static bool IsOceanAt(string seed, int x, int y, int step = 1)
+    public static string ElevationBandAt(string seed, int x, int y, int step = 1)
     {
         var amplitude = ElevationWarpRegionScale * step * ElevationWarpAmplitudeFraction;
         var elevationNoise = ElevationNoise(seed, step);
@@ -419,8 +421,14 @@ public static class MapGenerator
             }
         }
 
-        return BandOf(elevation, ElevationBands) == "Ocean";
+        return BandOf(elevation, ElevationBands);
     }
+
+    /// <summary>Whether the elevation band at a coordinate is Ocean - see <see cref="ElevationBandAt"/>.</summary>
+    public static bool IsOceanAt(string seed, int x, int y, int step = 1) => ElevationBandAt(seed, x, y, step) == "Ocean";
+
+    /// <summary>Whether the elevation band at a coordinate is Peak - see <see cref="ElevationBandAt"/>.</summary>
+    public static bool IsPeakAt(string seed, int x, int y, int step = 1) => ElevationBandAt(seed, x, y, step) == "Peak";
 
     /// <summary>
     /// Sample the [0, 1] plate-boundary edge proximity at a coordinate,

@@ -164,6 +164,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/Rivers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    seed?: string;
+                    x?: number | string;
+                    y?: number | string;
+                    width?: number | string;
+                    height?: number | string;
+                    step?: number | string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RiverPaths"];
+                        "application/json": components["schemas"]["RiverPaths"];
+                        "text/json": components["schemas"]["RiverPaths"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -213,6 +257,28 @@ export interface components {
             /** Format: int32 */
             height: number | string;
             points: components["schemas"]["BoundaryPoint"][];
+        };
+        RiverPaths: {
+            seed: string;
+            /** Format: int32 */
+            originX: number | string;
+            /** Format: int32 */
+            originY: number | string;
+            /** Format: int32 */
+            width: number | string;
+            /** Format: int32 */
+            height: number | string;
+            segments: components["schemas"]["RiverSegment"][];
+        };
+        RiverSegment: {
+            /** Format: int32 */
+            x1: number | string;
+            /** Format: int32 */
+            y1: number | string;
+            /** Format: int32 */
+            x2: number | string;
+            /** Format: int32 */
+            y2: number | string;
         };
     };
     responses: never;

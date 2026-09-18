@@ -14,6 +14,7 @@ import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS } from 
 import { MapCanvas } from "@/map/MapCanvas"
 import { MapParamsPanel } from "@/map/MapParamsPanel"
 import { RegionBordersLayer } from "@/map/RegionBordersLayer"
+import { RiversLayer } from "@/map/RiversLayer"
 import { computeChunkGrid, runWithConcurrency } from "@/map/tiling"
 
 type MapDto = components["schemas"]["Map"]
@@ -54,6 +55,7 @@ function App() {
   const [errorMessage, setErrorMessage] = useState("")
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [regionBordersCanvasEl, setRegionBordersCanvasEl] = useState<HTMLCanvasElement | null>(null)
+  const [riversCanvasEl, setRiversCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [showLegend, setShowLegend] = useState(false)
   const [showLayers, setShowLayers] = useState(false)
   const [layerVisibility, setLayerVisibility] = useState<Record<LayerId, boolean>>(defaultLayerVisibility)
@@ -245,6 +247,10 @@ function App() {
       ctx.drawImage(regionBordersCanvasEl, 0, 0)
     }
 
+    if (layerVisibility.rivers && riversCanvasEl) {
+      ctx.drawImage(riversCanvasEl, 0, 0)
+    }
+
     if (layerVisibility.compass && compassInfo) {
       const dpr = window.devicePixelRatio || 1
       const rect = compassInfo.img.getBoundingClientRect()
@@ -293,6 +299,20 @@ function App() {
           step={viewWindow.step}
           generation={viewWindow.generation}
           onCanvasReady={setRegionBordersCanvasEl}
+        />
+      )}
+
+      {viewWindow && layerVisibility.rivers && (
+        <RiversLayer
+          seed={viewWindow.seed}
+          originX={viewWindow.originX}
+          originY={viewWindow.originY}
+          width={viewWindow.width}
+          height={viewWindow.height}
+          cellPx={viewWindow.cellPx}
+          step={viewWindow.step}
+          generation={viewWindow.generation}
+          onCanvasReady={setRiversCanvasEl}
         />
       )}
 
