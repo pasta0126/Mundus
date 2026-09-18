@@ -309,10 +309,16 @@ public class MapGeneratorTests
     [Fact]
     public void MountainsOnlyAppearNearAPlateBoundary()
     {
-        // Every Mountains/Snow cell in a window must sit on (or right
-        // next to) a plate seam - see "Mountain ranges as plate
-        // boundaries" in design.md - not scattered wherever elevation
-        // happens to be high.
+        // Every Mountains/Snow cell in a window must either sit on (or
+        // right next to) a plate seam - see "Mountain ranges as plate
+        // boundaries" in design.md - or, for Mountains only, be a coastal
+        // cliff (CoastBiomeAt's `coast >= 0.8` style, Beach-band
+        // elevation meeting the water directly with no beach at all -
+        // see "Coast styles: not every shore is a beach" in design.md) -
+        // not scattered wherever elevation happens to be high for no
+        // reason at all. Snow only ever comes from the Peak/plate-seam
+        // path (CoastBiomeAt never returns Snow), so it has no cliff
+        // exception.
         var map = MapGenerator.Generate("plate-gate-check", -256, -256, 512, 512);
         var sawAny = false;
         foreach (var cell in map.Cells)
@@ -320,7 +326,9 @@ public class MapGeneratorTests
             if (cell.Biome is not (Biome.Mountains or Biome.Snow)) continue;
             sawAny = true;
             var edge = MapGenerator.PlateEdgeAt(map.Seed, cell.X, cell.Y);
-            Assert.True(edge > 0, $"({cell.X}, {cell.Y}) was {cell.Biome} but had no plate-edge proximity");
+            var elevation = MapGenerator.ElevationAt(map.Seed, cell.X, cell.Y);
+            var isCoastalCliff = cell.Biome == Biome.Mountains && elevation is >= 0.42 and < 0.46;
+            Assert.True(edge > 0 || isCoastalCliff, $"({cell.X}, {cell.Y}) was {cell.Biome} but had no plate-edge proximity and wasn't a coastal cliff (elevation {elevation})");
         }
 
         Assert.True(sawAny, "expected at least one Mountains/Snow cell in this window to make the check meaningful");

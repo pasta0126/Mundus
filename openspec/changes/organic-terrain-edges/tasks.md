@@ -27,3 +27,10 @@
 
 - [x] 5.1 Bump `MapGenerator.CurrentSpecVersion` if the warp changes the response shape for existing cells at the same coordinate (per the project's existing convention - a same-seed/coordinate biome value changing counts as a contract change even though the field/type shape doesn't) (bumped 14 -> 15)
 - [x] 5.2 Confirm no frontend changes are required (band/biome output shape unchanged) - close the loop with a quick manual check of map rendering at multiple zoom levels (confirmed `Cell`/`Map` response shape is unchanged; grepped `frontend/src` for `SpecVersion` - no references, so nothing there depends on the bumped constant)
+
+## 6. Post-deploy fixes (found via user report on the live v0.3.3 deploy)
+
+- [x] 6.1 Fix `InlandFloor`'s regional-elevation check to sample at the same warped coordinate as the detailed sample, not the cell's true `(x, y)` - the mismatch let isolated single-cell ponds through once warping was live (`CoastlinesDoNotProduceIsolatedSingleCellPonds` caught this)
+- [x] 6.2 Fix the plate-seam lookup (`Generate` and `PlateEdgeAt`) to compose on top of the elevation warp's displaced coordinate instead of the cell's true `(x, y)` - the two independent warps drifting apart produced a disconnected, badly-aligned mountain "stripe" unrelated to the surrounding terrain, reported directly by the user from the live deploy
+- [x] 6.3 Update `MountainsOnlyAppearNearAPlateBoundary` to also accept a coastal-cliff origin (`CoastBiomeAt`'s `coast >= 0.8` style) for Mountains cells, not only a plate seam - this pre-existing exception (see design.md "Coast styles") was newly exercised once the elevation warp shifted which cells land in the Beach band, and the test's original assertion didn't account for it
+- [x] 6.4 Attempted raising `ElevationWarpAmplitudeFraction` (up to 0.4) and adding a 4th octave to fix a user-reported still-too-smooth water body - reverted after `CoastlinesDoNotProduceIsolatedSingleCellPonds` showed this reliably reintroduces isolated ponds past ~0.25-0.3; kept at the original, verified-safe amplitude (see design.md's revised "amplitude" decision and its Open Question)

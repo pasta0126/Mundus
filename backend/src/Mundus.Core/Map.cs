@@ -87,7 +87,18 @@ public static class MapGenerator
 
     private const int ElevationWarpOctaves = 3;
 
-    /// <summary>How far (as a fraction of <see cref="ElevationWarpRegionScale"/>) the warp can displace a coordinate before it's handed to the elevation field for band lookup.</summary>
+    /// <summary>
+    /// How far (as a fraction of <see cref="ElevationWarpRegionScale"/>)
+    /// the warp can displace a coordinate before it's handed to the
+    /// elevation field for band lookup. Pushing this above ~0.25
+    /// (verified empirically via <c>CoastlinesDoNotProduceIsolatedSingleCellPonds</c>)
+    /// starts reintroducing isolated single-cell ponds even with the
+    /// InlandFloor regional check itself sampled at the warped
+    /// coordinate: a large enough displacement lets one cell's warp
+    /// diverge from all four of its true-grid neighbors' warps enough to
+    /// land on a genuinely different, real local dip that the neighbors
+    /// don't share.
+    /// </summary>
     private const double ElevationWarpAmplitudeFraction = 0.25;
 
     /// <summary>
@@ -276,10 +287,16 @@ public static class MapGenerator
                 // already below the floor - elsewhere there's nothing to
                 // suppress, and skipping it avoids a second noise sample
                 // for the large majority of cells that aren't near a
-                // coast.
+                // coast. Sampled at the *warped* coordinate, matching
+                // `elevation` above - the warp can itself land on a
+                // genuinely low-lying lattice cell while the cell's true
+                // (unwarped) surroundings are solid land, so "regional"
+                // has to mean "around the point actually sampled", not
+                // "around the cell's own true position", or an isolated
+                // one-cell pond slips through unsuppressed.
                 if (elevation < InlandFloor)
                 {
-                    var regionalElevation = elevationNoise.Sample(x, y, minRegionScale: ElevationRegionScale * step);
+                    var regionalElevation = elevationNoise.Sample(warpedElevationX, warpedElevationY, minRegionScale: ElevationRegionScale * step);
                     if (regionalElevation >= InlandFloor)
                     {
                         elevation = InlandFloor;
@@ -318,7 +335,17 @@ public static class MapGenerator
                         // PlateWarpRegionScale) so the seam it traces
                         // winds organically instead of following the
                         // dead-straight edges a raw Voronoi diagram has.
-                        var (warpedPlateX, warpedPlateY) = WarpedCoordinate(warpXNoise, warpYNoise, x, y, step, plateWarpAmplitude);
+                        // Composed on top of the elevation warp's own
+                        // displaced coordinate (not the cell's true x,y):
+                        // "is this cell Highland/Peak" was itself decided
+                        // by sampling elevation at (warpedElevationX,
+                        // warpedElevationY) - so "is that same elevated
+                        // ground near a seam" must be tested from the
+                        // same displaced point, or the two warps drift
+                        // apart and produce a mountain range that traces
+                        // neither the true elevation contour nor the true
+                        // plate seam.
+                        var (warpedPlateX, warpedPlateY) = WarpedCoordinate(warpXNoise, warpYNoise, warpedElevationX, warpedElevationY, step, plateWarpAmplitude);
                         var plateEdge = plateField.EdgeProximity(warpedPlateX, warpedPlateY, plateEdgeWidth);
                         elevationBand = UpliftedBand(elevationBand, elevation, plateEdge);
                     }
@@ -373,9 +400,14 @@ public static class MapGenerator
     /// </summary>
     public static double PlateEdgeAt(string seed, int x, int y, int step = 1)
     {
+        // Matches Generate exactly: the plate warp is composed on top of
+        // the elevation warp's displaced coordinate, not the raw (x, y) -
+        // see the comment at its call site in Generate.
+        var elevationWarpAmplitude = ElevationWarpRegionScale * step * ElevationWarpAmplitudeFraction;
+        var (warpedElevationX, warpedElevationY) = WarpedCoordinate(ElevationWarpNoise(seed, step, axis: "x"), ElevationWarpNoise(seed, step, axis: "y"), x, y, step, elevationWarpAmplitude);
+
         var plateWarpAmplitude = PlateRegionScale * step * PlateWarpAmplitudeFraction;
-        var warpedX = x + (int)Math.Round((PlateWarpNoise(seed, step, axis: "x").Sample(x, y, step) - 0.5) * 2 * plateWarpAmplitude);
-        var warpedY = y + (int)Math.Round((PlateWarpNoise(seed, step, axis: "y").Sample(x, y, step) - 0.5) * 2 * plateWarpAmplitude);
+        var (warpedX, warpedY) = WarpedCoordinate(PlateWarpNoise(seed, step, axis: "x"), PlateWarpNoise(seed, step, axis: "y"), warpedElevationX, warpedElevationY, step, plateWarpAmplitude);
         return PlateField(seed, step).EdgeProximity(warpedX, warpedY, PlateRegionScale * step * PlateEdgeWidthFraction);
     }
 
