@@ -14,7 +14,7 @@ export interface LayerDefinition {
  */
 export const LAYER_REGISTRY: LayerDefinition[] = [
   { id: "compass", label: "Compass rose", defaultVisible: true },
-  { id: "regionBorders", label: "Region borders", defaultVisible: true },
+  { id: "regionBorders", label: "Region borders (Experimental)", defaultVisible: false },
 ]
 
 export function defaultLayerVisibility(): Record<LayerId, boolean> {

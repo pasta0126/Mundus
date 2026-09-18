@@ -51,10 +51,18 @@ that happen to be straight are all acceptable outcomes of this omission.
   that map-generation's own pond suppression already treats as land
 - **THEN** the boundary still renders across that point
 
-### Requirement: Region borders render as a toggleable layer
+### Requirement: Region borders render as a toggleable layer, off by default
 Region borders SHALL be hidden entirely when the region-borders layer is
-hidden (see `map-layers`).
+hidden (see `map-layers`). Pending further tuning, this layer's
+documented default visibility is hidden, and it is labeled "Experimental"
+in the layers panel.
 
 #### Scenario: Hiding the layer removes all region boundaries
 - **WHEN** a user hides the region-borders layer
 - **THEN** no region boundary is rendered anywhere in the current view
+
+#### Scenario: The layer starts hidden on first load
+- **WHEN** the page loads and a map is generated for the first time in a
+  session
+- **THEN** the region-borders layer's visibility matches its documented
+  default of hidden
