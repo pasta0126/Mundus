@@ -325,4 +325,159 @@ public class MapGeneratorTests
 
         Assert.True(sawAny, "expected at least one Mountains/Snow cell in this window to make the check meaningful");
     }
+
+    [Fact]
+    public void WarpedElevationAndMoistureLookupsAreDeterministic()
+    {
+        // ElevationAt/MoistureAt now warp the lookup coordinate (see
+        // organic-terrain-edges) - confirm that stays a pure function of
+        // (seed, x, y) across repeated calls, same as before the warp.
+        const string seed = "warp-determinism";
+        for (var i = 0; i < 20; i++)
+        {
+            var x = i * 37;
+            var y = -i * 19;
+            Assert.Equal(MapGenerator.ElevationAt(seed, x, y), MapGenerator.ElevationAt(seed, x, y));
+            Assert.Equal(MapGenerator.MoistureAt(seed, x, y), MapGenerator.MoistureAt(seed, x, y));
+        }
+    }
+
+    /// <summary>
+    /// Scans rows `yMin..yMax` at each `x` in `xMin..xMax`, and for each
+    /// row where `sample` crosses `threshold`, returns the interpolated
+    /// x position of that crossing - a discretized boundary line.
+    /// </summary>
+    private static List<(int Y, double X)> FindBoundaryCrossings(Func<int, int, double> sample, double threshold, int xMin, int xMax, int yMin, int yMax)
+    {
+        var crossings = new List<(int Y, double X)>();
+        for (var y = yMin; y <= yMax; y++)
+        {
+            double? previousValue = null;
+            for (var x = xMin; x <= xMax; x++)
+            {
+                var value = sample(x, y);
+                if (previousValue is { } prev && (prev < threshold) != (value < threshold))
+                {
+                    var t = (threshold - prev) / (value - prev);
+                    crossings.Add((y, x - 1 + t));
+                    break;
+                }
+
+                previousValue = value;
+            }
+        }
+
+        return crossings;
+    }
+
+    /// <summary>
+    /// Mean absolute deviation of each boundary point from a moving
+    /// average of its neighbors - near zero for a smooth curve, larger
+    /// for a ragged one.
+    /// </summary>
+    private static double BoundaryRaggedness(List<(int Y, double X)> crossings, int smoothWindow)
+    {
+        var half = smoothWindow / 2;
+        double deviationSum = 0;
+        var count = 0;
+        for (var i = half; i < crossings.Count - half; i++)
+        {
+            var windowAverage = crossings.Skip(i - half).Take(smoothWindow).Average(c => c.X);
+            deviationSum += Math.Abs(crossings[i].X - windowAverage);
+            count++;
+        }
+
+        return count == 0 ? 0 : deviationSum / count;
+    }
+
+    [Fact]
+    public void CoastlineBoundaryIsNotASmoothCurve()
+    {
+        // A dead-smooth coastline (the reported artifact) would have a
+        // near-zero mean deviation from a locally smoothed version of
+        // itself. 0.75 cells is comfortably below the several-cell
+        // deviation the warp is designed to produce, while still clearly
+        // above what a smooth bilinear-interpolated arc would show.
+        const double minRaggedness = 0.75;
+        const int minCrossings = 40;
+
+        for (var i = 0; i < 30; i++)
+        {
+            var seed = $"coastline-raggedness-{i}";
+            var crossings = FindBoundaryCrossings((x, y) => MapGenerator.ElevationAt(seed, x, y), threshold: 0.42, xMin: -150, xMax: 150, yMin: 0, yMax: 199);
+            if (crossings.Count < minCrossings) continue;
+
+            var raggedness = BoundaryRaggedness(crossings, smoothWindow: 7);
+            Assert.True(raggedness > minRaggedness, $"seed {seed}: coastline raggedness {raggedness} was not above {minRaggedness}");
+            return;
+        }
+
+        Assert.Fail("no seed in range produced a long enough coastline stretch to test");
+    }
+
+    [Fact]
+    public void MoistureBoundaryIsNotASmoothCurve()
+    {
+        const double minRaggedness = 0.75;
+        const int minCrossings = 40;
+
+        for (var i = 0; i < 30; i++)
+        {
+            var seed = $"moisture-raggedness-{i}";
+            var crossings = FindBoundaryCrossings((x, y) => MapGenerator.MoistureAt(seed, x, y), threshold: 0.35, xMin: -150, xMax: 150, yMin: 0, yMax: 199);
+            if (crossings.Count < minCrossings) continue;
+
+            var raggedness = BoundaryRaggedness(crossings, smoothWindow: 7);
+            Assert.True(raggedness > minRaggedness, $"seed {seed}: moisture boundary raggedness {raggedness} was not above {minRaggedness}");
+            return;
+        }
+
+        Assert.Fail("no seed in range produced a long enough moisture-boundary stretch to test");
+    }
+
+    [Fact]
+    public void CoastlinesDoNotProduceIsolatedSingleCellPonds()
+    {
+        // Regression for the InlandFloor stray-pond suppression (Map.cs)
+        // staying intact now that elevation-band lookups are warped: a
+        // fine-detail dip deep inland must still be suppressed rather
+        // than reading as an isolated one-cell pond.
+        for (var i = 0; i < 20; i++)
+        {
+            var seed = $"stray-pond-check-{i}";
+            var map = MapGenerator.Generate(seed, -128, -128, 256, 256);
+            var byCoord = map.Cells.ToDictionary(c => (c.X, c.Y), c => c.Biome);
+            foreach (var cell in map.Cells)
+            {
+                if (cell.Biome != Biome.Ocean) continue;
+                var hasWaterNeighbor = new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }
+                    .Any(d => byCoord.TryGetValue((cell.X + d.Item1, cell.Y + d.Item2), out var n) && n is Biome.Ocean or Biome.Beach);
+                Assert.True(hasWaterNeighbor, $"({cell.X},{cell.Y}) in seed {seed} is an isolated single-cell Ocean pond");
+            }
+        }
+    }
+
+    [Fact]
+    public void BandProportionsStayWithinSaneBoundsAcrossSeeds()
+    {
+        // Warping bends band boundaries but must not systematically
+        // distort how much of the map each band covers - e.g. Ocean
+        // collapsing to near-0% or near-100% across many independent
+        // seeds/windows would signal the warp is dominating the
+        // elevation signal rather than just roughening its edges. A
+        // single window's Ocean fraction varies naturally (some windows
+        // are all-land), so this checks the aggregate across many.
+        var oceanCells = 0;
+        var totalCells = 0;
+        for (var i = 0; i < 20; i++)
+        {
+            var seed = $"band-proportions-{i}";
+            var map = MapGenerator.Generate(seed, -128, -128, 256, 256);
+            oceanCells += map.Cells.Count(c => c.Biome == Biome.Ocean);
+            totalCells += map.Cells.Count;
+        }
+
+        var oceanFraction = oceanCells / (double)totalCells;
+        Assert.InRange(oceanFraction, 0.05, 0.95);
+    }
 }

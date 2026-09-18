@@ -29,7 +29,7 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 14;
+    public const int CurrentSpecVersion = 15;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 512;
@@ -70,6 +70,27 @@ public static class MapGenerator
     private const double InlandFloor = 0.48;
 
     /// <summary>
+    /// Elevation-band boundaries (Ocean/Beach and every band above it) are
+    /// threshold crossings of <see cref="ElevationNoise"/> alone - fBm adds
+    /// fine detail, but with <see cref="NoisePersistence"/> the base octave
+    /// still carries about half the sample's weight, so a long stretch of
+    /// coastline can read as that octave's smooth bilinear shape wherever
+    /// the finer octaves don't happen to cross the threshold. As with
+    /// <see cref="PlateWarpRegionScale"/>, warping the coordinate before
+    /// the elevation-band lookup bends that smooth shape into an organic
+    /// edge; kept at roughly a third of <see cref="ElevationRegionScale"/>,
+    /// the same ratio <see cref="PlateWarpRegionScale"/> has to
+    /// <see cref="PlateRegionScale"/>, so one boundary stretch wobbles more
+    /// than once along its length.
+    /// </summary>
+    private const int ElevationWarpRegionScale = 170;
+
+    private const int ElevationWarpOctaves = 3;
+
+    /// <summary>How far (as a fraction of <see cref="ElevationWarpRegionScale"/>) the warp can displace a coordinate before it's handed to the elevation field for band lookup.</summary>
+    private const double ElevationWarpAmplitudeFraction = 0.25;
+
+    /// <summary>
     /// Moisture's base region scale - broad climate zones, independent of
     /// elevation's own field. Kept close to elevation's scale (though not
     /// identical, so climate zones don't just trace elevation's own
@@ -88,6 +109,20 @@ public static class MapGenerator
     /// not a smoother or coarser edge than the coastline.
     /// </summary>
     private const int MoistureOctaves = 6;
+
+    /// <summary>
+    /// Same organic-edge rationale as <see cref="ElevationWarpRegionScale"/>,
+    /// applied to moisture-band boundaries (e.g. Forest's edge) instead of
+    /// elevation-band ones - kept independent (own seed, own region scale
+    /// derived from <see cref="MoistureRegionScale"/>) so coastline and
+    /// biome-border raggedness don't visibly correlate.
+    /// </summary>
+    private const int MoistureWarpRegionScale = 110;
+
+    private const int MoistureWarpOctaves = 3;
+
+    /// <summary>How far (as a fraction of <see cref="MoistureWarpRegionScale"/>) the warp can displace a coordinate before it's handed to the moisture field for band lookup.</summary>
+    private const double MoistureWarpAmplitudeFraction = 0.25;
 
     private const double NoisePersistence = 0.5;
 
@@ -204,9 +239,15 @@ public static class MapGenerator
         var plateField = PlateField(seed, step);
         var warpXNoise = PlateWarpNoise(seed, step, axis: "x");
         var warpYNoise = PlateWarpNoise(seed, step, axis: "y");
+        var elevationWarpXNoise = ElevationWarpNoise(seed, step, axis: "x");
+        var elevationWarpYNoise = ElevationWarpNoise(seed, step, axis: "y");
+        var moistureWarpXNoise = MoistureWarpNoise(seed, step, axis: "x");
+        var moistureWarpYNoise = MoistureWarpNoise(seed, step, axis: "y");
         var coastNoise = CoastNoise(seed, step);
         var plateEdgeWidth = PlateRegionScale * step * PlateEdgeWidthFraction;
         var plateWarpAmplitude = PlateRegionScale * step * PlateWarpAmplitudeFraction;
+        var elevationWarpAmplitude = ElevationWarpRegionScale * step * ElevationWarpAmplitudeFraction;
+        var moistureWarpAmplitude = MoistureWarpRegionScale * step * MoistureWarpAmplitudeFraction;
         var cells = new List<Cell>(width * height);
         for (var j = 0; j < height; j++)
         {
@@ -214,7 +255,16 @@ public static class MapGenerator
             for (var i = 0; i < width; i++)
             {
                 var x = originX + (i * step);
-                var elevation = elevationNoise.Sample(x, y, step);
+
+                // Warp the coordinate before the elevation-band lookup
+                // (see ElevationWarpRegionScale) so a long coastline/band
+                // boundary winds organically instead of tracing the
+                // smooth shape of the noise field's own base octave. The
+                // InlandFloor check below deliberately samples the
+                // *unwarped* (x, y) - the warp only affects which band a
+                // cell falls into, not what "clearly inland" means.
+                var (warpedElevationX, warpedElevationY) = WarpedCoordinate(elevationWarpXNoise, elevationWarpYNoise, x, y, step, elevationWarpAmplitude);
+                var elevation = elevationNoise.Sample(warpedElevationX, warpedElevationY, step);
 
                 // Suppress tiny fine-detail dips below the Ocean/Beach
                 // threshold when the *regional* (base-octave-only)
@@ -247,12 +297,18 @@ public static class MapGenerator
                     // Coast style only needs sampling for the actual
                     // coastline cells, not the whole map.
                     var coast = coastNoise.Sample(x, y, step);
-                    var moisture = moistureNoise.Sample(x, y, step);
+                    var (warpedCoastMoistureX, warpedCoastMoistureY) = WarpedCoordinate(moistureWarpXNoise, moistureWarpYNoise, x, y, step, moistureWarpAmplitude);
+                    var moisture = moistureNoise.Sample(warpedCoastMoistureX, warpedCoastMoistureY, step);
                     biome = CoastBiomeAt(coast, moisture);
                 }
                 else
                 {
-                    var moisture = moistureNoise.Sample(x, y, step);
+                    // Warp the coordinate before the moisture-band lookup
+                    // for the same reason as elevation above - organic
+                    // Forest/Desert/Grassland edges instead of the noise
+                    // field's own smooth base-octave shape.
+                    var (warpedMoistureX, warpedMoistureY) = WarpedCoordinate(moistureWarpXNoise, moistureWarpYNoise, x, y, step, moistureWarpAmplitude);
+                    var moisture = moistureNoise.Sample(warpedMoistureX, warpedMoistureY, step);
                     if (elevationBand is "Highland" or "Peak")
                     {
                         // Plate-boundary proximity only matters for
@@ -262,9 +318,8 @@ public static class MapGenerator
                         // PlateWarpRegionScale) so the seam it traces
                         // winds organically instead of following the
                         // dead-straight edges a raw Voronoi diagram has.
-                        var warpedX = x + (int)Math.Round((warpXNoise.Sample(x, y, step) - 0.5) * 2 * plateWarpAmplitude);
-                        var warpedY = y + (int)Math.Round((warpYNoise.Sample(x, y, step) - 0.5) * 2 * plateWarpAmplitude);
-                        var plateEdge = plateField.EdgeProximity(warpedX, warpedY, plateEdgeWidth);
+                        var (warpedPlateX, warpedPlateY) = WarpedCoordinate(warpXNoise, warpYNoise, x, y, step, plateWarpAmplitude);
+                        var plateEdge = plateField.EdgeProximity(warpedPlateX, warpedPlateY, plateEdgeWidth);
                         elevationBand = UpliftedBand(elevationBand, elevation, plateEdge);
                     }
 
@@ -287,11 +342,29 @@ public static class MapGenerator
         };
     }
 
-    /// <summary>Sample the raw [0, 1) elevation value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
-    public static double ElevationAt(string seed, int x, int y, int step = 1) => ElevationNoise(seed, step).Sample(x, y, step);
+    /// <summary>
+    /// Sample the [0, 1) elevation value at a coordinate, including the
+    /// same elevation-band domain warp <see cref="Generate"/> applies -
+    /// exposed for testing neighbor smoothness and boundary raggedness.
+    /// </summary>
+    public static double ElevationAt(string seed, int x, int y, int step = 1)
+    {
+        var amplitude = ElevationWarpRegionScale * step * ElevationWarpAmplitudeFraction;
+        var (warpedX, warpedY) = WarpedCoordinate(ElevationWarpNoise(seed, step, axis: "x"), ElevationWarpNoise(seed, step, axis: "y"), x, y, step, amplitude);
+        return ElevationNoise(seed, step).Sample(warpedX, warpedY, step);
+    }
 
-    /// <summary>Sample the raw [0, 1) moisture value at a coordinate, independent of any window - exposed for testing neighbor smoothness.</summary>
-    public static double MoistureAt(string seed, int x, int y, int step = 1) => MoistureNoise(seed, step).Sample(x, y, step);
+    /// <summary>
+    /// Sample the [0, 1) moisture value at a coordinate, including the
+    /// same moisture-band domain warp <see cref="Generate"/> applies -
+    /// exposed for testing neighbor smoothness and boundary raggedness.
+    /// </summary>
+    public static double MoistureAt(string seed, int x, int y, int step = 1)
+    {
+        var amplitude = MoistureWarpRegionScale * step * MoistureWarpAmplitudeFraction;
+        var (warpedX, warpedY) = WarpedCoordinate(MoistureWarpNoise(seed, step, axis: "x"), MoistureWarpNoise(seed, step, axis: "y"), x, y, step, amplitude);
+        return MoistureNoise(seed, step).Sample(warpedX, warpedY, step);
+    }
 
     /// <summary>
     /// Sample the [0, 1] plate-boundary edge proximity at a coordinate,
@@ -306,6 +379,19 @@ public static class MapGenerator
         return PlateField(seed, step).EdgeProximity(warpedX, warpedY, PlateRegionScale * step * PlateEdgeWidthFraction);
     }
 
+    /// <summary>
+    /// Displaces a coordinate by a pair of independent noise fields before
+    /// it's handed to a threshold/lookup field - bends that field's own
+    /// smooth or straight-edged shape into an organic one. Shared by the
+    /// plate, elevation-band, and moisture-band warps.
+    /// </summary>
+    private static (int X, int Y) WarpedCoordinate(InfiniteValueNoise2D warpXNoise, InfiniteValueNoise2D warpYNoise, int x, int y, int step, double amplitude)
+    {
+        var warpedX = x + (int)Math.Round((warpXNoise.Sample(x, y, step) - 0.5) * 2 * amplitude);
+        var warpedY = y + (int)Math.Round((warpYNoise.Sample(x, y, step) - 0.5) * 2 * amplitude);
+        return (warpedX, warpedY);
+    }
+
     private static InfiniteValueNoise2D ElevationNoise(string seed, int step) =>
         new(seed, ElevationRegionScale * step, ElevationOctaves, NoisePersistence);
 
@@ -315,6 +401,12 @@ public static class MapGenerator
     // entirely different lattice hashes, so fields never correlate.
     private static InfiniteValueNoise2D MoistureNoise(string seed, int step) =>
         new($"{seed}:moisture", MoistureRegionScale * step, MoistureOctaves, NoisePersistence);
+
+    private static InfiniteValueNoise2D ElevationWarpNoise(string seed, int step, string axis) =>
+        new($"{seed}:elevation-warp-{axis}", ElevationWarpRegionScale * step, ElevationWarpOctaves, NoisePersistence);
+
+    private static InfiniteValueNoise2D MoistureWarpNoise(string seed, int step, string axis) =>
+        new($"{seed}:moisture-warp-{axis}", MoistureWarpRegionScale * step, MoistureWarpOctaves, NoisePersistence);
 
     private static WorleyBoundaryField PlateField(string seed, int step) =>
         new($"{seed}:plate", PlateRegionScale * step);
