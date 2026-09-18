@@ -6,6 +6,7 @@ import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { BiomeLegend } from "@/map/BiomeLegend"
 import { Button } from "@/components/ui/button"
+import { CompassRose } from "@/map/CompassRose"
 import { Progress } from "@/components/ui/progress"
 import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS } from "@/map/constants"
 import { MapCanvas } from "@/map/MapCanvas"
@@ -273,6 +274,8 @@ function App() {
 
       {phase === "result" && viewWindow && (
         <>
+          <CompassRose seed={viewWindow.seed} />
+
           <div className="fixed top-4 left-4 z-10 flex items-start gap-3">
             <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
               <div className="flex items-center justify-between gap-2">

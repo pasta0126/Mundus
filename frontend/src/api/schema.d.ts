@@ -4,6 +4,45 @@
  */
 
 export interface paths {
+    "/api/Compass": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    seed?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Compass"];
+                        "application/json": components["schemas"]["Compass"];
+                        "text/json": components["schemas"]["Compass"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/Health": {
         parameters: {
             query?: never;
@@ -93,6 +132,11 @@ export interface components {
             /** Format: int32 */
             y: number | string;
             biome: components["schemas"]["Biome"];
+        };
+        Compass: {
+            seed: string;
+            /** Format: double */
+            bearingDegrees: number | string;
         };
         Map: {
             /** Format: int32 */

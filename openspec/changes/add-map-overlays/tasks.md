@@ -1,13 +1,13 @@
 ## 1. Compass rose (backend)
 
-- [ ] 1.1 Add a `seed.Child("north-bearing")`-derived bearing calculation in `Mundus.Core`, returning a single `[0, 360)` degree value per seed
-- [ ] 1.2 Add a `CompassController` (or equivalent) endpoint returning the bearing for a given seed
-- [ ] 1.3 Add backend tests: same seed always yields the same bearing; different seeds are not guaranteed to match; bearing is independent of any window/coordinate parameter
+- [x] 1.1 Add a `seed.Child("north-bearing")`-derived bearing calculation in `Mundus.Core`, returning a single `[0, 360)` degree value per seed
+- [x] 1.2 Add a `CompassController` (or equivalent) endpoint returning the bearing for a given seed
+- [x] 1.3 Add backend tests: same seed always yields the same bearing; different seeds are not guaranteed to match; bearing is independent of any window/coordinate parameter
 
 ## 2. Compass rose (frontend)
 
-- [ ] 2.1 Add a compass-rose overlay canvas/component, fixed screen position, rotated per the fetched bearing
-- [ ] 2.2 Wire the compass-rose layer into the layer-visibility system (see Section 6)
+- [x] 2.1 Add a compass-rose overlay component, fixed screen position, rotated per the fetched bearing
+- [ ] 2.2 Wire the compass-rose layer into the layer-visibility system (see Section 6) - deferred until the layer system (Section 7) exists; compass currently always renders
 
 ## 3. Rivers (backend)
 
