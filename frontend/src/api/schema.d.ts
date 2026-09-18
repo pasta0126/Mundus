@@ -120,12 +120,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/Regions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    seed?: string;
+                    x?: number | string;
+                    y?: number | string;
+                    width?: number | string;
+                    height?: number | string;
+                    step?: number | string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["RegionBoundaries"];
+                        "application/json": components["schemas"]["RegionBoundaries"];
+                        "text/json": components["schemas"]["RegionBoundaries"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {unknown} */
         Biome: "Ocean" | "Beach" | "Desert" | "Grassland" | "Swamp" | "Tundra" | "Forest" | "Rainforest" | "Mountains" | "Snow";
+        BoundaryPoint: {
+            /** Format: int32 */
+            x: number | string;
+            /** Format: int32 */
+            y: number | string;
+        };
         Cell: {
             /** Format: int32 */
             x: number | string;
@@ -151,6 +201,18 @@ export interface components {
             /** Format: int32 */
             height: number | string;
             cells: components["schemas"]["Cell"][];
+        };
+        RegionBoundaries: {
+            seed: string;
+            /** Format: int32 */
+            originX: number | string;
+            /** Format: int32 */
+            originY: number | string;
+            /** Format: int32 */
+            width: number | string;
+            /** Format: int32 */
+            height: number | string;
+            points: components["schemas"]["BoundaryPoint"][];
         };
     };
     responses: never;

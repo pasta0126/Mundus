@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress"
 import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS } from "@/map/constants"
 import { MapCanvas } from "@/map/MapCanvas"
 import { MapParamsPanel } from "@/map/MapParamsPanel"
+import { RegionBordersLayer } from "@/map/RegionBordersLayer"
 import { computeChunkGrid, runWithConcurrency } from "@/map/tiling"
 
 type MapDto = components["schemas"]["Map"]
@@ -52,6 +53,7 @@ function App() {
   const [progress, setProgress] = useState({ loaded: 0, total: 0 })
   const [errorMessage, setErrorMessage] = useState("")
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
+  const [regionBordersCanvasEl, setRegionBordersCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [showLegend, setShowLegend] = useState(false)
   const [showLayers, setShowLayers] = useState(false)
   const [layerVisibility, setLayerVisibility] = useState<Record<LayerId, boolean>>(defaultLayerVisibility)
@@ -239,6 +241,10 @@ function App() {
     if (!ctx) return
     ctx.drawImage(canvasEl, 0, 0)
 
+    if (layerVisibility.regionBorders && regionBordersCanvasEl) {
+      ctx.drawImage(regionBordersCanvasEl, 0, 0)
+    }
+
     if (layerVisibility.compass && compassInfo) {
       const dpr = window.devicePixelRatio || 1
       const rect = compassInfo.img.getBoundingClientRect()
@@ -273,6 +279,20 @@ function App() {
           step={viewWindow.step}
           generation={viewWindow.generation}
           onCanvasReady={setCanvasEl}
+        />
+      )}
+
+      {viewWindow && layerVisibility.regionBorders && (
+        <RegionBordersLayer
+          seed={viewWindow.seed}
+          originX={viewWindow.originX}
+          originY={viewWindow.originY}
+          width={viewWindow.width}
+          height={viewWindow.height}
+          cellPx={viewWindow.cellPx}
+          step={viewWindow.step}
+          generation={viewWindow.generation}
+          onCanvasReady={setRegionBordersCanvasEl}
         />
       )}
 

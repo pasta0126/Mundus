@@ -417,7 +417,7 @@ public static class MapGenerator
     /// smooth or straight-edged shape into an organic one. Shared by the
     /// plate, elevation-band, and moisture-band warps.
     /// </summary>
-    private static (int X, int Y) WarpedCoordinate(InfiniteValueNoise2D warpXNoise, InfiniteValueNoise2D warpYNoise, int x, int y, int step, double amplitude)
+    internal static (int X, int Y) WarpedCoordinate(InfiniteValueNoise2D warpXNoise, InfiniteValueNoise2D warpYNoise, int x, int y, int step, double amplitude)
     {
         var warpedX = x + (int)Math.Round((warpXNoise.Sample(x, y, step) - 0.5) * 2 * amplitude);
         var warpedY = y + (int)Math.Round((warpYNoise.Sample(x, y, step) - 0.5) * 2 * amplitude);
