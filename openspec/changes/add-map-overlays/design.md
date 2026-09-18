@@ -172,6 +172,12 @@ simply never drawn to it.
 
 Plus one non-POI icon: the **compass rose** itself.
 
+Artwork for all 20 POI icons exists as vector illustrations in
+`frontend/src/assets/poi/` (`poi-<name>.svg` source + `poi-<name>.png`
+256x256, transparent background; names match the table, e.g.
+`poi-mountain-peak`, `poi-sea-monster`, `poi-worship`). They aren't wired
+into any layer yet - that lands with task 4/6.4.
+
 This is the exact set `points-of-interest`'s spec fixes as the documented
 icon-type inventory; icon artwork for any of these can be supplied and
 wired in independently of the others.
