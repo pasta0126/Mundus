@@ -42,13 +42,32 @@ public static class RegionGenerator
     /// <summary>Boundary line half-width, as a fraction of <see cref="RegionScale"/> - a thin drawn line, not a mountain belt's uplifted width.</summary>
     private const double RegionEdgeWidthFraction = 0.01;
 
-    /// <summary>Domain-warp scale for the boundary seam, a few times finer than <see cref="RegionScale"/> so a long stretch wobbles more than once along its length - same technique as <c>PlateWarpRegionScale</c>.</summary>
-    private const int RegionWarpRegionScale = 512;
+    /// <summary>
+    /// Domain-warp scale for the boundary seam - finer than
+    /// <see cref="RegionScale"/> and than <c>PlateWarpRegionScale</c>
+    /// (mountain seams use ~256) so the line wobbles noticeably more
+    /// than once along its length, reading as a hand-drawn/natural
+    /// political border rather than a smoothed Voronoi edge. Finer still
+    /// (paired with a higher amplitude below) collapses into chaotic
+    /// self-crossing loops disconnected from the real seam - verified by
+    /// eye, not just by proximity math.
+    /// </summary>
+    private const int RegionWarpRegionScale = 340;
 
-    private const int RegionWarpOctaves = 3;
+    private const int RegionWarpOctaves = 4;
 
-    private const double RegionWarpAmplitudeFraction = 0.25;
-    private const double NoisePersistence = 0.5;
+    /// <summary>
+    /// Stronger than <c>PlateWarpAmplitudeFraction</c> (0.25) so the line
+    /// reads noisier/hand-drawn, occasionally enough to displace a
+    /// stretch across a neighboring region's own seam and produce a
+    /// small enclave/exclave as a natural side effect - but well short of
+    /// <see cref="RegionScale"/> itself, or the warp dominates the real
+    /// seam entirely and produces scribbly noise unrelated to any actual
+    /// boundary.
+    /// </summary>
+    private const double RegionWarpAmplitudeFraction = 0.35;
+
+    private const double NoisePersistence = 0.55;
 
     /// <summary>A cell counts as "on the boundary" once proximity reaches this close to the seam - not exactly 1, or only the (vanishingly rare) integer coordinate exactly equidistant between two feature points would ever qualify.</summary>
     private const double BoundaryThreshold = 0.9;
