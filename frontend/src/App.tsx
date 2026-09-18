@@ -14,7 +14,6 @@ import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS } from 
 import { MapCanvas } from "@/map/MapCanvas"
 import { MapParamsPanel } from "@/map/MapParamsPanel"
 import { RegionBordersLayer } from "@/map/RegionBordersLayer"
-import { RiversLayer } from "@/map/RiversLayer"
 import { computeChunkGrid, runWithConcurrency } from "@/map/tiling"
 
 type MapDto = components["schemas"]["Map"]
@@ -55,7 +54,6 @@ function App() {
   const [errorMessage, setErrorMessage] = useState("")
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [regionBordersCanvasEl, setRegionBordersCanvasEl] = useState<HTMLCanvasElement | null>(null)
-  const [riversCanvasEl, setRiversCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [showLegend, setShowLegend] = useState(false)
   const [showLayers, setShowLayers] = useState(false)
   const [layerVisibility, setLayerVisibility] = useState<Record<LayerId, boolean>>(defaultLayerVisibility)
@@ -228,7 +226,7 @@ function App() {
    * Composites the biome canvas plus every currently-visible overlay onto
    * one offscreen canvas before exporting - a hidden layer is simply never
    * drawn onto it. The compass is a fixed-position screen icon (not a
-   * world-space canvas like future rivers/borders/routes), so it's
+   * world-space canvas like future borders/routes), so it's
    * redrawn here at its on-screen rect and rotation rather than composited
    * via drawImage(canvasEl, ...) like a peer canvas would be.
    */
@@ -245,10 +243,6 @@ function App() {
 
     if (layerVisibility.regionBorders && regionBordersCanvasEl) {
       ctx.drawImage(regionBordersCanvasEl, 0, 0)
-    }
-
-    if (layerVisibility.rivers && riversCanvasEl) {
-      ctx.drawImage(riversCanvasEl, 0, 0)
     }
 
     if (layerVisibility.compass && compassInfo) {
@@ -299,20 +293,6 @@ function App() {
           step={viewWindow.step}
           generation={viewWindow.generation}
           onCanvasReady={setRegionBordersCanvasEl}
-        />
-      )}
-
-      {viewWindow && layerVisibility.rivers && (
-        <RiversLayer
-          seed={viewWindow.seed}
-          originX={viewWindow.originX}
-          originY={viewWindow.originY}
-          width={viewWindow.width}
-          height={viewWindow.height}
-          cellPx={viewWindow.cellPx}
-          step={viewWindow.step}
-          generation={viewWindow.generation}
-          onCanvasReady={setRiversCanvasEl}
         />
       )}
 

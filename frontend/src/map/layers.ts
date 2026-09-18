@@ -1,4 +1,4 @@
-export type LayerId = "compass" | "regionBorders" | "rivers"
+export type LayerId = "compass" | "regionBorders"
 
 export interface LayerDefinition {
   id: LayerId
@@ -9,15 +9,14 @@ export interface LayerDefinition {
 }
 
 /**
- * Every toggleable overlay layer, in panel-display order. Each POI
- * category and trade routes get appended here once their backends/
- * canvases land - never inserted between existing entries (same
+ * Every toggleable overlay layer, in panel-display order. Rivers, each
+ * POI category, and trade routes get appended here once their (re-)built
+ * backends/canvases land - never inserted between existing entries (same
  * frozen-append contract as `Rng.Child`).
  */
 export const LAYER_REGISTRY: LayerDefinition[] = [
   { id: "compass", label: "Compass rose", defaultVisible: true },
   { id: "regionBorders", label: "Region borders", defaultVisible: false, experimental: true },
-  { id: "rivers", label: "Rivers", defaultVisible: false, experimental: true },
 ]
 
 export function defaultLayerVisibility(): Record<LayerId, boolean> {

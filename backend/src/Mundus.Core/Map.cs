@@ -401,9 +401,8 @@ public static class MapGenerator
     /// (see <see cref="InlandFloor"/>), so a tiny fine-detail noise dip
     /// that Generate itself wouldn't render as Ocean doesn't read as
     /// water here either - only real, regionally-inland water bodies do.
-    /// Exposed for overlays (region borders avoiding water, rivers
-    /// finding Peak-band sources and Ocean termini) that need a band
-    /// classification without the rest of biome generation.
+    /// Exposed for overlays (e.g. region borders avoiding water) that
+    /// need a band classification without the rest of biome generation.
     /// </summary>
     public static string ElevationBandAt(string seed, int x, int y, int step = 1)
     {
@@ -426,9 +425,6 @@ public static class MapGenerator
 
     /// <summary>Whether the elevation band at a coordinate is Ocean - see <see cref="ElevationBandAt"/>.</summary>
     public static bool IsOceanAt(string seed, int x, int y, int step = 1) => ElevationBandAt(seed, x, y, step) == "Ocean";
-
-    /// <summary>Whether the elevation band at a coordinate is Peak - see <see cref="ElevationBandAt"/>.</summary>
-    public static bool IsPeakAt(string seed, int x, int y, int step = 1) => ElevationBandAt(seed, x, y, step) == "Peak";
 
     /// <summary>
     /// Sample the [0, 1] plate-boundary edge proximity at a coordinate,

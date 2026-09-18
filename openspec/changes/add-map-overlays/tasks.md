@@ -11,13 +11,20 @@
 
 ## 3. Rivers (backend)
 
-- [x] 3.1 Implement the deterministic river-source lattice scatter (`$"{seed}:river-sources"`, string-suffix convention - see Section 5's note), filtered to `Peak`-band cells (`RiverGenerator.TraceRivers` in `Rivers.cs`)
-- [x] 3.2 Implement the deterministic lake-basin lattice scatter (`$"{seed}:lakes"`) as a terminal water body distinct from `Ocean` (`RiverGenerator.IsLakeAt`) - not itself rendered, per design.md
-- [x] 3.3 Implement downhill path tracing from a source using `ElevationAt`, with meander (a noise-perturbed steepest-descent angle, falling back to pure steepest-descent whenever the perturbed step would go uphill - simpler than warping the sampled coordinate, same effect), terminating at `Ocean`, a lake, or the documented max length (discard otherwise)
-- [x] 3.4 Implement tributary confluence detection/merging between traced paths - merge direction is chosen by elevation (whichever splice doesn't require an uphill jump), not path length, after an initial length-based version produced physically-impossible uphill jumps at the seam
-- [x] 3.5 Implement the windowed query: trace every candidate source within max-river-length of the requested window, return only in-window path segments
-- [x] 3.6 Add a `RiversController` (or equivalent) endpoint mirroring `MapsController`'s seed/window/step contract
-- [x] 3.7 Add backend tests: determinism across repeated calls; overlapping-window agreement; source-band invariant; downhill-elevation invariant; sinuosity (not a straight line); confluence merges into one downstream path; unreachable sources are discarded
+- [ ] 3.1 Implement the deterministic river-source lattice scatter (`seed.Child("river-sources")`), filtered to `Peak`-band cells
+- [ ] 3.2 Implement the deterministic lake-basin lattice scatter (`seed.Child("lakes")`) as a terminal water body distinct from `Ocean`
+- [ ] 3.3 Implement downhill path tracing from a source using `ElevationAt`, with domain-warped meander, terminating at `Ocean`, a lake, or the documented max length (discard otherwise)
+- [ ] 3.4 Implement tributary confluence detection/merging between traced paths
+- [ ] 3.5 Implement the windowed query: trace every candidate source within max-river-length of the requested window, return only in-window path segments
+- [ ] 3.6 Add a `RiversController` (or equivalent) endpoint mirroring `MapsController`'s seed/window/step contract
+- [ ] 3.7 Add backend tests: determinism across repeated calls; overlapping-window agreement; source-band invariant; downhill-elevation invariant; sinuosity (not a straight line); confluence merges into one downstream path; unreachable sources are discarded
+
+Implemented and then removed (2026-09-18): a working version shipped as
+"Rivers (Experimental)" but was pulled entirely at the user's request. See
+git history around that date if picking this back up - the trace/meander/
+confluence approach and the bugs found along the way (a trace-oscillation
+fix and an elevation-based, not length-based, confluence-merge direction)
+are worth reading before re-implementing from scratch.
 
 ## 4. Points of interest (backend)
 
@@ -42,11 +49,11 @@
 
 ## 7. Layer system (frontend)
 
-- [x] 7.1 Add a layers panel component listing every overlay layer (compass rose, rivers, each POI category, region borders, trade routes) with a toggle and documented default visibility - registry (`map/layers.ts`) currently has the compass rose, region borders, and rivers; POI/routes get appended once their backends land
+- [x] 7.1 Add a layers panel component listing every overlay layer (compass rose, rivers, each POI category, region borders, trade routes) with a toggle and documented default visibility - registry (`map/layers.ts`) currently has the compass rose and region borders (grouped under a "stable" vs. "Experimental" heading); rivers/POI/routes get appended once their backends land
 - [x] 7.2 Add per-layer visibility state that persists across pan/zoom/coordinate-jump but resets on full reload
-- [x] 7.3 Add one overlay `<canvas>` per layer, stacked above the biome `MapCanvas` and below UI panels, shown/hidden per the layer state - done for region borders and rivers (`RegionBordersLayer.tsx`, `RiversLayer.tsx`); compass stays a fixed-position `<img>`, not a world-space canvas
-- [x] 7.4 Fetch and render rivers, POIs (per visible category only), and trade routes into their respective canvases, following the existing chunked/tiled fetch pattern from `tiling.ts` - done for rivers (`RiversLayer.tsx`); POI/routes remain
-- [x] 7.5 Render rivers as solid strokes, region borders as a thin solid stroke, trade routes as dotted strokes, and POI/compass as icons (placeholder icons until real artwork is supplied) - rivers and region borders use distinct colors (blue vs. brown) so both being solid doesn't read as one layer; compass icon already in place
+- [x] 7.3 Add one overlay `<canvas>` per layer, stacked above the biome `MapCanvas` and below UI panels, shown/hidden per the layer state - done for region borders (`RegionBordersLayer.tsx`); compass stays a fixed-position `<img>`, not a world-space canvas
+- [ ] 7.4 Fetch and render rivers, POIs (per visible category only), and trade routes into their respective canvases, following the existing chunked/tiled fetch pattern from `tiling.ts` - region borders already does this
+- [x] 7.5 Render rivers as solid strokes, region borders as a thin solid stroke, trade routes as dotted strokes, and POI/compass as icons (placeholder icons until real artwork is supplied) - region borders and rivers will need distinguishable colors once rivers exist again, since both are solid; compass icon already in place
 
 ## 8. Icon legend (frontend)
 
@@ -55,8 +62,8 @@
 
 ## 9. Download compositing (frontend)
 
-- [x] 9.1 Rewrite `downloadMap()` to draw the biome canvas plus every currently visible overlay canvas onto one offscreen canvas, in a fixed stacking order, before `toBlob` - compass composited via its on-screen rect/rotation; region borders and rivers (and future canvas-based layers) via a plain `drawImage` per canvas
-- [x] 9.2 Verify a hidden layer never appears in the downloaded PNG and a visible layer always does - verified manually for the compass, region-borders, and rivers layers
+- [x] 9.1 Rewrite `downloadMap()` to draw the biome canvas plus every currently visible overlay canvas onto one offscreen canvas, in a fixed stacking order, before `toBlob` - compass composited via its on-screen rect/rotation; region borders (and future canvas-based layers) via a plain `drawImage` per canvas
+- [x] 9.2 Verify a hidden layer never appears in the downloaded PNG and a visible layer always does - verified manually for the compass and region-borders layers
 
 ## 10. Spec/version housekeeping
 
