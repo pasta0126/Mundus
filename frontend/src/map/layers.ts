@@ -4,6 +4,8 @@ export interface LayerDefinition {
   id: LayerId
   label: string
   defaultVisible: boolean
+  /** Shown under a separate "Experimental" heading in the layers panel - not yet tuned/validated enough to be a fully-supported layer. */
+  experimental?: boolean
 }
 
 /**
@@ -14,8 +16,8 @@ export interface LayerDefinition {
  */
 export const LAYER_REGISTRY: LayerDefinition[] = [
   { id: "compass", label: "Compass rose", defaultVisible: true },
-  { id: "regionBorders", label: "Region borders (Experimental)", defaultVisible: false },
-  { id: "rivers", label: "Rivers (Experimental)", defaultVisible: false },
+  { id: "regionBorders", label: "Region borders", defaultVisible: false, experimental: true },
+  { id: "rivers", label: "Rivers", defaultVisible: false, experimental: true },
 ]
 
 export function defaultLayerVisibility(): Record<LayerId, boolean> {
