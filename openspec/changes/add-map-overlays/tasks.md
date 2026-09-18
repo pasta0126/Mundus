@@ -7,7 +7,7 @@
 ## 2. Compass rose (frontend)
 
 - [x] 2.1 Add a compass-rose overlay component, fixed screen position, rotated per the fetched bearing
-- [ ] 2.2 Wire the compass-rose layer into the layer-visibility system (see Section 6) - deferred until the layer system (Section 7) exists; compass currently always renders
+- [x] 2.2 Wire the compass-rose layer into the layer-visibility system (see Section 7)
 
 ## 3. Rivers (backend)
 
@@ -42,11 +42,11 @@
 
 ## 7. Layer system (frontend)
 
-- [ ] 7.1 Add a layers panel component listing every overlay layer (compass rose, rivers, each POI category, region borders, trade routes) with a toggle and documented default visibility
-- [ ] 7.2 Add per-layer visibility state that persists across pan/zoom/coordinate-jump but resets on full reload
-- [ ] 7.3 Add one overlay `<canvas>` per layer, stacked above the biome `MapCanvas` and below UI panels, shown/hidden per the layer state
+- [x] 7.1 Add a layers panel component listing every overlay layer (compass rose, rivers, each POI category, region borders, trade routes) with a toggle and documented default visibility - registry (`map/layers.ts`) currently only has the compass rose; rivers/POI/regions/routes get appended once their backends land
+- [x] 7.2 Add per-layer visibility state that persists across pan/zoom/coordinate-jump but resets on full reload
+- [ ] 7.3 Add one overlay `<canvas>` per layer, stacked above the biome `MapCanvas` and below UI panels, shown/hidden per the layer state - not needed yet for the compass (a fixed-position icon, not a world-space canvas); applies once rivers/regions/routes land
 - [ ] 7.4 Fetch and render rivers, POIs (per visible category only), region borders, and trade routes into their respective canvases, following the existing chunked/tiled fetch pattern from `tiling.ts`
-- [ ] 7.5 Render rivers as solid strokes, region borders as dashed strokes, trade routes as dotted strokes, and POI/compass as icons (placeholder icons until real artwork is supplied)
+- [ ] 7.5 Render rivers as solid strokes, region borders as dashed strokes, trade routes as dotted strokes, and POI/compass as icons (placeholder icons until real artwork is supplied) - compass icon already in place
 
 ## 8. Icon legend (frontend)
 
@@ -55,8 +55,8 @@
 
 ## 9. Download compositing (frontend)
 
-- [ ] 9.1 Rewrite `downloadMap()` to draw the biome canvas plus every currently visible overlay canvas onto one offscreen canvas, in a fixed stacking order, before `toBlob`
-- [ ] 9.2 Verify a hidden layer never appears in the downloaded PNG and a visible layer always does
+- [x] 9.1 Rewrite `downloadMap()` to draw the biome canvas plus every currently visible overlay canvas onto one offscreen canvas, in a fixed stacking order, before `toBlob` - compass composited via its on-screen rect/rotation; future canvas-based layers get a plain `drawImage` per canvas
+- [x] 9.2 Verify a hidden layer never appears in the downloaded PNG and a visible layer always does - verified manually for the compass layer
 
 ## 10. Spec/version housekeeping
 

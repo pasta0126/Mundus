@@ -1,12 +1,14 @@
 import { AnimatePresence, motion } from "motion/react"
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Info, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Info, Layers, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { BiomeLegend } from "@/map/BiomeLegend"
 import { Button } from "@/components/ui/button"
-import { CompassRose } from "@/map/CompassRose"
+import { CompassRose, type CompassInfo } from "@/map/CompassRose"
+import { defaultLayerVisibility, type LayerId } from "@/map/layers"
+import { LayersPanel } from "@/map/LayersPanel"
 import { Progress } from "@/components/ui/progress"
 import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS } from "@/map/constants"
 import { MapCanvas } from "@/map/MapCanvas"
@@ -51,6 +53,13 @@ function App() {
   const [errorMessage, setErrorMessage] = useState("")
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [showLegend, setShowLegend] = useState(false)
+  const [showLayers, setShowLayers] = useState(false)
+  const [layerVisibility, setLayerVisibility] = useState<Record<LayerId, boolean>>(defaultLayerVisibility)
+  const [compassInfo, setCompassInfo] = useState<CompassInfo | null>(null)
+
+  function toggleLayer(id: LayerId) {
+    setLayerVisibility((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
 
   const generationRef = useRef(0)
   // Whether any view has ever loaded successfully - not component state,
@@ -211,10 +220,36 @@ function App() {
     return `mundus-${view.seed}-x${view.originX}-y${view.originY}-${timestamp}.png`
   }
 
+  /**
+   * Composites the biome canvas plus every currently-visible overlay onto
+   * one offscreen canvas before exporting - a hidden layer is simply never
+   * drawn onto it. The compass is a fixed-position screen icon (not a
+   * world-space canvas like future rivers/borders/routes), so it's
+   * redrawn here at its on-screen rect and rotation rather than composited
+   * via drawImage(canvasEl, ...) like a peer canvas would be.
+   */
   function downloadMap() {
     if (!canvasEl || !viewWindow) return
     const filename = downloadFilename(viewWindow)
-    canvasEl.toBlob((blob) => {
+
+    const composite = document.createElement("canvas")
+    composite.width = canvasEl.width
+    composite.height = canvasEl.height
+    const ctx = composite.getContext("2d")
+    if (!ctx) return
+    ctx.drawImage(canvasEl, 0, 0)
+
+    if (layerVisibility.compass && compassInfo) {
+      const dpr = window.devicePixelRatio || 1
+      const rect = compassInfo.img.getBoundingClientRect()
+      ctx.save()
+      ctx.translate((rect.left + rect.width / 2) * dpr, (rect.top + rect.height / 2) * dpr)
+      ctx.rotate((compassInfo.bearing * Math.PI) / 180)
+      ctx.drawImage(compassInfo.img, (-rect.width / 2) * dpr, (-rect.height / 2) * dpr, rect.width * dpr, rect.height * dpr)
+      ctx.restore()
+    }
+
+    composite.toBlob((blob) => {
       if (!blob) return
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
@@ -274,7 +309,7 @@ function App() {
 
       {phase === "result" && viewWindow && (
         <>
-          <CompassRose seed={viewWindow.seed} />
+          <CompassRose seed={viewWindow.seed} visible={layerVisibility.compass} onReady={setCompassInfo} />
 
           <div className="fixed top-4 left-4 z-10 flex items-start gap-3">
             <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
@@ -291,6 +326,15 @@ function App() {
                   </button>
                 </h1>
                 <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={() => setShowLayers((v) => !v)}
+                    aria-label="Toggle layers panel"
+                    aria-expanded={showLayers}
+                  >
+                    <Layers />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon-sm"
@@ -321,18 +365,32 @@ function App() {
                 </Button>
               </div>
             </div>
-            <AnimatePresence>
-              {showLegend && (
-                <motion.div
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ duration: 0.15 }}
-                >
-                  <BiomeLegend />
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <div className="flex flex-col gap-3">
+              <AnimatePresence>
+                {showLayers && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -8 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <LayersPanel visibility={layerVisibility} onToggle={toggleLayer} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              <AnimatePresence>
+                {showLegend && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -8 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -8 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <BiomeLegend />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
           <div className="fixed right-4 bottom-4 z-10 flex items-end gap-3">
