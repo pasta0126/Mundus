@@ -1,23 +1,23 @@
 ## Purpose
 
 Lets a person independently show or hide every optional map overlay (compass
-rose, rivers, each points-of-interest category, region borders, trade
-routes) from one place, and guarantees that a downloaded map image reflects
-exactly the overlays currently visible on screen.
+rose, each points-of-interest category, region borders) from one place, and
+guarantees that a downloaded map image reflects exactly the overlays
+currently visible on screen.
 
 ## ADDED Requirements
 
 ### Requirement: Independent layer visibility toggles
 The system SHALL expose one toggle per overlay layer - the compass rose,
-rivers, each points-of-interest category (see `points-of-interest`), region
-borders, and trade routes - each of which SHALL show or hide only that
-layer, without affecting the biome grid or any other layer's visibility.
+each points-of-interest category (see `points-of-interest`), and region
+borders - each of which SHALL show or hide only that layer, without
+affecting the biome grid or any other layer's visibility.
 
 #### Scenario: Hiding one layer leaves others untouched
-- **WHEN** a user hides the rivers layer while the compass rose and region
-  borders layers are visible
-- **THEN** rivers are no longer rendered on the canvas, while the compass
-  rose and region borders remain rendered exactly as before
+- **WHEN** a user hides the region-borders layer while the compass rose is
+  visible
+- **THEN** region borders are no longer rendered on the canvas, while the
+  compass rose remains rendered exactly as before
 
 #### Scenario: Each points-of-interest category toggles independently
 - **WHEN** a user hides the "settlements" points-of-interest category
@@ -49,14 +49,14 @@ saved PNG image includes the biome grid plus every overlay layer currently
 visible on screen, and excludes every overlay layer currently hidden.
 
 #### Scenario: A hidden layer is absent from the download
-- **WHEN** a user hides the trade-routes layer and then chooses "Download"
-- **THEN** the saved image does not contain any trade-route lines
+- **WHEN** a user hides the region-borders layer and then chooses "Download"
+- **THEN** the saved image does not contain any region-border lines
 
 #### Scenario: A visible layer is present in the download
-- **WHEN** a user has the compass rose, rivers, and settlements layers
-  visible and chooses "Download"
-- **THEN** the saved image contains the compass rose, the rendered rivers,
-  and the settlement icons, positioned as they appear on screen
+- **WHEN** a user has the compass rose and settlements layers visible and
+  chooses "Download"
+- **THEN** the saved image contains the compass rose and the settlement
+  icons, positioned as they appear on screen
 
 ### Requirement: A combined icon legend reflects visible icon layers
 The system SHALL show a legend explaining what each icon means, listing

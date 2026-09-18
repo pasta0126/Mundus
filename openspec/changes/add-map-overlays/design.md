@@ -11,8 +11,8 @@ seed-derived sub-system already forks its own independent stream off the
 parent seed, either via string suffixing (`$"{seed}:moisture"`) or
 `Rng.Child(name)`; the frozen-order-of-derivation contract on `Rng.Child`
 (design.md comment: "always append new child streams, never insert them")
-is the mechanism this change's north bearing, rivers, POIs, regions, and
-routes all reuse for their own independent determinism.
+is the mechanism this change's north bearing, POIs, and regions all reuse
+for their own independent determinism.
 
 The frontend (`MapCanvas.tsx`) draws the biome grid onto one full-viewport
 `<canvas>`; `App.tsx.downloadMap()` calls `canvasEl.toBlob(...)` directly on
@@ -35,21 +35,21 @@ toggleable, composited-on-download picture.
 **Non-Goals:**
 - Actual icon artwork - the user supplies it later; this change only fixes
   the enumerated set it must cover.
-- Naming of regions, settlements, or routes - out of scope until a later
-  change.
-- Full graph-based trade-route pathfinding (roads around terrain
-  obstacles) - v1 routes are direct links between nearby settlements.
+- Naming of regions or settlements - out of scope until a later change.
+- Rivers and trade routes - dropped from this change's scope (rivers was
+  implemented then removed at the user's request; trade routes was never
+  built). See `tasks.md` for the historical note.
 
 ## Decisions
 
 ### One seed-derived sub-stream per overlay generator
-Each new generator (north bearing, river sources, POI scatter, region
-partition, route graph) derives its own child stream via
+Each new generator (north bearing, POI scatter, region partition) derives
+its own child stream via
 `seed.Child("<name>")` (or an equivalent seed-suffix), following the
 existing `Rng.Child` contract: appended once, in a fixed order, never
 inserted between existing streams. This is what keeps regenerating "the
-same" seed's north, rivers, and POIs stable even as more overlay types are
-added later - exactly the property `map-generation`'s biome field already
+same" seed's north and POIs stable even as more overlay types are added
+later - exactly the property `map-generation`'s biome field already
 guarantees for terrain.
 
 **Alternative considered**: deriving every overlay from the same single
@@ -137,31 +137,22 @@ suppression `Generate` itself uses, so tiny noise-artifact ponds don't
 fragment the line): a visualization-only omission, not a change to the
 partition or boundary calculation itself.
 
-### Trade routes: nearest-neighbor links between settlement POIs, not global pathfinding
-Once settlement/seaport POIs exist (previous decision), each settlement
-deterministically links to its `k` nearest settlement/seaport POIs
-(documented `k`, e.g. 2-3), by seed-hashed selection among candidates
-within a bounded radius - not a shortest-path road network avoiding
-terrain. This keeps routes a local, bounded computation per window rather
-than a global graph search over an unbounded world.
-
 ### API shape: one endpoint per overlay capability, mirroring `MapsController`
-Each overlay is served by its own endpoint (e.g. `GET /api/rivers`,
-`/api/points-of-interest`, `/api/regions`, `/api/routes`, `/api/compass`),
-taking the same `seed` + window/`step` query contract as `MapsController`,
-rather than folding overlay data into the `Map` response.
+Each overlay is served by its own endpoint (e.g.
+`GET /api/points-of-interest`, `/api/regions`, `/api/compass`), taking the
+same `seed` + window/`step` query contract as `MapsController`, rather
+than folding overlay data into the `Map` response.
 
 **Alternative considered**: extending `Map`/`MapsController` to always
 include overlay data. Rejected - it would force the backend to compute
 every overlay on every request even when its layer is hidden (defeating
 the point of per-layer toggles), bloat the response the biome grid alone
-needs, and couple five independently-evolving capabilities into one
-contract.
+needs, and couple independently-evolving capabilities into one contract.
 
 ### Frontend: one overlay `<canvas>` per layer, composited only on download
-Each layer (compass rose, rivers, each POI category, region borders, trade
-routes) draws into its own `<canvas>`, stacked above `MapCanvas`'s biome
-canvas and below the UI panels, shown/hidden via the layer toggles.
+Each layer (compass rose, each POI category, region borders) draws into
+its own `<canvas>`, stacked above `MapCanvas`'s biome canvas and below the
+UI panels, shown/hidden via the layer toggles.
 `downloadMap()` is rewritten to draw the biome canvas plus every currently
 visible overlay canvas onto one offscreen canvas, in a fixed stacking
 order, before calling `toBlob` on that composite - so hidden layers are
@@ -187,16 +178,7 @@ wired in independently of the others.
 
 ## Risks / Trade-offs
 
-- [Retracing river paths on every window request that touches them is
-  extra compute per request] → bounded by the documented maximum river
-  length, and only sources within that radius of the window are ever
-  traced; revisit with server-side caching if this proves too slow in
-  practice.
-- [Lakes as an authored feature, not derived from real elevation minima,
-  can occasionally sit somewhere a heightmap-literate viewer wouldn't
-  expect a basin] → acceptable for a stylized, not physically-simulated,
-  fantasy map; documented as a deliberate simplification.
-- [Five new endpoints instead of one enriched response adds frontend
+- [New endpoints instead of one enriched response adds frontend
   request-orchestration complexity, layered on top of the existing tiled
   biome-loading logic] → each overlay endpoint is only called for
   currently-visible layers, and follows the exact same chunking pattern
@@ -209,9 +191,7 @@ wired in independently of the others.
 
 ## Open Questions
 
-- Exact per-category POI density and per-overlay documented constants
-  (lattice block size for rivers/lakes, `k` for route nearest-neighbors,
-  max river length) - tunable implementation details, not spec-level
-  behavior; pick reasonable defaults during implementation and document
-  them next to the code, the way `PlateRegionScale` etc. are documented
-  today.
+- Exact per-category POI density - a tunable implementation detail, not
+  spec-level behavior; pick a reasonable default during implementation and
+  document it next to the code, the way `PlateRegionScale` etc. are
+  documented today.

@@ -9,10 +9,10 @@ export interface LayerDefinition {
 }
 
 /**
- * Every toggleable overlay layer, in panel-display order. Rivers, each
- * POI category, and trade routes get appended here once their (re-)built
- * backends/canvases land - never inserted between existing entries (same
- * frozen-append contract as `Rng.Child`).
+ * Every toggleable overlay layer, in panel-display order. Each POI
+ * category gets appended here once its backend/canvas lands - never
+ * inserted between existing entries (same frozen-append contract as
+ * `Rng.Child`).
  */
 export const LAYER_REGISTRY: LayerDefinition[] = [
   { id: "compass", label: "Compass rose", defaultVisible: true },

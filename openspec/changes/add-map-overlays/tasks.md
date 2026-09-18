@@ -7,23 +7,17 @@
 ## 2. Compass rose (frontend)
 
 - [x] 2.1 Add a compass-rose overlay component, fixed screen position, rotated per the fetched bearing
-- [x] 2.2 Wire the compass-rose layer into the layer-visibility system (see Section 7)
+- [x] 2.2 Wire the compass-rose layer into the layer-visibility system (see Section 6)
 
-## 3. Rivers (backend)
+## 3. Rivers (backend) - OUT OF SCOPE
 
-- [ ] 3.1 Implement the deterministic river-source lattice scatter (`seed.Child("river-sources")`), filtered to `Peak`-band cells
-- [ ] 3.2 Implement the deterministic lake-basin lattice scatter (`seed.Child("lakes")`) as a terminal water body distinct from `Ocean`
-- [ ] 3.3 Implement downhill path tracing from a source using `ElevationAt`, with domain-warped meander, terminating at `Ocean`, a lake, or the documented max length (discard otherwise)
-- [ ] 3.4 Implement tributary confluence detection/merging between traced paths
-- [ ] 3.5 Implement the windowed query: trace every candidate source within max-river-length of the requested window, return only in-window path segments
-- [ ] 3.6 Add a `RiversController` (or equivalent) endpoint mirroring `MapsController`'s seed/window/step contract
-- [ ] 3.7 Add backend tests: determinism across repeated calls; overlapping-window agreement; source-band invariant; downhill-elevation invariant; sinuosity (not a straight line); confluence merges into one downstream path; unreachable sources are discarded
-
-Implemented and then removed (2026-09-18): a working version shipped as
-"Rivers (Experimental)" but was pulled entirely at the user's request. See
-git history around that date if picking this back up - the trace/meander/
-confluence approach and the bugs found along the way (a trace-oscillation
-fix and an elevation-based, not length-based, confluence-merge direction)
+Implemented and then removed (2026-09-18) at the user's request: a working
+version shipped as "Rivers (Experimental)" - source lattice scatter,
+lake-basin scatter, downhill trace with meander, tributary confluence,
+windowed endpoint, tests - and was then pulled entirely. See git history
+around that date if picking this back up; the trace/meander/confluence
+approach and the bugs found along the way (a trace-oscillation fix, and
+an elevation-based rather than length-based confluence-merge direction)
 are worth reading before re-implementing from scratch.
 
 ## 4. Points of interest (backend)
@@ -41,31 +35,25 @@ are worth reading before re-implementing from scratch.
 - [x] 5.3 Add a `RegionsController` (or equivalent) endpoint mirroring `MapsController`'s contract, returning boundary segments for a window - returns only the boundary points to render (on the threshold, excluding `Ocean`), not a full per-cell grid
 - [x] 5.4 Add backend tests: determinism across repeated calls; overlapping-window agreement; no boundary point falls on ocean across many seeds
 
-## 6. Trade routes (backend)
+## 6. Layer system (frontend)
 
-- [ ] 6.1 Implement nearest-neighbor route linking between settlement/seaport POIs (documented `k`, bounded radius)
-- [ ] 6.2 Add a `RoutesController` (or equivalent) endpoint mirroring `MapsController`'s contract
-- [ ] 6.3 Add backend tests: determinism across repeated calls; overlapping-window agreement; every route's endpoints are settlement/seaport POIs
+- [x] 6.1 Add a layers panel component listing every overlay layer (compass rose, each POI category, region borders) with a toggle and documented default visibility - registry (`map/layers.ts`) currently has the compass rose and region borders (grouped under a "stable" vs. "Experimental" heading); POI categories get appended once their backend lands
+- [x] 6.2 Add per-layer visibility state that persists across pan/zoom/coordinate-jump but resets on full reload
+- [x] 6.3 Add one overlay `<canvas>` per layer, stacked above the biome `MapCanvas` and below UI panels, shown/hidden per the layer state - done for region borders (`RegionBordersLayer.tsx`); compass stays a fixed-position `<img>`, not a world-space canvas
+- [ ] 6.4 Fetch and render POIs (per visible category only) into their respective canvases, following the existing chunked/tiled fetch pattern from `tiling.ts` - region borders already does this
+- [x] 6.5 Render region borders as a thin solid stroke and POI/compass as icons (placeholder icons until real artwork is supplied) - compass icon already in place
 
-## 7. Layer system (frontend)
+## 7. Icon legend (frontend)
 
-- [x] 7.1 Add a layers panel component listing every overlay layer (compass rose, rivers, each POI category, region borders, trade routes) with a toggle and documented default visibility - registry (`map/layers.ts`) currently has the compass rose and region borders (grouped under a "stable" vs. "Experimental" heading); rivers/POI/routes get appended once their backends land
-- [x] 7.2 Add per-layer visibility state that persists across pan/zoom/coordinate-jump but resets on full reload
-- [x] 7.3 Add one overlay `<canvas>` per layer, stacked above the biome `MapCanvas` and below UI panels, shown/hidden per the layer state - done for region borders (`RegionBordersLayer.tsx`); compass stays a fixed-position `<img>`, not a world-space canvas
-- [ ] 7.4 Fetch and render rivers, POIs (per visible category only), and trade routes into their respective canvases, following the existing chunked/tiled fetch pattern from `tiling.ts` - region borders already does this
-- [x] 7.5 Render rivers as solid strokes, region borders as a thin solid stroke, trade routes as dotted strokes, and POI/compass as icons (placeholder icons until real artwork is supplied) - region borders and rivers will need distinguishable colors once rivers exist again, since both are solid; compass icon already in place
+- [ ] 7.1 Add a legend component listing the icon types belonging to currently visible POI categories (plus the compass rose when visible), each with a short description
+- [ ] 7.2 Update the legend live as layers are toggled
 
-## 8. Icon legend (frontend)
+## 8. Download compositing (frontend)
 
-- [ ] 8.1 Add a legend component listing the icon types belonging to currently visible POI categories (plus the compass rose when visible), each with a short description
-- [ ] 8.2 Update the legend live as layers are toggled
+- [x] 8.1 Rewrite `downloadMap()` to draw the biome canvas plus every currently visible overlay canvas onto one offscreen canvas, in a fixed stacking order, before `toBlob` - compass composited via its on-screen rect/rotation; region borders (and future canvas-based layers) via a plain `drawImage` per canvas
+- [x] 8.2 Verify a hidden layer never appears in the downloaded PNG and a visible layer always does - verified manually for the compass and region-borders layers
 
-## 9. Download compositing (frontend)
+## 9. Spec/version housekeeping
 
-- [x] 9.1 Rewrite `downloadMap()` to draw the biome canvas plus every currently visible overlay canvas onto one offscreen canvas, in a fixed stacking order, before `toBlob` - compass composited via its on-screen rect/rotation; region borders (and future canvas-based layers) via a plain `drawImage` per canvas
-- [x] 9.2 Verify a hidden layer never appears in the downloaded PNG and a visible layer always does - verified manually for the compass and region-borders layers
-
-## 10. Spec/version housekeeping
-
-- [ ] 10.1 Bump `MapGenerator.CurrentSpecVersion` if any new response shape changes existing contracts (new endpoints alone do not require this)
-- [ ] 10.2 Update `openspec/specs/map-creation-wizard/spec.md` and add the new capability specs to `openspec/specs/` once this change is archived
+- [ ] 9.1 Bump `MapGenerator.CurrentSpecVersion` if any new response shape changes existing contracts (new endpoints alone do not require this)
+- [ ] 9.2 Update `openspec/specs/map-creation-wizard/spec.md` and add the new capability specs to `openspec/specs/` once this change is archived

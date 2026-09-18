@@ -8,8 +8,8 @@ to toggle it.
 
 #### Scenario: The layers panel lists every overlay
 - **WHEN** the layers panel is opened
-- **THEN** it lists the compass rose, rivers, each points-of-interest
-  category, region borders, and trade routes, each with its own toggle
+- **THEN** it lists the compass rose, each points-of-interest category, and
+  region borders, each with its own toggle
 
 ### Requirement: Icon legend display
 The system SHALL show the points-of-interest and compass-rose icon legend
