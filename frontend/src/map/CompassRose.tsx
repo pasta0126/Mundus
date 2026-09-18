@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { api } from "@/api/client"
-import compassIcon from "@/assets/compass.png"
+import compassIcon from "@/assets/compass-alt.png"
 
 interface CompassRoseProps {
   /** Only the seed matters - the bearing is fixed per seed, independent of pan/zoom/coordinate. */
