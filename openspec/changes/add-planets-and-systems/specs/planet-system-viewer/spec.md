@@ -101,26 +101,33 @@ custom system, with nothing saved on a server.
 - **WHEN** the person tries to add a ninth planet seed
 - **THEN** it is refused
 
-### Requirement: Copy seed and description
-Both pages SHALL let the person copy, with one control each, the seed of what
-is shown and its full description as JSON. For a planet that is its seed (its
-name) and its planetary information; for a system it is its seed and its
-configuration, including its central bodies, orbits, belt, and every planet
-in it. When a planet of a system is open, the controls SHALL copy that
-planet's seed and description. Copying SHALL give visible confirmation, and a
-clear message if the browser refuses.
+### Requirement: Copy seed and specs
+Both pages SHALL let the person copy the seed of what is shown and its full
+specifications as JSON, each with its own control: a "Copy seed" control
+placed directly below the seed, and a "Copy specs" control placed directly
+below the specifications. For a planet the specifications are its planetary
+information; for a system they are its configuration, including its central
+bodies, orbits, belt, and every planet in it. When a planet of a system is
+open, it SHALL carry its own two controls, the seed control directly below its
+name and the specs control below its sheet, and they SHALL copy that planet's
+seed and specifications. Copying SHALL give visible confirmation, and a clear
+message if the browser refuses.
 
-#### Scenario: A planet's seed and information can be copied
+#### Scenario: A planet's seed and specs can be copied
 - **WHEN** the person uses the copy controls on a planet page
-- **THEN** the planet's seed, or its full description as JSON, is on the clipboard and a confirmation is shown
+- **THEN** the planet's seed, or its full specifications as JSON, is on the clipboard and a confirmation is shown
 
-#### Scenario: A system's seed and configuration can be copied
+#### Scenario: A system's seed and specs can be copied
 - **WHEN** the person uses the copy controls on a system page
 - **THEN** the system's seed, or its full configuration with its central bodies and planets as JSON, is on the clipboard
 
+#### Scenario: Each control sits under what it copies
+- **WHEN** a planet or system page is shown
+- **THEN** the seed control is directly below the seed and the specs control is directly below the specifications
+
 #### Scenario: A planet opened from a system copies that planet
-- **WHEN** a planet of a system is open and the person uses the copy controls
-- **THEN** that planet's seed or description is copied, not the system's
+- **WHEN** a planet of a system is open and the person uses its copy controls
+- **THEN** that planet's seed or specifications are copied, not the system's
 
 #### Scenario: A refused copy is reported
 - **WHEN** the browser refuses clipboard access

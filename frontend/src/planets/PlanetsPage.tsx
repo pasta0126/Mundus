@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { randomName } from "@/lib/randomName"
-import { CopyButtons } from "./CopyButtons"
+import { CopyButton, specsText } from "./CopyButton"
 import { PlanetScene } from "./PlanetScene"
 import { PlanetSheet } from "./PlanetSheet"
 import type { PlanetDto } from "./planetTexture"
@@ -113,11 +113,12 @@ export default function PlanetsPage() {
               <Dices />
             </Button>
           </form>
+          {planet && !error && <CopyButton kind="seed" text={planet.name} />}
 
           {planet && !error && (
             <>
               <PlanetSheet planet={planet} />
-              <CopyButtons seed={planet.name} json={planet} />
+              <CopyButton kind="specs" text={specsText(planet)} />
             </>
           )}
         </div>

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import type { PlanetDto } from "./planetTexture"
 
 export const TYPE_LABELS: Record<PlanetDto["type"], string> = {
@@ -19,7 +20,8 @@ function Row({ label, value }: { label: string; value: string }) {
   )
 }
 
-export function PlanetSheet({ planet }: { planet: PlanetDto }) {
+/** `underName` sits directly below the planet's name (used for its copy-seed button). */
+export function PlanetSheet({ planet, underName }: { planet: PlanetDto; underName?: ReactNode }) {
   const atmosphere = planet.atmosphere ? (planet.atmosphere.clouds ? "Cloudy" : "Clear") : "None"
   const moons = planet.moons.length
   return (
@@ -28,6 +30,7 @@ export function PlanetSheet({ planet }: { planet: PlanetDto }) {
         <h2 className="text-lg leading-tight font-semibold">{planet.name}</h2>
         <p className="text-muted-foreground text-xs">{TYPE_LABELS[planet.type]} planet</p>
       </div>
+      {underName}
       <p className="text-sm leading-snug">{planet.description}</p>
       <dl className="space-y-1 text-xs">
         <Row label="Radius" value={`${Number(planet.radius).toFixed(1)} Earth`} />

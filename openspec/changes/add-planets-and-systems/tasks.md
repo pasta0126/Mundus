@@ -59,4 +59,4 @@
 
 ## 9. Copy seed and description
 
-- [x] 9.1 Add copy-seed and copy-JSON controls to the planet page, the system page, and an opened planet of a system, with confirmation and a refusal message
+- [x] 9.1 Add a "Copy seed" control under the seed and a "Copy specs" control under the specifications on the planet page, the system page, and an opened planet of a system, with confirmation and a refusal message

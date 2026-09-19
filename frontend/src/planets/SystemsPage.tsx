@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { randomName } from "@/lib/randomName"
-import { CopyButtons } from "./CopyButtons"
+import { CopyButton, specsText } from "./CopyButton"
 import { PlanetScene } from "./PlanetScene"
 import { PlanetSheet, TYPE_LABELS } from "./PlanetSheet"
 import { SystemScene, type SystemDto } from "./SystemScene"
@@ -201,6 +201,7 @@ export default function SystemsPage() {
               <Dices />
             </Button>
           </form>
+          {system && !error && <CopyButton kind="seed" text={system.name} />}
 
           {selectedSlot ? (
             <div className="space-y-3">
@@ -208,8 +209,8 @@ export default function SystemsPage() {
                 <ArrowLeft />
                 Back to system
               </Button>
-              <PlanetSheet planet={selectedSlot.planet} />
-              <CopyButtons seed={selectedSlot.planet.name} json={selectedSlot.planet} />
+              <PlanetSheet planet={selectedSlot.planet} underName={<CopyButton kind="seed" text={selectedSlot.planet.name} />} />
+              <CopyButton kind="specs" text={specsText(selectedSlot.planet)} />
             </div>
           ) : (
             system &&
@@ -240,7 +241,7 @@ export default function SystemsPage() {
                   {system.belt ? `Asteroid belt after planet ${system.belt.afterSlot}.` : "No asteroid belt."} Click a planet to see it up close.
                 </p>
 
-                <CopyButtons seed={system.name} json={system} />
+                <CopyButton kind="specs" text={specsText(system)} />
 
                 {editing ? (
                   <div className="space-y-2 border-t pt-3">
