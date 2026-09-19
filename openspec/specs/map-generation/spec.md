@@ -145,6 +145,17 @@ it.
   size - it can span an area comparable to the window itself, large
   enough to plausibly separate two landmasses
 
+### Requirement: Inland water and swamps are only ever large
+Ponds and puddle-sized bogs SHALL NOT appear: an `Ocean` cell with no other water within a few cells (an isolated speck, a hole in a small islet, a pond) SHALL read as `Beach`, and `Swamp` SHALL be decided from a smoothed moisture blend agreeing with the regional (base-octave) moisture, only on inland Lowland ground away from the Beach and Highland band edges, and never as a coastal-style strip. Large inland lakes SHALL be carved out of Lowland by a dedicated broad noise field that must clear its threshold at both the detailed and the regional scale, and only well inland, so every lake is a coherent basin and none is small. Each rule is a pure function of the seed and the cell's own position (and a fixed set of neighboring probe positions), never of the requested window. Changing these rules is a breaking change to `Map.SpecVersion` (16).
+
+#### Scenario: No small enclosed water or swamps
+- **WHEN** ten seeds are each generated over a 256x256 window
+- **THEN** across all of them at most a couple of enclosed `Ocean` or `Swamp` patches are smaller than 10 cells, and no enclosed `Swamp` patch has between 10 and 99 cells
+
+#### Scenario: Large inland lakes exist
+- **WHEN** thirty seeds are each generated over a wide-stride window
+- **THEN** at least one fully enclosed body of water spans a few hundred sampled cells
+
 ### Requirement: Organic, non-smooth boundary edges
 Every threshold-crossing boundary between biomes derived from the elevation field (Ocean/Beach, Beach/Lowland, and every other elevation-band edge, including any water body distinct from Ocean) and every threshold-crossing boundary between biomes derived from the moisture field (e.g. Desert/Grassland, Grassland/Forest) SHALL carry organic, ragged detail along its length, comparable in character to the domain-warped mountain/plate-boundary seams, rather than reading as a long, smooth, low-curvature arc. This applies at the finest supported sampling stride (`step = 1`) and SHALL NOT rely on speckled per-cell noise to satisfy it - the "Neighboring cells trend toward the same or adjacent biome" requirement's coherence still applies away from a boundary.
 

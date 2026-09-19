@@ -488,4 +488,87 @@ public class MapGeneratorTests
         var oceanFraction = oceanCells / (double)totalCells;
         Assert.InRange(oceanFraction, 0.05, 0.95);
     }
+
+    /// <summary>Sizes (in sampled cells) of the 4-connected patches of `target` that never touch the window's edge - i.e. are fully enclosed inside it.</summary>
+    private static List<int> EnclosedPatchSizes(Map map, Biome target, int size, int step)
+    {
+        var grid = new Biome[size, size];
+        foreach (var c in map.Cells)
+        {
+            grid[(c.X - map.OriginX) / step, (c.Y - map.OriginY) / step] = c.Biome;
+        }
+
+        var seen = new bool[size, size];
+        var sizes = new List<int>();
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                if (seen[x, y] || grid[x, y] != target) continue;
+                var count = 0;
+                var touchesEdge = false;
+                var stack = new Stack<(int X, int Y)>();
+                stack.Push((x, y));
+                seen[x, y] = true;
+                while (stack.Count > 0)
+                {
+                    var (cx, cy) = stack.Pop();
+                    count++;
+                    touchesEdge |= cx == 0 || cy == 0 || cx == size - 1 || cy == size - 1;
+                    foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+                    {
+                        var nx = cx + dx;
+                        var ny = cy + dy;
+                        if (nx < 0 || ny < 0 || nx >= size || ny >= size || seen[nx, ny] || grid[nx, ny] != target) continue;
+                        seen[nx, ny] = true;
+                        stack.Push((nx, ny));
+                    }
+                }
+
+                if (!touchesEdge) sizes.Add(count);
+            }
+        }
+
+        return sizes;
+    }
+
+    [Fact]
+    public void InlandWaterAndSwampsAreNeverSmall()
+    {
+        // Ponds and puddle-sized bogs are suppressed: what water or swamp
+        // is fully enclosed in a window is a real lake or a real swamp.
+        // A handful of stragglers at the very edge of the rules is
+        // tolerated across the whole sample; an epidemic is not.
+        var tinyWater = 0;
+        var tinySwamp = 0;
+        var midSwamp = 0;
+        for (var i = 0; i < 10; i++)
+        {
+            var map = MapGenerator.Generate($"pond-check-{i}", 0, 0, 256, 256);
+            tinyWater += EnclosedPatchSizes(map, Biome.Ocean, 256, 1).Count(n => n < 10);
+            var swamps = EnclosedPatchSizes(map, Biome.Swamp, 256, 1);
+            tinySwamp += swamps.Count(n => n < 10);
+            midSwamp += swamps.Count(n => n is >= 10 and < 100);
+        }
+
+        Assert.InRange(tinyWater, 0, 2);
+        Assert.InRange(tinySwamp, 0, 2);
+        Assert.Equal(0, midSwamp);
+    }
+
+    [Fact]
+    public void LargeInlandLakesExist()
+    {
+        // Lakes are carved from lowland on purpose: across a spread of
+        // seeds at a wide stride, some enclosed body of water must be big.
+        var biggest = 0;
+        for (var i = 0; i < 30; i++)
+        {
+            var map = MapGenerator.Generate($"lake-check-{i}", 0, 0, 256, 256, step: 4);
+            var lakes = EnclosedPatchSizes(map, Biome.Ocean, 256, 4);
+            if (lakes.Count > 0) biggest = Math.Max(biggest, lakes.Max());
+        }
+
+        Assert.True(biggest >= 300, $"largest enclosed lake was only {biggest} sampled cells");
+    }
 }

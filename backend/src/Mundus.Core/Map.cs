@@ -29,7 +29,7 @@ public sealed record Map
 /// </summary>
 public static class MapGenerator
 {
-    public const int CurrentSpecVersion = 15;
+    public const int CurrentSpecVersion = 16;
 
     /// <summary>Per-request window bound (each axis), matching the old "Huge" preset's proven-fast cost.</summary>
     public const int MaxWindowDimension = 512;
@@ -67,7 +67,7 @@ public static class MapGenerator
     /// upper bound so real coastline unevenness (where the *regional*
     /// value is also near the boundary) is left alone.
     /// </summary>
-    private const double InlandFloor = 0.48;
+    private const double InlandFloor = 0.52;
 
     /// <summary>
     /// Elevation-band boundaries (Ocean/Beach and every band above it) are
@@ -134,6 +134,45 @@ public static class MapGenerator
 
     /// <summary>How far (as a fraction of <see cref="MoistureWarpRegionScale"/>) the warp can displace a coordinate before it's handed to the moisture field for band lookup.</summary>
     private const double MoistureWarpAmplitudeFraction = 0.25;
+
+    /// <summary>
+    /// Regional (base-octave) moisture a Lowland or coastal cell needs
+    /// before a wet reading may become Swamp. Fine octaves alone can dip a
+    /// cell into "Wet" inside otherwise medium-moisture grassland, which
+    /// reads as a stray puddle-sized bog; requiring the broad climate
+    /// signal to agree keeps only swamps large enough to be a place. Same
+    /// trick as <see cref="InlandFloor"/>, applied to moisture.
+    /// </summary>
+    private const double SwampRegionalFloor = 0.62;
+
+    /// <summary>Region scale below which moisture octaves are ignored when deciding Swamp: the finest octaves are what make isolated one-cell bogs along a swamp's edge, so Swamp is read from the smoother blend.</summary>
+    private const int SwampSmoothRegionScale = 80;
+
+    /// <summary>Regional-elevation window a swamp may occupy - kept off both band edges (Beach below, Highland above), where swamp would only survive as thin strips.</summary>
+    private const double SwampElevationMin = 0.5;
+
+    private const double SwampElevationMax = 0.6;
+
+    /// <summary>
+    /// Inland lakes: broad blobs of a dedicated noise field carved out of
+    /// Lowland ground. Two octaves only, so a lake is one coherent basin
+    /// rather than a scatter of ponds, and both the detailed and the
+    /// regional (base-octave) value must clear their thresholds - a fine
+    /// bump alone never makes a lake, so none is small.
+    /// </summary>
+    private const int LakeRegionScale = 200;
+
+    private const int LakeOctaves = 2;
+
+    private const double LakeThreshold = 0.66;
+
+    private const double LakeRegionalThreshold = 0.62;
+
+    /// <summary>Regional elevation a lake needs (well inland), so lakes never crowd a coastline or read as an inlet of the sea.</summary>
+    private const double LakeInlandFloor = 0.56;
+
+    /// <summary>Distance (in cells) at which <see cref="HasWaterAt"/> looks for other water; ponds narrower than this vanish.</summary>
+    private const int PondProbeDistance = 6;
 
     private const double NoisePersistence = 0.5;
 
@@ -255,6 +294,7 @@ public static class MapGenerator
         var moistureWarpXNoise = MoistureWarpNoise(seed, step, axis: "x");
         var moistureWarpYNoise = MoistureWarpNoise(seed, step, axis: "y");
         var coastNoise = CoastNoise(seed, step);
+        var lakeNoise = LakeNoise(seed, step);
         var plateEdgeWidth = PlateRegionScale * step * PlateEdgeWidthFraction;
         var plateWarpAmplitude = PlateRegionScale * step * PlateWarpAmplitudeFraction;
         var elevationWarpAmplitude = ElevationWarpRegionScale * step * ElevationWarpAmplitudeFraction;
@@ -304,6 +344,15 @@ public static class MapGenerator
                 }
 
                 var elevationBand = BandOf(elevation, ElevationBands);
+                if (elevationBand == "Ocean"
+                    && !(HasWaterAt(elevationNoise, elevationWarpXNoise, elevationWarpYNoise, x, y, step, elevationWarpAmplitude, 1, PondNeighborDirections)
+                        && HasWaterAt(elevationNoise, elevationWarpXNoise, elevationWarpYNoise, x, y, step, elevationWarpAmplitude, PondProbeDistance, PondProbeDirections)))
+                {
+                    // An isolated pond or a one-cell speck of sea: not part
+                    // of any body of water worth a name. Read as shoreline.
+                    elevationBand = "Beach";
+                }
+
                 Biome biome;
                 if (elevationBand == "Ocean")
                 {
@@ -350,7 +399,14 @@ public static class MapGenerator
                         elevationBand = UpliftedBand(elevationBand, elevation, plateEdge);
                     }
 
-                    biome = LandBiomeAt(elevationBand, moisture);
+                    var swamp = elevationBand == "Lowland"
+                        && IsSwamp(moistureNoise, warpedMoistureX, warpedMoistureY, step)
+                        && elevationNoise.Sample(warpedElevationX, warpedElevationY, minRegionScale: ElevationRegionScale * step) is >= SwampElevationMin and < SwampElevationMax;
+                    biome = LandBiomeAt(elevationBand, moisture, swamp);
+                    if (elevationBand == "Lowland" && IsLake(lakeNoise, elevationNoise, x, y, warpedElevationX, warpedElevationY, step))
+                    {
+                        biome = Biome.Ocean;
+                    }
                 }
 
                 cells.Add(new Cell { X = x, Y = y, Biome = biome });
@@ -423,6 +479,14 @@ public static class MapGenerator
         return BandOf(elevation, ElevationBands);
     }
 
+    /// <summary>
+    /// The biome at one coordinate - exactly what <see cref="Generate"/>
+    /// would report for that cell (a cell's biome is a pure function of
+    /// seed, position and step), without building a whole window. Exposed
+    /// for overlays (points of interest) that place things by biome.
+    /// </summary>
+    public static Biome BiomeAt(string seed, int x, int y, int step = 1) => Generate(seed, x, y, 1, 1, step).Cells[0].Biome;
+
     /// <summary>Whether the elevation band at a coordinate is Ocean - see <see cref="ElevationBandAt"/>.</summary>
     public static bool IsOceanAt(string seed, int x, int y, int step = 1) => ElevationBandAt(seed, x, y, step) == "Ocean";
 
@@ -483,6 +547,71 @@ public static class MapGenerator
         new($"{seed}:coast", CoastRegionScale * step, CoastOctaves, NoisePersistence);
 
     /// <summary>
+    /// Swamp is read only from the smooth blend of moisture (octaves finer
+    /// than <see cref="SwampSmoothRegionScale"/> ignored) agreeing with the
+    /// regional signal - the detailed value would fringe every swamp with
+    /// one-cell bogs. Whether a cell sits in a swamp is therefore as
+    /// coherent as a broad blob, never a speck.
+    /// </summary>
+    private static bool IsSwamp(InfiniteValueNoise2D moistureNoise, int x, int y, int step) =>
+        moistureNoise.Sample(x, y, minRegionScale: SwampSmoothRegionScale * step) >= MoistureBands[1].UpperBound
+        && moistureNoise.Sample(x, y, minRegionScale: MoistureRegionScale * step) >= SwampRegionalFloor;
+
+    /// <summary>
+    /// Whether some other cell `distance` cells away (in one of
+    /// `directions`) is Ocean too. <see cref="Generate"/> asks twice: the
+    /// four adjacent cells (a hole in an islet has none) and eight probes
+    /// <see cref="PondProbeDistance"/> out (a pond has none) - true for open
+    /// sea, bays and every real coastline. Pure per cell: each probe
+    /// re-derives the same elevation lookup <see cref="Generate"/> does, so
+    /// the answer never depends on the requested window. Stops at the first
+    /// probe that finds water, so the deep sea (nearly every Ocean cell)
+    /// costs one or two extra samples per question.
+    /// </summary>
+    private static bool HasWaterAt(InfiniteValueNoise2D elevationNoise, InfiniteValueNoise2D warpXNoise, InfiniteValueNoise2D warpYNoise, int x, int y, int step, double warpAmplitude, int distance, (int X, int Y)[] directions)
+    {
+        var reach = distance * step;
+        foreach (var (dx, dy) in directions)
+        {
+            var (wx, wy) = WarpedCoordinate(warpXNoise, warpYNoise, x + (dx * reach), y + (dy * reach), step, warpAmplitude);
+            var elevation = elevationNoise.Sample(wx, wy, step);
+            if (elevation >= ElevationBands[0].UpperBound)
+            {
+                continue;
+            }
+
+            // Same "clearly inland" suppression the main lookup applies.
+            if (elevation < InlandFloor && elevationNoise.Sample(wx, wy, minRegionScale: ElevationRegionScale * step) >= InlandFloor)
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private static readonly (int X, int Y)[] PondNeighborDirections = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+
+    private static readonly (int X, int Y)[] PondProbeDirections = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)];
+
+    private static InfiniteValueNoise2D LakeNoise(string seed, int step) =>
+        new($"{seed}:lake", LakeRegionScale * step, LakeOctaves, NoisePersistence);
+
+    /// <summary>Whether a Lowland cell is carved into an inland lake - see <see cref="LakeThreshold"/>.</summary>
+    private static bool IsLake(InfiniteValueNoise2D lakeNoise, InfiniteValueNoise2D elevationNoise, int x, int y, int warpedX, int warpedY, int step)
+    {
+        if (lakeNoise.Sample(x, y, step) < LakeThreshold)
+        {
+            return false;
+        }
+
+        return lakeNoise.Sample(x, y, minRegionScale: LakeRegionScale * step) >= LakeRegionalThreshold
+            && elevationNoise.Sample(warpedX, warpedY, minRegionScale: ElevationRegionScale * step) >= LakeInlandFloor;
+    }
+
+    /// <summary>
     /// Promotes an elevated cell's band to "Peak" if it sits on a plate
     /// seam (thrust up into a mountain range), or demotes an already-Peak
     /// cell away from one back to "Highland" (a plateau, not a jagged
@@ -506,7 +635,7 @@ public static class MapGenerator
     }
 
     /// <summary>Biome for a non-Ocean, non-Beach elevation band, by moisture.</summary>
-    private static Biome LandBiomeAt(string elevationBand, double moisture)
+    private static Biome LandBiomeAt(string elevationBand, double moisture, bool swamp)
     {
         var moistureBand = BandOf(moisture, MoistureBands);
         return elevationBand switch
@@ -515,8 +644,7 @@ public static class MapGenerator
             "Lowland" => moistureBand switch
             {
                 "Dry" => Biome.Desert,
-                "Medium" => Biome.Grassland,
-                _ => Biome.Swamp,
+                _ => swamp ? Biome.Swamp : Biome.Grassland,
             },
             // "Highland"
             _ => moistureBand switch
@@ -549,8 +677,7 @@ public static class MapGenerator
             return moistureBand switch
             {
                 "Dry" => Biome.Desert,
-                "Medium" => Biome.Grassland,
-                _ => Biome.Swamp,
+                _ => Biome.Grassland,
             };
         }
 
