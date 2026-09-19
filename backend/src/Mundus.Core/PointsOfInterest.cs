@@ -47,15 +47,23 @@ public sealed record PointsOfInterest
 /// </summary>
 public static class PointOfInterestGenerator
 {
-    /// <summary>One lattice per category. Order and numbers are part of the frozen determinism contract - only ever append.</summary>
-    private static readonly (string Category, int BlockSize, double Density, int Tries)[] Layers =
+    /// <summary>
+    /// One lattice per category. Order and numbers are part of the frozen determinism contract - only ever append.
+    /// `Reference` is the total icon weight a spot needs to be always kept: a
+    /// spot whose valid icons weigh less is kept only in proportion, so a
+    /// biome offering nothing but rare icons stays sparse instead of every
+    /// block filling up with the one rare icon it has. 0 means no scaling.
+    /// </summary>
+    private static readonly (string Key, string Category, int BlockSize, double Density, int Tries, int Reference, bool SeekCoast)[] Layers =
     [
-        (PointOfInterestCatalog.Relief, 110, 0.7, 12),
-        (PointOfInterestCatalog.Nature, 180, 0.55, 8),
-        (PointOfInterestCatalog.Sea, 200, 0.5, 5),
-        (PointOfInterestCatalog.Settlements, 420, 0.55, 6),
-        (PointOfInterestCatalog.Heritage, 340, 0.4, 6),
-        (PointOfInterestCatalog.Legends, 520, 0.3, 8),
+        (PointOfInterestCatalog.Relief, PointOfInterestCatalog.Relief, 110, 0.9, 12, 100, false),
+        (PointOfInterestCatalog.Nature, PointOfInterestCatalog.Nature, 150, 0.9, 8, 100, false),
+        (PointOfInterestCatalog.Sea, PointOfInterestCatalog.Sea, 170, 0.8, 5, 100, false),
+        (PointOfInterestCatalog.Settlements, PointOfInterestCatalog.Settlements, 420, 0.55, 6, 0, false),
+        (PointOfInterestCatalog.Heritage, PointOfInterestCatalog.Heritage, 300, 0.6, 6, 35, false),
+        (PointOfInterestCatalog.Legends, PointOfInterestCatalog.Legends, 520, 0.45, 8, 20, false),
+        // Lighthouses, islet beacons and piers need a cape, an islet or a shore - spots a random point almost never lands on, so this lattice walks rays out from each candidate until it meets a shoreline.
+        ("coast", PointOfInterestCatalog.Settlements, 260, 0.15, 8, 0, true),
     ];
 
     public static IReadOnlyList<string> Categories { get; } = PointOfInterestCatalog.Categories.Select(c => c.Id).ToList();
@@ -78,7 +86,7 @@ public static class PointOfInterestGenerator
     private const int CoastReach = 8;
     private const int WatersideReach = 10;
     private const int CapeReach = 12;
-    private const int IsletReach = 12;
+    private const int IsletReach = 10;
     private const int NearCoastReach = 45;
     private const int OpenSeaReach = 50;
 
@@ -124,7 +132,7 @@ public static class PointOfInterestGenerator
         var probe = new BiomeProbe(seed, step);
 
         var points = new List<PointOfInterest>();
-        foreach (var (cat, blockSize, density, tries) in Layers)
+        foreach (var (key, cat, blockSize, density, tries, reference, seekCoast) in Layers)
         {
             if (category is not null && category != cat)
             {
@@ -142,20 +150,24 @@ public static class PointOfInterestGenerator
             var maxBlockX = FloorDiv(maxX + reach, block);
             var minBlockY = FloorDiv(minY - reach, block);
             var maxBlockY = FloorDiv(maxY + reach, block);
-            var entries = PointOfInterestCatalog.InCategory(cat).Where(e => e.Kind != PoiKind.Service).ToList();
+            var entries = PointOfInterestCatalog.InCategory(cat)
+                .Where(e => e.Kind != PoiKind.Service && (e.Placement is Placement.Cape or Placement.Islet or Placement.Coast) == seekCoast)
+                .ToList();
             for (var by = minBlockY; by <= maxBlockY; by++)
             {
                 for (var bx = minBlockX; bx <= maxBlockX; bx++)
                 {
                     // Each block gets its own stream, so what one block decides
                     // never depends on the window or on any other block.
-                    var rng = new Rng($"{seed}:poi-{cat}:{bx}:{by}");
+                    var rng = new Rng($"{seed}:poi-{key}:{bx}:{by}");
                     if (rng.Float() >= density)
                     {
                         continue;
                     }
 
-                    var placed = TryPlace(rng, probe, entries, bx, by, block, tries, step);
+                    var placed = seekCoast
+                        ? TryPlaceOnShore(rng, probe, entries, bx, by, block, tries, step)
+                        : TryPlace(rng, probe, entries, bx, by, block, tries, reference, step);
                     if (placed is null)
                     {
                         continue;
@@ -183,8 +195,8 @@ public static class PointOfInterestGenerator
         };
     }
 
-    /// <summary>Try a few jittered positions and keep the first whose biome and terrain suit some icon - lets rare-terrain categories still show up, and stays a pure function of the block.</summary>
-    private static (int X, int Y, PoiEntry Entry, Biome Biome)? TryPlace(Rng rng, BiomeProbe probe, IReadOnlyList<PoiEntry> entries, int bx, int by, int block, int tries, int step)
+    /// <summary>Try a few jittered positions and keep the first whose biome and terrain suit some icon - lets rare-terrain categories still show up, and stays a pure function of the block. Five draws per attempt, always, so the stream never depends on what happened.</summary>
+    private static (int X, int Y, PoiEntry Entry, Biome Biome)? TryPlace(Rng rng, BiomeProbe probe, IReadOnlyList<PoiEntry> entries, int bx, int by, int block, int tries, int reference, int step)
     {
         for (var attempt = 0; attempt < tries; attempt++)
         {
@@ -193,6 +205,7 @@ public static class PointOfInterestGenerator
             var ty = (int)((by + 0.15 + (rng.Float() * 0.7)) * block);
             var tierPick = rng.Float();
             var pick = rng.Float();
+            var keep = rng.Float();
 
             var biome = probe.At(tx, ty);
             var placementOk = new Dictionary<Placement, bool>();
@@ -210,10 +223,82 @@ public static class PointOfInterestGenerator
                 continue;
             }
 
+            // A spot that suits some icon but only rare ones is kept in
+            // proportion to their weight; a spot turned down ends the block
+            // (retrying elsewhere would refill it with the same rare icon).
+            if (reference > 0 && keep >= suitable.Sum(e => e.Weight) / (double)reference)
+            {
+                return null;
+            }
+
             var chosen = suitable.Any(e => e.Kind == PoiKind.Anchor)
                 ? PickAnchor(suitable, tierPick, pick)
                 : WeightedPick(suitable, e => e.Weight, pick);
             return (tx, ty, chosen, biome);
+        }
+
+        return null;
+    }
+
+    /// <summary>How far, in strides, a shoreline search walks before giving up, and how long a stride is (cells at step 1).</summary>
+    private const int ShoreSteps = 80;
+
+    private const int ShoreStride = 3;
+
+    /// <summary>
+    /// Like <see cref="TryPlace"/> but each attempt walks a ray out from a
+    /// jittered start until land turns to sea (or sea to land), then tries
+    /// the last few cells on the land side - where capes, islets and shores
+    /// are. Six draws per attempt, always.
+    /// </summary>
+    private static (int X, int Y, PoiEntry Entry, Biome Biome)? TryPlaceOnShore(Rng rng, BiomeProbe probe, IReadOnlyList<PoiEntry> entries, int bx, int by, int block, int tries, int step)
+    {
+        for (var attempt = 0; attempt < tries; attempt++)
+        {
+            var tx = (int)((bx + 0.15 + (rng.Float() * 0.7)) * block);
+            var ty = (int)((by + 0.15 + (rng.Float() * 0.7)) * block);
+            var direction = Compass[rng.Int(0, Compass.Length - 1)];
+            var tierPick = rng.Float();
+            var pick = rng.Float();
+            rng.Float(); // the sixth draw, kept so every attempt consumes the same amount
+
+            var stride = ShoreStride * step;
+            var startedOnLand = probe.IsLand(tx, ty);
+            var crossing = 0;
+            for (var k = 1; k <= ShoreSteps; k++)
+            {
+                if (probe.IsLand(tx + (direction.X * stride * k), ty + (direction.Y * stride * k)) != startedOnLand)
+                {
+                    crossing = k;
+                    break;
+                }
+            }
+
+            if (crossing == 0)
+            {
+                continue;
+            }
+
+            // Land side of the crossing: coming from land it is the step before; from sea, the step after and a few beyond (an islet's middle).
+            var spots = startedOnLand ? new[] { crossing - 1, crossing - 2, crossing - 3 } : new[] { crossing, crossing + 1, crossing + 2 };
+            foreach (var k in spots)
+            {
+                var x = tx + (direction.X * stride * k);
+                var y = ty + (direction.Y * stride * k);
+                if (!probe.IsLand(x, y))
+                {
+                    continue;
+                }
+
+                var biome = probe.At(x, y);
+                var placementOk = new Dictionary<Placement, bool>();
+                var suitable = entries.Where(e => e.Biomes.Contains(biome) && PlacementHolds(probe, e.Placement, x, y, step, placementOk)).ToList();
+                if (suitable.Count > 0)
+                {
+                    // A cape or islet is a hard-won spot: when one is found, favor the beacon it suits over the pier any shore also suits.
+                    return (x, y, WeightedPick(suitable, e => e.Placement is Placement.Cape or Placement.Islet ? e.Weight * 6 : e.Weight, pick), biome);
+                }
+            }
         }
 
         return null;
@@ -315,7 +400,7 @@ public static class PointOfInterestGenerator
             Placement.Coast => probe.IsLand(x, y) && probe.WaterAt(x, y, CoastReach * step, Cardinal) >= 1,
             Placement.Waterside => probe.IsLand(x, y) && (probe.WaterAt(x, y, WatersideReach * step, Compass) >= 1 || probe.WaterAt(x, y, WatersideReach * step / 2, Compass) >= 1),
             Placement.Cape => probe.IsLand(x, y) && probe.WaterAt(x, y, CapeReach * step, Cardinal) >= 3,
-            Placement.Islet => probe.IsLand(x, y) && probe.WaterAt(x, y, IsletReach * step, Compass) == Compass.Length,
+            Placement.Islet => probe.IsLand(x, y) && probe.WaterAt(x, y, IsletReach * step, Compass) >= Compass.Length - 1,
             Placement.Lake => probe.IsWater(x, y) && IsLake(probe, x, y, step),
             Placement.NearCoast => probe.IsWater(x, y) && probe.LandAt(x, y, NearCoastReach * step, Compass) >= 1,
             Placement.OpenSea => probe.IsWater(x, y) && probe.LandAt(x, y, OpenSeaReach * step, Compass) == 0 && probe.LandAt(x, y, OpenSeaReach * step * 2, Compass) == 0,

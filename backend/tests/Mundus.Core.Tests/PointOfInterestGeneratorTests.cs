@@ -175,7 +175,7 @@ public class PointOfInterestGeneratorTests
                     Assert.True(Water(12 * Step, Cardinal) >= 3, $"{p.Type} at ({p.X},{p.Y}) in {seed} is not on a cape");
                     break;
                 case Placement.Islet:
-                    Assert.Equal(Compass.Length, Water(12 * Step, Compass));
+                    Assert.True(Water(10 * Step, Compass) >= Compass.Length - 1, $"{p.Type} at ({p.X},{p.Y}) in {seed} is not on an islet");
                     break;
                 case Placement.NearCoast:
                     Assert.True(Land(45 * Step, Compass) >= 1, $"{p.Type} at ({p.X},{p.Y}) in {seed} is far from any coast");
@@ -241,6 +241,29 @@ public class PointOfInterestGeneratorTests
             .Sum(e => counts.GetValueOrDefault(e.Id));
         var exceptional = PointOfInterestCatalog.Entries.Where(e => e.Rarity == Rarity.Exceptional).Sum(e => counts.GetValueOrDefault(e.Id));
         Assert.True(common > exceptional * 3, $"common={common} exceptional={exceptional}");
+    }
+
+    [Fact]
+    public void NoIconDominatesItsCategory()
+    {
+        // Balance guard: a biome offering only one icon must not let it flood a whole category.
+        var points = ManyPoints(200).Select(s => s.Point).ToList();
+        foreach (var category in new[] { PointOfInterestCatalog.Relief, PointOfInterestCatalog.Nature, PointOfInterestCatalog.Sea, PointOfInterestCatalog.Heritage })
+        {
+            var inCategory = points.Where(p => p.Category == category).ToList();
+            Assert.NotEmpty(inCategory);
+            var top = inCategory.GroupBy(p => p.Type).OrderByDescending(g => g.Count()).First();
+            Assert.True(top.Count() <= inCategory.Count * 0.45, $"{top.Key} is {top.Count()} of {inCategory.Count} {category} icons");
+        }
+    }
+
+    [Fact]
+    public void ShoreIconsDoAppear()
+    {
+        // Capes, islets and shores are found by a dedicated shoreline search; without it these would never show up.
+        var types = ManyPoints(300).Select(s => s.Point.Type).ToHashSet();
+        Assert.Contains("lighthouse", types);
+        Assert.Contains("dock", types);
     }
 
     [Fact]

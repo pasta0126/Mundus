@@ -55,7 +55,7 @@ public enum Placement
     /// <summary>Land jutting into the sea - ocean on at least three sides.</summary>
     Cape,
 
-    /// <summary>Land surrounded by sea on every side - an islet.</summary>
+    /// <summary>Land surrounded by sea - an islet (sea in at least seven of the eight directions).</summary>
     Islet,
 
     /// <summary>Water enclosed by land on every side - a lake, not a sea.</summary>
@@ -152,9 +152,9 @@ public static class PointOfInterestCatalog
         Entry("mountain-peak", "Mountain peak", "A lone, snow-capped summit", Relief, PoiKind.Terrain, Rarity.Common, Mountain),
         Entry("mountain-range", "Mountain range", "A chain of high peaks", Relief, PoiKind.Terrain, Rarity.Common, Mountain),
         Entry("volcano", "Volcano", "A smoking, lava-filled crater", Relief, PoiKind.Terrain, Rarity.Rare, [Biome.Mountains]),
-        Entry("cave", "Cave", "A dark opening in the rock", Relief, PoiKind.Terrain, Rarity.Uncommon, [Biome.Mountains, Biome.Tundra, Biome.Forest]),
+        Entry("cave", "Cave", "A dark opening in the rock", Relief, PoiKind.Terrain, Rarity.Uncommon, [Biome.Mountains, Biome.Tundra]),
         Entry("canyon", "Canyon", "A river carving through red rock", Relief, PoiKind.Terrain, Rarity.Rare, [Biome.Desert, Biome.Tundra]),
-        Entry("mesa", "Mesa", "Flat-topped rock towers", Relief, PoiKind.Terrain, Rarity.Uncommon, Dry),
+        Entry("mesa", "Mesa", "Flat-topped rock towers", Relief, PoiKind.Terrain, Rarity.Rare, Dry),
         Entry("waterfall", "Waterfall", "Water tumbling down a cliff", Relief, PoiKind.Terrain, Rarity.Rare, [Biome.Mountains, Biome.Forest, Biome.Rainforest]),
         Entry("ice-cavern", "Ice cavern", "A frozen hollow of blue ice", Relief, PoiKind.Terrain, Rarity.Rare, Cold),
         Entry("crystals", "Crystal outcrop", "Purple crystals breaking through the rock", Relief, PoiKind.Terrain, Rarity.Rare, [Biome.Mountains, Biome.Desert]),
@@ -170,10 +170,10 @@ public static class PointOfInterestCatalog
         Entry("great-tree", "Great tree", "A colossal tree older than the kingdoms", Nature, PoiKind.Terrain, Rarity.Rare, [Biome.Forest, Biome.Rainforest, Biome.Grassland]),
         Entry("mushrooms", "Giant mushrooms", "A grove of towering fungi", Nature, PoiKind.Terrain, Rarity.Rare, [Biome.Forest, Biome.Rainforest, Biome.Swamp]),
         Entry("fossil", "Fossil bed", "Bones of something enormous", Nature, PoiKind.Terrain, Rarity.Rare, [Biome.Desert, Biome.Tundra]),
-        Entry("deer", "Deer", "Game roaming the wild", Nature, PoiKind.Terrain, Rarity.Uncommon, [Biome.Forest, Biome.Grassland, Biome.Tundra]),
+        Entry("deer", "Deer", "Game roaming the wild", Nature, PoiKind.Terrain, Rarity.Rare, [Biome.Forest, Biome.Grassland, Biome.Tundra]),
 
         // -- Sea & islands -----------------------------------------------------
-        Entry("island", "Island", "A lone palm island", Sea, PoiKind.Terrain, Rarity.Common, OpenWater, Placement.NearCoast),
+        Entry("island", "Island", "A lone palm island", Sea, PoiKind.Terrain, Rarity.Uncommon, OpenWater, Placement.NearCoast),
         Entry("palm-islands", "Palm islands", "Sandy islets under palms", Sea, PoiKind.Terrain, Rarity.Uncommon, OpenWater, Placement.NearCoast),
         Entry("archipelago", "Archipelago", "A scatter of green islets", Sea, PoiKind.Terrain, Rarity.Uncommon, OpenWater, Placement.NearCoast),
         Entry("sea-stacks", "Sea stacks", "Rocks rising from the waves", Sea, PoiKind.Terrain, Rarity.Rare, OpenWater, Placement.NearCoast),
@@ -190,11 +190,12 @@ public static class PointOfInterestCatalog
         Entry("watchtower", "Watchtower", "A wooden lookout", Settlements, PoiKind.Anchor, Rarity.Uncommon, [Biome.Grassland, Biome.Tundra, Biome.Desert], tier: SettlementTier.Point),
         Entry("watchtower-forest", "Forest watchtower", "A lookout above the canopy", Settlements, PoiKind.Anchor, Rarity.Uncommon, Woods, tier: SettlementTier.Point),
         Entry("tower-stone", "Stone tower", "A lone fortified tower", Settlements, PoiKind.Anchor, Rarity.Uncommon, [Biome.Grassland, Biome.Tundra, Biome.Mountains, Biome.Desert], tier: SettlementTier.Point),
-        Entry("lighthouse", "Lighthouse", "A beacon on a headland", Settlements, PoiKind.Anchor, Rarity.Rare, [Biome.Beach, Biome.Mountains, Biome.Grassland], Placement.Cape, SettlementTier.Point),
-        Entry("sea-lighthouse", "Island lighthouse", "A beacon on a rock in the waves", Settlements, PoiKind.Anchor, Rarity.Rare, [Biome.Beach, Biome.Mountains, Biome.Grassland], Placement.Islet, SettlementTier.Point),
+        Entry("lighthouse", "Lighthouse", "A beacon on a headland", Settlements, PoiKind.Anchor, Rarity.Rare, Land, Placement.Cape, SettlementTier.Point),
+        Entry("sea-lighthouse", "Island lighthouse", "A beacon on a rock in the waves", Settlements, PoiKind.Anchor, Rarity.Rare, Land, Placement.Islet, SettlementTier.Point),
         Entry("mine", "Mine", "A timbered shaft into the hill", Settlements, PoiKind.Anchor, Rarity.Uncommon, [Biome.Mountains, Biome.Tundra], tier: SettlementTier.Point),
         Entry("pickaxe", "Quarry", "Ore and stone being worked", Settlements, PoiKind.Anchor, Rarity.Uncommon, [Biome.Mountains, Biome.Tundra], tier: SettlementTier.Point),
         Entry("mine-cart", "Mining camp", "Carts laden with gold", Settlements, PoiKind.Anchor, Rarity.Uncommon, [Biome.Mountains, Biome.Desert], tier: SettlementTier.Point),
+        Entry("dock", "Pier", "A wooden pier and its fishing berths", Settlements, PoiKind.Anchor, Rarity.Uncommon, [Biome.Beach, Biome.Grassland, Biome.Forest], Placement.Coast, SettlementTier.Point),
         Entry("cottage", "Cottage", "A lone thatched house", Settlements, PoiKind.Anchor, Rarity.Common, Homeland, tier: SettlementTier.Point),
         Entry("farm", "Farmstead", "A farm with its silo and fences", Settlements, PoiKind.Anchor, Rarity.Common, Plains, tier: SettlementTier.Point),
 
@@ -203,8 +204,8 @@ public static class PointOfInterestCatalog
         Entry("chapel-village", "Town", "A market town with its church", Settlements, PoiKind.Anchor, Rarity.Common, Fertile, tier: SettlementTier.Medium),
         Entry("castle-town", "City", "A walled city of red roofs", Settlements, PoiKind.Anchor, Rarity.Common, [Biome.Grassland, Biome.Beach], tier: SettlementTier.Large),
         Entry("gatehouse", "Fortified city", "A city behind a great gatehouse", Settlements, PoiKind.Anchor, Rarity.Uncommon, [Biome.Grassland, Biome.Tundra], tier: SettlementTier.Large),
-        Entry("palace", "Capital", "A royal capital with its palace", Settlements, PoiKind.Anchor, Rarity.Common, Plains, tier: SettlementTier.Huge),
-        Entry("capitol-dome", "Grand capital", "A capital crowned by a golden dome", Settlements, PoiKind.Anchor, Rarity.Uncommon, Plains, tier: SettlementTier.Huge),
+        Entry("palace", "Capital", "A royal capital with its palace", Settlements, PoiKind.Anchor, Rarity.Common, [Biome.Grassland, Biome.Beach], tier: SettlementTier.Huge),
+        Entry("capitol-dome", "Grand capital", "A capital crowned by a golden dome", Settlements, PoiKind.Anchor, Rarity.Uncommon, [Biome.Grassland, Biome.Beach], tier: SettlementTier.Huge),
 
         // -- Settlements: services ---------------------------------------------
         Entry("tavern", "Tavern", "Ale, beds and rumours", Settlements, PoiKind.Service, Rarity.Common, Land),
@@ -213,7 +214,6 @@ public static class PointOfInterestCatalog
         Entry("stable", "Stable", "Horses for hire", Settlements, PoiKind.Service, Rarity.Common, Land),
         Entry("market", "Market", "Stalls and traders", Settlements, PoiKind.Service, Rarity.Common, Land),
         Entry("watermill", "Watermill", "A mill on a stream", Settlements, PoiKind.Service, Rarity.Uncommon, Land, Placement.Waterside),
-        Entry("dock", "Docks", "Berths for boats", Settlements, PoiKind.Service, Rarity.Common, Land, Placement.Coast),
         Entry("sailboat", "Harbor", "Sailing boats at anchor", Settlements, PoiKind.Service, Rarity.Common, Land, Placement.Coast),
         Entry("stone-bridge", "Bridge", "A stone bridge over the water", Settlements, PoiKind.Service, Rarity.Uncommon, Land, Placement.Waterside),
         Entry("temple", "Temple", "A house of the gods", Settlements, PoiKind.Service, Rarity.Common, Land),
@@ -247,8 +247,8 @@ public static class PointOfInterestCatalog
         Entry("dark-crystals", "Dark crystals", "Corrupted crystals humming with power", Legends, PoiKind.Singular, Rarity.Exceptional, [Biome.Tundra, Biome.Snow, Biome.Swamp, Biome.Mountains]),
         Entry("crystal-cave", "Crystal cave", "A cavern lined with glowing crystal", Legends, PoiKind.Singular, Rarity.Rare, Mountain),
         Entry("floating-island", "Floating island", "A castle drifting on the clouds", Legends, PoiKind.Singular, Rarity.Exceptional, Land),
-        Entry("treasure", "Treasure", "Riches lost or buried", Legends, PoiKind.Singular, Rarity.Rare, Land),
-        Entry("balloon", "Balloon", "A hot-air balloon adrift", Legends, PoiKind.Singular, Rarity.Rare, [Biome.Grassland, Biome.Desert, Biome.Beach]),
+        Entry("treasure", "Treasure", "Riches lost or buried", Legends, PoiKind.Singular, Rarity.Exceptional, Land),
+        Entry("balloon", "Balloon", "A hot-air balloon adrift", Legends, PoiKind.Singular, Rarity.Exceptional, Plains),
     ];
 
     /// <summary>What each core size contains: the icons that cluster around its anchor. Ordered small to huge.</summary>

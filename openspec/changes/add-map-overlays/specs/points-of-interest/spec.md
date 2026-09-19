@@ -37,6 +37,23 @@ exceptional ones.
 - **WHEN** many seeds are generated
 - **THEN** common non-settlement icons outnumber exceptional ones by a wide margin
 
+### Requirement: Balanced frequencies
+A place whose biome offers only rare icons SHALL stay sparse rather than
+filling with the one rare icon it has: a candidate spot is kept in
+proportion to the total rarity weight of the icons valid there (up to a
+per-category reference weight), so no single icon dominates its category.
+Icons that depend on rare geometry - lighthouses on capes, beacons on
+islets, piers on shores - SHALL still appear, found by a dedicated
+shoreline search rather than left to chance.
+
+#### Scenario: No icon dominates its category
+- **WHEN** many seeds are generated
+- **THEN** no single icon accounts for more than 45% of the relief, nature, sea or monuments icons
+
+#### Scenario: Shore icons appear
+- **WHEN** many seeds are generated
+- **THEN** lighthouses and piers are among the points found
+
 ### Requirement: Deterministic point-of-interest placement
 Given a seed, the set of points of interest (their category, icon type, role
 and coordinate) SHALL be byte-identical on every invocation, on any machine,
