@@ -56,3 +56,7 @@
 - [x] 8.1 Verify all new user-facing text is English and the map page is unchanged
 - [x] 8.2 Run backend tests and the frontend build and lint
 - [x] 8.3 Bump the semver in `package.json` and tag the commit `vX.Y.Z` per the versioning workflow
+
+## 9. Copy seed and description
+
+- [x] 9.1 Add copy-seed and copy-JSON controls to the planet page, the system page, and an opened planet of a system, with confirmation and a refusal message

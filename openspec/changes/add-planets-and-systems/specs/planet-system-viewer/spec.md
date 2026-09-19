@@ -101,6 +101,31 @@ custom system, with nothing saved on a server.
 - **WHEN** the person tries to add a ninth planet seed
 - **THEN** it is refused
 
+### Requirement: Copy seed and description
+Both pages SHALL let the person copy, with one control each, the seed of what
+is shown and its full description as JSON. For a planet that is its seed (its
+name) and its planetary information; for a system it is its seed and its
+configuration, including its central bodies, orbits, belt, and every planet
+in it. When a planet of a system is open, the controls SHALL copy that
+planet's seed and description. Copying SHALL give visible confirmation, and a
+clear message if the browser refuses.
+
+#### Scenario: A planet's seed and information can be copied
+- **WHEN** the person uses the copy controls on a planet page
+- **THEN** the planet's seed, or its full description as JSON, is on the clipboard and a confirmation is shown
+
+#### Scenario: A system's seed and configuration can be copied
+- **WHEN** the person uses the copy controls on a system page
+- **THEN** the system's seed, or its full configuration with its central bodies and planets as JSON, is on the clipboard
+
+#### Scenario: A planet opened from a system copies that planet
+- **WHEN** a planet of a system is open and the person uses the copy controls
+- **THEN** that planet's seed or description is copied, not the system's
+
+#### Scenario: A refused copy is reported
+- **WHEN** the browser refuses clipboard access
+- **THEN** a message says the copy did not work
+
 ### Requirement: Loading and error feedback
 The pages SHALL show progress while a planet or system is being fetched and a
 clear message if fetching fails, so the person is never left without an

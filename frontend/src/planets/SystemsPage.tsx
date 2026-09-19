@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { randomName } from "@/lib/randomName"
+import { CopyButtons } from "./CopyButtons"
 import { PlanetScene } from "./PlanetScene"
 import { PlanetSheet, TYPE_LABELS } from "./PlanetSheet"
 import { SystemScene, type SystemDto } from "./SystemScene"
@@ -208,6 +209,7 @@ export default function SystemsPage() {
                 Back to system
               </Button>
               <PlanetSheet planet={selectedSlot.planet} />
+              <CopyButtons seed={selectedSlot.planet.name} json={selectedSlot.planet} />
             </div>
           ) : (
             system &&
@@ -237,6 +239,8 @@ export default function SystemsPage() {
                 <p className="text-muted-foreground text-xs">
                   {system.belt ? `Asteroid belt after planet ${system.belt.afterSlot}.` : "No asteroid belt."} Click a planet to see it up close.
                 </p>
+
+                <CopyButtons seed={system.name} json={system} />
 
                 {editing ? (
                   <div className="space-y-2 border-t pt-3">
