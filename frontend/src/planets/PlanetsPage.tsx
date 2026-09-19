@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { randomName } from "@/lib/randomName"
-import { CopyButton, specsText } from "./CopyButton"
+import { CopyButton } from "./CopyButton"
 import { PlanetScene } from "./PlanetScene"
 import { PlanetSheet } from "./PlanetSheet"
 import type { PlanetDto } from "./planetTexture"
+import { planetSpecsText } from "./specs"
 
 function seedFromUrl(): string {
   return new URLSearchParams(window.location.search).get("seed")?.trim() ?? ""
@@ -118,7 +119,7 @@ export default function PlanetsPage() {
           {planet && !error && (
             <>
               <PlanetSheet planet={planet} />
-              <CopyButton kind="specs" text={specsText(planet)} />
+              <CopyButton kind="specs" text={planetSpecsText(planet)} />
             </>
           )}
         </div>

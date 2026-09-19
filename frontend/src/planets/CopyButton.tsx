@@ -6,8 +6,8 @@ type State = "idle" | "copied" | "failed"
 
 /**
  * A full-width button that copies `text` and says so. It belongs directly
- * below the thing it copies: "seed" under a seed, "specs" (the full
- * description as pretty-printed JSON) under the specifications.
+ * below the thing it copies: "seed" under a seed, "specs" (the
+ * specifications as pretty-printed JSON, see specs.ts) under them.
  */
 export function CopyButton({ kind, text }: { kind: "seed" | "specs"; text: string }) {
   const [state, setState] = useState<State>("idle")
@@ -31,9 +31,4 @@ export function CopyButton({ kind, text }: { kind: "seed" | "specs"; text: strin
       {label}
     </Button>
   )
-}
-
-/** The full description of a planet or system, ready to paste. */
-export function specsText(description: unknown): string {
-  return JSON.stringify(description, null, 2)
 }

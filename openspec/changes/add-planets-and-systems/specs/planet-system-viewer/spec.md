@@ -107,7 +107,10 @@ specifications as JSON, each with its own control: a "Copy seed" control
 placed directly below the seed, and a "Copy specs" control placed directly
 below the specifications. For a planet the specifications are its planetary
 information; for a system they are its configuration, including its central
-bodies, orbits, belt, and every planet in it. When a planet of a system is
+bodies, orbits, belt, and every planet in it. The specifications SHALL
+leave out details that exist only to draw a planet (its surface features and
+texture seed) and anything repeated inside them (a system's slot does not
+repeat its planet's seed, which its planet already carries). When a planet of a system is
 open, it SHALL carry its own two controls, the seed control directly below its
 name and the specs control below its sheet, and they SHALL copy that planet's
 seed and specifications. Copying SHALL give visible confirmation, and a clear
@@ -120,6 +123,10 @@ message if the browser refuses.
 #### Scenario: A system's seed and specs can be copied
 - **WHEN** the person uses the copy controls on a system page
 - **THEN** the system's seed, or its full configuration with its central bodies and planets as JSON, is on the clipboard
+
+#### Scenario: Drawing details and repeated seeds are not copied
+- **WHEN** the person copies the specs of a planet or of a system
+- **THEN** the copied JSON has no surface features or texture seed for any planet, and no slot repeats its planet's seed
 
 #### Scenario: Each control sits under what it copies
 - **WHEN** a planet or system page is shown

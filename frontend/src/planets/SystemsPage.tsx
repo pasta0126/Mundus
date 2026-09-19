@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { randomName } from "@/lib/randomName"
-import { CopyButton, specsText } from "./CopyButton"
+import { CopyButton } from "./CopyButton"
 import { PlanetScene } from "./PlanetScene"
 import { PlanetSheet, TYPE_LABELS } from "./PlanetSheet"
 import { SystemScene, type SystemDto } from "./SystemScene"
+import { planetSpecsText, systemSpecsText } from "./specs"
 
 const MAX_PLANETS = 8
 
@@ -210,7 +211,7 @@ export default function SystemsPage() {
                 Back to system
               </Button>
               <PlanetSheet planet={selectedSlot.planet} underName={<CopyButton kind="seed" text={selectedSlot.planet.name} />} />
-              <CopyButton kind="specs" text={specsText(selectedSlot.planet)} />
+              <CopyButton kind="specs" text={planetSpecsText(selectedSlot.planet)} />
             </div>
           ) : (
             system &&
@@ -241,7 +242,7 @@ export default function SystemsPage() {
                   {system.belt ? `Asteroid belt after planet ${system.belt.afterSlot}.` : "No asteroid belt."} Click a planet to see it up close.
                 </p>
 
-                <CopyButton kind="specs" text={specsText(system)} />
+                <CopyButton kind="specs" text={systemSpecsText(system)} />
 
                 {editing ? (
                   <div className="space-y-2 border-t pt-3">
