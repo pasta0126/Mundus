@@ -281,3 +281,17 @@ names itself on hover (see `points-of-interest`).
 #### Scenario: The legend is visible alongside the map
 - **WHEN** the legend is toggled on
 - **THEN** the biome legend overlay is shown alongside the canvas
+
+### Requirement: Touch-first devices are told the page is not optimized for them
+On a phone or tablet - a device whose primary input is a touch screen -
+the system SHALL show a small, dismissible notice above the controls block
+saying the page is not optimized for phones or tablets yet. A computer with
+a mouse or trackpad, including a touch-screen laptop, SHALL NOT see it.
+
+#### Scenario: A phone sees the notice above the controls
+- **WHEN** the page is opened on a touch-first device
+- **THEN** a small notice appears above the controls block and can be dismissed
+
+#### Scenario: A desktop does not
+- **WHEN** the page is opened on a computer whose primary pointer is a mouse or trackpad
+- **THEN** no such notice is shown

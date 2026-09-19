@@ -117,8 +117,9 @@ export function PointsOfInterestLayer({
       const scale = size / Math.max(img.naturalWidth, img.naturalHeight)
       const w = img.naturalWidth * scale
       const h = img.naturalHeight * scale
-      ctx.drawImage(img, px - w / 2, py - h / 2, w, h)
-      hits.push({ type: p.type, left: px - w / 2, top: py - h / 2, right: px + w / 2, bottom: py + h / 2 })
+      // The point is where the icon stands: its base, centered - not the middle of the picture.
+      ctx.drawImage(img, px - w / 2, py - h, w, h)
+      hits.push({ type: p.type, left: px - w / 2, top: py - h, right: px + w / 2, bottom: py })
     }
     hitsRef.current = hits
   }, [])

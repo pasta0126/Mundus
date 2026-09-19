@@ -5,6 +5,7 @@ import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { BiomeLegend } from "@/map/BiomeLegend"
+import { MobileNotice } from "@/components/MobileNotice"
 import { Button } from "@/components/ui/button"
 import { CompassRose, type CompassInfo } from "@/map/CompassRose"
 import { LAYER_REGISTRY, defaultLayerVisibility, type LayerId } from "@/map/layers"
@@ -360,57 +361,60 @@ function App() {
           <CompassRose seed={viewWindow.seed} visible={layerVisibility.compass} onReady={setCompassInfo} />
 
           <div className="fixed top-4 left-4 z-10 flex items-start gap-3">
-            <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
-              <div className="flex items-center justify-between gap-2">
-                <h1 className="text-lg font-semibold tracking-tight">
-                  <button
-                    type="button"
-                    onClick={regenerate}
-                    className="flex items-center gap-2 hover:opacity-80"
-                    aria-label="Back to home"
-                  >
-                    <img src={mundusIcon} alt="" className="size-6" />
-                    Mundus
-                  </button>
-                </h1>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => setShowLayers((v) => !v)}
-                    aria-label="Toggle layers panel"
-                    aria-expanded={showLayers}
-                  >
-                    <Layers />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={() => setShowLegend((v) => !v)}
-                    aria-label="Toggle terrain legend"
-                    aria-expanded={showLegend}
-                  >
-                    <Info />
-                  </Button>
-                  <span className="text-muted-foreground font-mono text-xs">v{__APP_VERSION__}</span>
+            <div className="flex flex-col gap-2">
+              <MobileNotice />
+              <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
+                <div className="flex items-center justify-between gap-2">
+                  <h1 className="text-lg font-semibold tracking-tight">
+                    <button
+                      type="button"
+                      onClick={regenerate}
+                      className="flex items-center gap-2 hover:opacity-80"
+                      aria-label="Back to home"
+                    >
+                      <img src={mundusIcon} alt="" className="size-6" />
+                      Mundus
+                    </button>
+                  </h1>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setShowLayers((v) => !v)}
+                      aria-label="Toggle layers panel"
+                      aria-expanded={showLayers}
+                    >
+                      <Layers />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={() => setShowLegend((v) => !v)}
+                      aria-label="Toggle terrain legend"
+                      aria-expanded={showLegend}
+                    >
+                      <Info />
+                    </Button>
+                    <span className="text-muted-foreground font-mono text-xs">v{__APP_VERSION__}</span>
+                  </div>
                 </div>
-              </div>
-              <MapParamsPanel
-                seed={viewWindow.seed}
-                originX={viewWindow.originX}
-                originY={viewWindow.originY}
-                onGoTo={goToPosition}
-                onGenerateSeed={generateFromSeed}
-              />
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={regenerate} className="flex-1">
-                  <RefreshCw />
-                  Regenerate
-                </Button>
-                <Button variant="outline" size="sm" onClick={downloadMap} className="flex-1">
-                  <Download />
-                  Download
-                </Button>
+                <MapParamsPanel
+                  seed={viewWindow.seed}
+                  originX={viewWindow.originX}
+                  originY={viewWindow.originY}
+                  onGoTo={goToPosition}
+                  onGenerateSeed={generateFromSeed}
+                />
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={regenerate} className="flex-1">
+                    <RefreshCw />
+                    Regenerate
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={downloadMap} className="flex-1">
+                    <Download />
+                    Download
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="flex items-start gap-3">

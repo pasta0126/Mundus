@@ -137,6 +137,16 @@ of every other overlay layer.
 - **WHEN** a user hides the "legends & mysteries" category
 - **THEN** icons from every other category continue to render unchanged
 
+### Requirement: An icon stands on its point
+A point of interest's icon SHALL be drawn standing on its coordinate: the
+middle of the icon's base sits on the point, not the middle of the picture,
+so a tall tower's foot is where the terrain checks were made. Hovering
+follows the same drawn area.
+
+#### Scenario: The base of the icon is at the point
+- **WHEN** an icon is drawn for a point
+- **THEN** its bottom edge is at the point's vertical position and it is centered on the point horizontally
+
 ### Requirement: Icons name themselves on hover
 Hovering a point of interest SHALL show a tooltip with the icon's name and a
 short description, taken from the catalog. The tooltip SHALL appear only over
