@@ -285,10 +285,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/Systems": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    seed?: string;
+                    planets?: string[];
+                    belt?: number | string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PlanetarySystem"];
+                        "application/json": components["schemas"]["PlanetarySystem"];
+                        "text/json": components["schemas"]["PlanetarySystem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AsteroidBelt: {
+            /** Format: int32 */
+            afterSlot: number | string;
+            /** Format: double */
+            width: number | string;
+            color: string;
+            /** Format: int32 */
+            count: number | string;
+            orbit: components["schemas"]["Orbit"];
+        };
         AsteroidField: {
             /** Format: double */
             inner: number | string;
@@ -319,6 +370,15 @@ export interface components {
             y: number | string;
             biome: components["schemas"]["Biome"];
         };
+        CentralBody: {
+            kind: components["schemas"]["CentralBodyKind"];
+            /** Format: double */
+            size: number | string;
+            color: string;
+            orbit: null | components["schemas"]["Orbit"];
+        };
+        /** @enum {unknown} */
+        CentralBodyKind: "RedDwarf" | "Orange" | "Yellow" | "BlueGiant" | "WhiteDwarf" | "Pulsar" | "BlackHole";
         CloudLayer: {
             color: string;
             /** Format: double */
@@ -385,6 +445,22 @@ export interface components {
             rotationPeriodSeconds: number | string;
             /** Format: double */
             axialTiltDegrees: number | string;
+        };
+        PlanetarySystem: {
+            /** Format: int32 */
+            specVersion: number | string;
+            seed: string;
+            name: string;
+            central: components["schemas"]["CentralBody"][];
+            slots: components["schemas"]["PlanetSlot"][];
+            belt: null | components["schemas"]["AsteroidBelt"];
+        };
+        PlanetSlot: {
+            /** Format: int32 */
+            index: number | string;
+            planetSeed: string;
+            planet: components["schemas"]["Planet"];
+            orbit: components["schemas"]["Orbit"];
         };
         /** @enum {unknown} */
         PlanetType: "Rocky" | "Desert" | "Oceanic" | "Ice" | "Lava" | "Toxic" | "GasGiant";

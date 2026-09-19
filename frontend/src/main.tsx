@@ -6,12 +6,20 @@ import App from './App.tsx'
 // The 3D pages pull in three.js; load them only when their route is visited
 // so the map page's bundle stays as light as it was.
 const PlanetsPage = lazy(() => import('./planets/PlanetsPage.tsx'))
+const SystemsPage = lazy(() => import('./planets/SystemsPage.tsx'))
 
 function Root() {
   if (window.location.pathname.startsWith('/planets')) {
     return (
       <Suspense fallback={null}>
         <PlanetsPage />
+      </Suspense>
+    )
+  }
+  if (window.location.pathname.startsWith('/systems')) {
+    return (
+      <Suspense fallback={null}>
+        <SystemsPage />
       </Suspense>
     )
   }

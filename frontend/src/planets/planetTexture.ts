@@ -210,23 +210,24 @@ function applyFeature(
  * its description (palette, texture seed, singularities). The backend
  * decides what the planet is; this only draws it.
  */
-export function createSurfaceCanvas(planet: PlanetDto): HTMLCanvasElement {
+export function createSurfaceCanvas(planet: PlanetDto, width = WIDTH): HTMLCanvasElement {
+  const height = width / 2
   const canvas = document.createElement("canvas")
-  canvas.width = WIDTH
-  canvas.height = HEIGHT
+  canvas.width = width
+  canvas.height = height
   const ctx = canvas.getContext("2d")!
-  const image = ctx.createImageData(WIDTH, HEIGHT)
+  const image = ctx.createImageData(width, height)
 
   const palette = planet.palette.map(hexToRgb)
   const seed = Number(planet.textureSeed) | 0
   const features = prepareFeatures(planet, palette)
 
-  for (let py = 0; py < HEIGHT; py++) {
-    const lat = (0.5 - (py + 0.5) / HEIGHT) * Math.PI
+  for (let py = 0; py < height; py++) {
+    const lat = (0.5 - (py + 0.5) / height) * Math.PI
     const cosLat = Math.cos(lat)
     const y = Math.sin(lat)
-    for (let px = 0; px < WIDTH; px++) {
-      const lon = ((px + 0.5) / WIDTH - 0.5) * 2 * Math.PI
+    for (let px = 0; px < width; px++) {
+      const lon = ((px + 0.5) / width - 0.5) * 2 * Math.PI
       const x = cosLat * Math.cos(lon)
       const z = cosLat * Math.sin(lon)
 
@@ -235,7 +236,7 @@ export function createSurfaceCanvas(planet: PlanetDto): HTMLCanvasElement {
         color = applyFeature(f, color, palette, seed, x, y, z, lat, lon)
       }
 
-      const i = (py * WIDTH + px) * 4
+      const i = (py * width + px) * 4
       image.data[i] = color[0]
       image.data[i + 1] = color[1]
       image.data[i + 2] = color[2]

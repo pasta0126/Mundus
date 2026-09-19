@@ -41,7 +41,7 @@ collide; this is acceptable for a generator of this kind. (An earlier idea to
 add SHA-256 was dropped because `Rng` already does the job.)
 
 **A system is data.** A system is a central group plus an ordered list of
-slots, each `{ planetSeed, orbit }`, plus an optional belt. A generated
+slots, each `{ planetSeed, planet, orbit }` (the full planet is embedded so the viewer needs no extra requests), plus an optional belt. A generated
 system fills the list from its seed; a custom system takes the list from the
 request. Both go through the same code and the same viewer. Slot orbits
 depend only on (central seed, slot index), and planet seeds are

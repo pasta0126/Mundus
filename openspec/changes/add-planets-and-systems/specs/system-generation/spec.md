@@ -34,7 +34,7 @@ center of the group.
 
 ### Requirement: Planet slots
 Every system SHALL have between one and eight planet slots. Each slot SHALL
-carry a planet seed and a deterministic orbit. A slot's planet seed SHALL be
+carry a planet seed, the planet that seed describes (in full, so a viewer needs no further request), and a deterministic orbit. A slot's planet seed SHALL be
 `<normalized system seed>/<n>` with `n` counting from 1, so requesting that
 seed as a planet on its own yields the identical planet. A slot's orbit
 SHALL depend only on the system seed and the slot's index, not on its planet
@@ -47,7 +47,7 @@ central group's extent.
 
 #### Scenario: A slot's planet equals the standalone planet
 - **WHEN** the planet seed of a slot is requested as a planet on its own
-- **THEN** it is identical to the planet shown in that slot
+- **THEN** it is identical to the planet shown in that slot, apart from its display name, which keeps the letter case the system was written with
 
 #### Scenario: Orbits move outward
 - **WHEN** a system has more than one slot

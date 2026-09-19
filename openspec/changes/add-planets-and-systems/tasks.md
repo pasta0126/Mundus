@@ -1,7 +1,7 @@
 ## 1. Seed handling and contracts (backend)
 
 - [x] 1.1 Add a seed normalizer to `Mundus.Core` (trim, collapse whitespace, invariant lower case, NFC, non-empty, max length) with unit tests for equivalent and rejected seeds
-- [ ] 1.2 Define the planet and system description types with their own `SpecVersion` constants
+- [x] 1.2 Define the planet and system description types with their own `SpecVersion` constants
 
 ## 2. Planet generation (backend)
 
@@ -14,25 +14,25 @@
 
 ## 3. System generation (backend)
 
-- [ ] 3.1 Implement the central group (1-3 bodies, kinds, sizes, colors, orbits around the common center)
-- [ ] 3.2 Implement 1-8 planet slots with `<seed>/<n>` planet seeds and outward-ordered orbits derived from (seed, index)
-- [ ] 3.3 Implement inclinations (mostly coplanar, occasional inclined orbit)
-- [ ] 3.4 Implement the optional single asteroid belt between two neighboring slots
-- [ ] 3.5 Implement custom systems (central seed, explicit planet list of 1-8, optional belt index) reusing the same derivation
-- [ ] 3.6 Unit tests: same seed identical, slot seeds equal standalone planets, custom equals generated, at most one belt, limits enforced
+- [x] 3.1 Implement the central group (1-3 bodies, kinds, sizes, colors, orbits around the common center)
+- [x] 3.2 Implement 1-8 planet slots with `<seed>/<n>` planet seeds and outward-ordered orbits derived from (seed, index)
+- [x] 3.3 Implement inclinations (mostly coplanar, occasional inclined orbit)
+- [x] 3.4 Implement the optional single asteroid belt between two neighboring slots
+- [x] 3.5 Implement custom systems (central seed, explicit planet list of 1-8, optional belt index) reusing the same derivation
+- [x] 3.6 Unit tests: same seed identical, slot seeds equal standalone planets, custom equals generated, at most one belt, limits enforced
 
 ## 4. HTTP API
 
 - [x] 4.1 Add `GET /api/planets?seed=` returning the description with its spec version, and 400 for invalid seeds
-- [ ] 4.2 Add `GET /api/systems?seed=` with optional `planets=` and `belt=` returning the description with its spec version, and 400 for invalid input or more than eight planets
-- [ ] 4.3 Regenerate the frontend API types (`npm run generate:api-types`)
+- [x] 4.2 Add `GET /api/systems?seed=` with optional `planets=` and `belt=` returning the description with its spec version, and 400 for invalid input or more than eight planets
+- [x] 4.3 Regenerate the frontend API types (`npm run generate:api-types`)
 
 ## 5. Frontend foundation
 
 - [x] 5.1 Add the `three` dependency and lazy-load the 3D code for the new routes only
-- [ ] 5.2 Add routing for `/planets` and `/systems` reading the seed from the URL, with an error state for invalid seeds
-- [ ] 5.3 Add the entry link on the map page, in the style of the phone notice
-- [ ] 5.4 Add the pronounceable random-name generator and the random control
+- [x] 5.2 Add routing for `/planets` and `/systems` reading the seed from the URL, with an error state for invalid seeds
+- [x] 5.3 Add the entry link on the map page, in the style of the phone notice
+- [x] 5.4 Add the pronounceable random-name generator and the random control
 
 ## 6. Planet view
 
@@ -45,14 +45,14 @@
 
 ## 7. System view
 
-- [ ] 7.1 Draw the central group, planets, belt, and orbit lines in 3D, including inclined orbits
-- [ ] 7.2 Animate bodies as a pure function of time, starting from the deterministic initial positions
-- [ ] 7.3 Add drag-to-rotate and wheel zoom
-- [ ] 7.4 Add click-a-planet to open its sheet and 3D model, with a way back to the system
-- [ ] 7.5 Add the custom system form (central seed, up to eight planet seeds, optional belt) reflected in the URL
+- [x] 7.1 Draw the central group, planets, belt, and orbit lines in 3D, including inclined orbits
+- [x] 7.2 Animate bodies as a pure function of time, starting from the deterministic initial positions
+- [x] 7.3 Add drag-to-rotate and wheel zoom
+- [x] 7.4 Add click-a-planet to open its sheet and 3D model, with a way back to the system
+- [x] 7.5 Add the custom system form (central seed, up to eight planet seeds, optional belt) reflected in the URL
 
 ## 8. Release
 
-- [ ] 8.1 Verify all new user-facing text is English and the map page is unchanged
-- [ ] 8.2 Run backend tests and the frontend build and lint
-- [ ] 8.3 Bump the semver in `package.json` and tag the commit `vX.Y.Z` per the versioning workflow
+- [x] 8.1 Verify all new user-facing text is English and the map page is unchanged
+- [x] 8.2 Run backend tests and the frontend build and lint
+- [x] 8.3 Bump the semver in `package.json` and tag the commit `vX.Y.Z` per the versioning workflow
