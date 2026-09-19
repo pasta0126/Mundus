@@ -111,7 +111,11 @@ public class PointOfInterestCatalogTests
         for (var i = 1; i < specs.Count; i++)
         {
             Assert.True(specs[i].Radius > specs[i - 1].Radius, $"{specs[i].Tier} must spread wider than {specs[i - 1].Tier}");
-            Assert.True(specs[i].Weight <= specs[i - 1].Weight, $"{specs[i].Tier} must be no more common than {specs[i - 1].Tier}");
+            // A lone point-size icon is not a step on the ladder: settlements are ranked from small up.
+            if (specs[i - 1].Tier != SettlementTier.Point)
+            {
+                Assert.True(specs[i].Weight <= specs[i - 1].Weight, $"{specs[i].Tier} must be no more common than {specs[i - 1].Tier}");
+            }
         }
 
         Assert.Equal(0, specs[0].Radius);

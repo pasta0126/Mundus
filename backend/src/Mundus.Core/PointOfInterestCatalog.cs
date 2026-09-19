@@ -254,7 +254,7 @@ public static class PointOfInterestCatalog
     /// <summary>What each core size contains: the icons that cluster around its anchor. Ordered small to huge.</summary>
     public static IReadOnlyList<SettlementSpec> SettlementSpecs { get; } =
     [
-        new(SettlementTier.Point, Rarity.Common, 0, []),
+        new(SettlementTier.Point, Rarity.Uncommon, 0, []),
         new(SettlementTier.Small, Rarity.Common, 60,
         [
             new("cottage", 2, 4), new("farm", 0, 2), new("fields", 1, 3), new("windmill", 0, 1), new("tavern", 0, 1),

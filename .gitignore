@@ -11,3 +11,6 @@ obj/
 .env
 .env.*
 !.env.example
+
+# local session notes
+session.txt
