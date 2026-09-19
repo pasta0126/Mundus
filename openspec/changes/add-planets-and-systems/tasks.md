@@ -1,0 +1,58 @@
+## 1. Seed handling and contracts (backend)
+
+- [x] 1.1 Add a seed normalizer to `Mundus.Core` (trim, collapse whitespace, invariant lower case, NFC, non-empty, max length) with unit tests for equivalent and rejected seeds
+- [ ] 1.2 Define the planet and system description types with their own `SpecVersion` constants
+
+## 2. Planet generation (backend)
+
+- [x] 2.1 Implement type selection, palette, radius, name, and descriptive text from the seed
+- [x] 2.2 Implement surface parameters (texture seed and bounded geographic singularities per type)
+- [x] 2.3 Implement atmosphere and clouds (gas giants always have an atmosphere; no atmosphere means no clouds)
+- [x] 2.4 Implement optional rings and optional asteroid field
+- [x] 2.5 Implement 0-3 moons with orbits, and the planet's spin (rotation period, axial tilt)
+- [x] 2.6 Unit tests: same seed identical, different seeds differ, moon and cloud rules, bounded counts
+
+## 3. System generation (backend)
+
+- [ ] 3.1 Implement the central group (1-3 bodies, kinds, sizes, colors, orbits around the common center)
+- [ ] 3.2 Implement 1-8 planet slots with `<seed>/<n>` planet seeds and outward-ordered orbits derived from (seed, index)
+- [ ] 3.3 Implement inclinations (mostly coplanar, occasional inclined orbit)
+- [ ] 3.4 Implement the optional single asteroid belt between two neighboring slots
+- [ ] 3.5 Implement custom systems (central seed, explicit planet list of 1-8, optional belt index) reusing the same derivation
+- [ ] 3.6 Unit tests: same seed identical, slot seeds equal standalone planets, custom equals generated, at most one belt, limits enforced
+
+## 4. HTTP API
+
+- [x] 4.1 Add `GET /api/planets?seed=` returning the description with its spec version, and 400 for invalid seeds
+- [ ] 4.2 Add `GET /api/systems?seed=` with optional `planets=` and `belt=` returning the description with its spec version, and 400 for invalid input or more than eight planets
+- [ ] 4.3 Regenerate the frontend API types (`npm run generate:api-types`)
+
+## 5. Frontend foundation
+
+- [ ] 5.1 Add the `three` dependency and lazy-load the 3D code for the new routes only
+- [ ] 5.2 Add routing for `/planets` and `/systems` reading the seed from the URL, with an error state for invalid seeds
+- [ ] 5.3 Add the entry link on the map page, in the style of the phone notice
+- [ ] 5.4 Add the pronounceable random-name generator and the random control
+
+## 6. Planet view
+
+- [ ] 6.1 Draw the sphere with a procedural low-detail surface texture from palette, texture seed, and singularities
+- [ ] 6.2 Add the cloud layer, rings, and asteroid field
+- [ ] 6.3 Animate the planet's spin (period and tilt) and the moons' slow orbits
+- [ ] 6.4 Add drag-to-rotate and wheel zoom
+- [ ] 6.5 Add the planet sheet (name, type, description, features)
+- [ ] 6.6 Add loading and error feedback
+
+## 7. System view
+
+- [ ] 7.1 Draw the central group, planets, belt, and orbit lines in 3D, including inclined orbits
+- [ ] 7.2 Animate bodies as a pure function of time, starting from the deterministic initial positions
+- [ ] 7.3 Add drag-to-rotate and wheel zoom
+- [ ] 7.4 Add click-a-planet to open its sheet and 3D model, with a way back to the system
+- [ ] 7.5 Add the custom system form (central seed, up to eight planet seeds, optional belt) reflected in the URL
+
+## 8. Release
+
+- [ ] 8.1 Verify all new user-facing text is English and the map page is unchanged
+- [ ] 8.2 Run backend tests and the frontend build and lint
+- [ ] 8.3 Bump the semver in `package.json` and tag the commit `vX.Y.Z` per the versioning workflow
