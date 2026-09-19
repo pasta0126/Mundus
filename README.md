@@ -6,6 +6,22 @@ content.
 
 Live at [mundus.northernarchive.com](https://mundus.northernarchive.com).
 
+## Pages
+
+- `/` - the 2D map: pan, zoom, layers, points of interest, regions.
+- `/planets?seed=Kepler` - one planet as a rotatable 3D model with its
+  sheet. The seed is the planet's name; the same name always gives the
+  same planet.
+- `/systems?seed=Kepler` - a whole planetary system (single or binary
+  center, up to eight planets, at most one asteroid belt), animated from
+  deterministic starting positions. Click a planet for its sheet and model.
+  `Customize` builds a custom system: the URL carries the central seed, the
+  planet names (`planet=`) and the belt position (`belt=`), so a link is the
+  whole system and nothing is stored.
+- Both new pages have `Copy seed` and `Copy specs` (the description as JSON).
+  The API behind them is `GET /api/Planets?seed=` and
+  `GET /api/Systems?seed=[&planets=...&belt=]`.
+
 ## Layout
 
 - `backend/` - .NET solution (`net10.0`, ASP.NET Core Controllers)
