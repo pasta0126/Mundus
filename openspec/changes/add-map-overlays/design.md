@@ -111,15 +111,22 @@ it were the only request" invariant, at the cost of retracing some path
 prefix on every request touching it - acceptable since tracing is O(path
 length) and cached per chunk request, not per cell.
 
-### Points of interest: deterministic blue-noise scatter per category, filtered by biome
-Each category gets its own lattice-hash scatter (`seed.Child("poi-<category>")`,
-mirroring the "scattering circular grains" approach already used for
-landmass shaping), at a documented density. A candidate point is kept only
-if the biome at its coordinate (from the existing `map-generation` field)
-satisfies that icon type's placement rule (e.g. mountain icons only on
-`Mountains`/`Snow`, sea icons only on `Ocean`). This keeps POI placement a
-pure function of `(seed, x, y)` per category, so windowing agrees exactly
-like biomes already do.
+### Points of interest: one catalog, lattice scatter per category, clusters for settlements
+`PointOfInterestCatalog` (Mundus.Core) is the single source of truth: every
+icon's category (a user-toggleable layer), class (terrain / anchor / service
+/ singular), rarity (a numeric weight), biomes, and terrain geometry rule
+(coast, cape, islet, lake, near-coast, open-sea, waterside), plus what each
+settlement size contains. The generator gives each category its own lattice
+(`"{seed}:poi-{category}:{bx}:{by}"`), one jittered candidate per block, kept
+with a per-category density. A candidate's icon is drawn, weighted by
+rarity, among the catalog entries valid on its biome and geometry. Geometry
+is checked with cached biome ray probes, so POI stay a pure function of
+`(seed, category, block)` and windowing agrees exactly like biomes do. A
+settlements block grows a whole cluster - an anchor of some size
+(point / small / medium / large / huge, each with its own rarity and
+radius) and the services around it - all decided inside that block.
+The API also serves the catalog (`GET /api/PointsOfInterest/catalog`), and
+the frontend derives its layers panel and legend from it.
 
 ### Regions: a second, coarser Worley/plate-style partition
 Region boundaries reuse the exact `WorleyBoundaryField` + domain-warp
@@ -158,29 +165,17 @@ visible overlay canvas onto one offscreen canvas, in a fixed stacking
 order, before calling `toBlob` on that composite - so hidden layers are
 simply never drawn to it.
 
-## Icon Inventory (for later art production)
+## Icon Inventory
 
-| Category | Icon types |
-| --- | --- |
-| Geology & relief | mountain peak, mountain range, volcano, cave |
-| Settlements | village, city, seaport, castle, landmark building, ruins |
-| Nature | forest |
-| History & scenic | historic site, scenic site |
-| Sacred & mystical | place of worship, portal |
-| Sea legends | sea monster, treasure, shipwreck, singular event |
-| Mythological beings | mythological creature |
+86 icons, in three interchangeable styles (color - the default, fantasy,
+line), cut from the artwork sheets in
+`frontend/src/assets/poi-suite/{color,fantasy,line}/<id>.png`
+(`source/` keeps the original sheets). Ids are the catalog's; every id has
+art in every style, enforced by tests. Categories (layers): relief &
+geology, nature & wildlife, sea & islands, settlements, monuments & ruins,
+legends & mysteries.
 
 Plus one non-POI icon: the **compass rose** itself.
-
-Artwork for all 20 POI icons exists as vector illustrations in
-`frontend/src/assets/poi/` (`poi-<name>.svg` source + `poi-<name>.png`
-256x256, transparent background; names match the table, e.g.
-`poi-mountain-peak`, `poi-sea-monster`, `poi-worship`). They aren't wired
-into any layer yet - that lands with task 4/6.4.
-
-This is the exact set `points-of-interest`'s spec fixes as the documented
-icon-type inventory; icon artwork for any of these can be supplied and
-wired in independently of the others.
 
 ## Risks / Trade-offs
 
@@ -189,11 +184,10 @@ wired in independently of the others.
   biome-loading logic] → each overlay endpoint is only called for
   currently-visible layers, and follows the exact same chunking pattern
   `tiling.ts` already implements for the biome grid.
-- [Icon inventory is fixed before any artwork exists, and a real design
-  pass on the icons could reveal a missing or redundant type] → the
-  documented set lives in `points-of-interest`'s spec as the single source
-  of truth; adding or removing a type later is a normal spec change, not a
-  rework of the placement/rendering mechanism.
+- [The catalog and the artwork must stay in step] → tests fail when an
+  icon has no art in any style or art has no catalog entry; adding or
+  removing a type is a catalog change, not a rework of the placement or
+  rendering mechanism.
 
 ## Open Questions
 

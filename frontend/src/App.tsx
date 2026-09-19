@@ -7,12 +7,14 @@ import mundusIcon from "@/assets/mundus-icon-header.png"
 import { BiomeLegend } from "@/map/BiomeLegend"
 import { Button } from "@/components/ui/button"
 import { CompassRose, type CompassInfo } from "@/map/CompassRose"
-import { defaultLayerVisibility, type LayerId } from "@/map/layers"
+import { LAYER_REGISTRY, defaultLayerVisibility, type LayerId } from "@/map/layers"
 import { LayersPanel } from "@/map/LayersPanel"
 import { Progress } from "@/components/ui/progress"
 import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS } from "@/map/constants"
 import { MapCanvas } from "@/map/MapCanvas"
 import { MapParamsPanel } from "@/map/MapParamsPanel"
+import { PointsOfInterestLayer } from "@/map/PointsOfInterestLayer"
+import { loadPoiStyle, savePoiStyle, type PoiStyle } from "@/map/poi"
 import { RegionBordersLayer } from "@/map/RegionBordersLayer"
 import { computeChunkGrid, runWithConcurrency } from "@/map/tiling"
 
@@ -54,10 +56,22 @@ function App() {
   const [errorMessage, setErrorMessage] = useState("")
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [regionBordersCanvasEl, setRegionBordersCanvasEl] = useState<HTMLCanvasElement | null>(null)
+  const [poiCanvasEl, setPoiCanvasEl] = useState<HTMLCanvasElement | null>(null)
+  const [poiTypes, setPoiTypes] = useState<string[]>([])
+  const [poiStyle, setPoiStyle] = useState<PoiStyle>(loadPoiStyle)
   const [showLegend, setShowLegend] = useState(false)
   const [showLayers, setShowLayers] = useState(false)
   const [layerVisibility, setLayerVisibility] = useState<Record<LayerId, boolean>>(defaultLayerVisibility)
   const [compassInfo, setCompassInfo] = useState<CompassInfo | null>(null)
+
+  const visiblePoiCategories = LAYER_REGISTRY.flatMap((layer) =>
+    layer.poiCategory && layerVisibility[layer.id] ? [layer.poiCategory] : [],
+  )
+
+  function changePoiStyle(style: PoiStyle) {
+    setPoiStyle(style)
+    savePoiStyle(style)
+  }
 
   function toggleLayer(id: LayerId) {
     setLayerVisibility((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -245,6 +259,10 @@ function App() {
       ctx.drawImage(regionBordersCanvasEl, 0, 0)
     }
 
+    if (poiCanvasEl) {
+      ctx.drawImage(poiCanvasEl, 0, 0)
+    }
+
     if (layerVisibility.compass && compassInfo) {
       const dpr = window.devicePixelRatio || 1
       const rect = compassInfo.img.getBoundingClientRect()
@@ -293,6 +311,23 @@ function App() {
           step={viewWindow.step}
           generation={viewWindow.generation}
           onCanvasReady={setRegionBordersCanvasEl}
+        />
+      )}
+
+      {viewWindow && (
+        <PointsOfInterestLayer
+          seed={viewWindow.seed}
+          originX={viewWindow.originX}
+          originY={viewWindow.originY}
+          width={viewWindow.width}
+          height={viewWindow.height}
+          cellPx={viewWindow.cellPx}
+          step={viewWindow.step}
+          generation={viewWindow.generation}
+          style={poiStyle}
+          visibleCategories={visiblePoiCategories}
+          onCanvasReady={setPoiCanvasEl}
+          onTypesPresent={setPoiTypes}
         />
       )}
 
@@ -385,7 +420,7 @@ function App() {
                 </Button>
               </div>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex items-start gap-3">
               <AnimatePresence>
                 {showLayers && (
                   <motion.div
@@ -394,7 +429,7 @@ function App() {
                     exit={{ opacity: 0, x: -8 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <LayersPanel visibility={layerVisibility} onToggle={toggleLayer} />
+                    <LayersPanel visibility={layerVisibility} onToggle={toggleLayer} poiStyle={poiStyle} onPoiStyleChange={changePoiStyle} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -406,7 +441,7 @@ function App() {
                     exit={{ opacity: 0, x: -8 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <BiomeLegend />
+                    <BiomeLegend poiTypes={poiTypes} poiStyle={poiStyle} />
                   </motion.div>
                 )}
               </AnimatePresence>

@@ -22,11 +22,11 @@ are worth reading before re-implementing from scratch.
 
 ## 4. Points of interest (backend)
 
-- [ ] 4.1 Define the fixed category/icon-type enum from design.md's inventory table
-- [ ] 4.2 Implement the per-category deterministic lattice-hash scatter (`seed.Child("poi-<category>")`) at a documented density
-- [ ] 4.3 Implement per-icon-type biome placement filters (mountain icons on `Mountains`/`Snow`, seaport adjacent to `Ocean`, sea icons on `Ocean`, forest icon on `Forest`/`Rainforest`, etc.)
-- [ ] 4.4 Add a `PointsOfInterestController` (or equivalent) endpoint mirroring `MapsController`'s contract, with a `category` filter
-- [ ] 4.5 Add backend tests: determinism across repeated calls; overlapping-window agreement; every generated point's icon type is in the documented set; biome-suitability filters hold per icon type
+- [x] 4.1 Define the icon catalog (`PointOfInterestCatalog`): 86 icons with category, class, rarity weight, biomes, terrain-geometry rule; settlement sizes and what each contains
+- [x] 4.2 Implement the per-category deterministic lattice-hash scatter (`"{seed}:poi-{category}:{bx}:{by}"`) at documented densities, and settlement clusters (anchor + services) generated whole inside their block
+- [x] 4.3 Implement biome and geometry placement (coast, cape, islet, lake, near-coast, open-sea, waterside) with cached biome ray probes
+- [x] 4.4 Add a `PointsOfInterestController` endpoint mirroring `MapsController`'s contract with a `category` filter, plus `GET /api/PointsOfInterest/catalog`
+- [x] 4.5 Add backend tests: determinism; overlapping-window agreement; catalog/artwork agreement; biome and geometry rules; cluster radius; rarity and settlement-size ordering
 
 ## 5. Region borders (backend)
 
@@ -40,12 +40,12 @@ are worth reading before re-implementing from scratch.
 - [x] 6.1 Add a layers panel component listing every overlay layer (compass rose, each POI category, region borders) with a toggle and documented default visibility - registry (`map/layers.ts`) currently has the compass rose and region borders (grouped under a "stable" vs. "Experimental" heading); POI categories get appended once their backend lands
 - [x] 6.2 Add per-layer visibility state that persists across pan/zoom/coordinate-jump but resets on full reload
 - [x] 6.3 Add one overlay `<canvas>` per layer, stacked above the biome `MapCanvas` and below UI panels, shown/hidden per the layer state - done for region borders (`RegionBordersLayer.tsx`); compass stays a fixed-position `<img>`, not a world-space canvas
-- [ ] 6.4 Fetch and render POIs (per visible category only) into their respective canvases, following the existing chunked/tiled fetch pattern from `tiling.ts` - region borders already does this
+- [x] 6.4 Fetch and render POIs (per visible category only) into their respective canvases, following the existing chunked/tiled fetch pattern from `tiling.ts` - region borders already does this
 - [x] 6.5 Render region borders as a thin solid stroke and POI/compass as icons (placeholder icons until real artwork is supplied) - compass icon already in place
 
 ## 7. Icon legend (frontend)
 
-- [ ] 7.1 Add a legend component listing the icon types belonging to currently visible POI categories (plus the compass rose when visible), each with a short description
+- [x] 7.1 Add a legend component listing the icon types belonging to currently visible POI categories (plus the compass rose when visible), each with a short description
 - [ ] 7.2 Update the legend live as layers are toggled
 
 ## 8. Download compositing (frontend)

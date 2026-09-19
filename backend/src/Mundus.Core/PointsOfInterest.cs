@@ -1,0 +1,393 @@
+namespace Mundus.Core;
+
+/// <summary>What an icon is to the cluster it belongs to.</summary>
+public enum PoiRole
+{
+    /// <summary>Stands alone: terrain features, monuments, legends.</summary>
+    Single,
+
+    /// <summary>Heads a settlement (a lone Point-tier icon is also an Anchor).</summary>
+    Anchor,
+
+    /// <summary>A service around an anchor - drawn only once the view is close enough.</summary>
+    Satellite,
+}
+
+public sealed record PointOfInterest
+{
+    public required int X { get; init; }
+    public required int Y { get; init; }
+    public required string Category { get; init; }
+    public required string Type { get; init; }
+    public required PoiRole Role { get; init; }
+
+    /// <summary>For anchors and their satellites: the size of the settlement they belong to.</summary>
+    public SettlementTier? Tier { get; init; }
+}
+
+public sealed record PointsOfInterest
+{
+    public required string Seed { get; init; }
+    public required int OriginX { get; init; }
+    public required int OriginY { get; init; }
+    public required int Width { get; init; }
+    public required int Height { get; init; }
+    public required IReadOnlyList<PointOfInterest> Points { get; init; }
+}
+
+/// <summary>
+/// Scatters seed-deterministic points of interest from the
+/// <see cref="PointOfInterestCatalog"/>: one lattice per catalog category,
+/// one jittered candidate per block, kept with a per-category probability.
+/// A candidate picks an icon among those the catalog allows on its biome
+/// and terrain geometry, weighted by rarity; a settlements block grows a
+/// whole cluster - an anchor of some size and the services around it.
+/// Every decision is a pure function of (seed, category, block), never of
+/// the requested window. See openspec/changes/add-map-overlays/specs/points-of-interest/spec.md.
+/// </summary>
+public static class PointOfInterestGenerator
+{
+    /// <summary>One lattice per category. Order and numbers are part of the frozen determinism contract - only ever append.</summary>
+    private static readonly (string Category, int BlockSize, double Density, int Tries)[] Layers =
+    [
+        (PointOfInterestCatalog.Relief, 110, 0.7, 12),
+        (PointOfInterestCatalog.Nature, 180, 0.55, 8),
+        (PointOfInterestCatalog.Sea, 200, 0.5, 5),
+        (PointOfInterestCatalog.Settlements, 420, 0.55, 6),
+        (PointOfInterestCatalog.Heritage, 340, 0.4, 6),
+        (PointOfInterestCatalog.Legends, 520, 0.3, 8),
+    ];
+
+    public static IReadOnlyList<string> Categories { get; } = PointOfInterestCatalog.Categories.Select(c => c.Id).ToList();
+
+    /// <summary>Every documented icon type, across all categories.</summary>
+    public static IReadOnlyList<string> Types { get; } = PointOfInterestCatalog.Entries.Select(e => e.Id).ToList();
+
+    public static IReadOnlyList<string> TypesOf(string category) =>
+        PointOfInterestCatalog.InCategory(category).Select(e => e.Id).ToList();
+
+    /// <summary>How far past the window (in sampled cells) a point still counts as touching it, so an icon straddling the edge is returned by both neighboring windows.</summary>
+    public const int EdgeMargin = 40;
+
+    /// <summary>Tightest a cluster packs its icons (in cells, i.e. on-screen pixels at every zoom) so satellites drawn at about 30px never sit on each other.</summary>
+    private const int ClusterSpacing = 26;
+
+    private const int SatelliteTries = 8;
+
+    // Terrain probes, in cells at step 1 (scaled by step at use).
+    private const int CoastReach = 8;
+    private const int WatersideReach = 10;
+    private const int CapeReach = 12;
+    private const int IsletReach = 12;
+    private const int NearCoastReach = 45;
+    private const int OpenSeaReach = 50;
+
+    // A lake is water with land on every side within LakeSteps strides of
+    // LakeStride cells, and no land closer than LakeMinStrides strides: a
+    // broad lake, not the edge of a bay.
+    private const int LakeSteps = 12;
+
+    private const int LakeStride = 12;
+
+    private const int LakeMinStrides = 2;
+
+    private static readonly (int X, int Y)[] Cardinal = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+    private static readonly (int X, int Y)[] Compass = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, -1), (1, -1), (-1, 1)];
+
+    public static PointsOfInterest Generate(string seed, int originX, int originY, int width, int height, int step = 1, string? category = null)
+    {
+        if (width < 1 || width > MapGenerator.MaxWindowDimension)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), $"width must be between 1 and {MapGenerator.MaxWindowDimension}");
+        }
+
+        if (height < 1 || height > MapGenerator.MaxWindowDimension)
+        {
+            throw new ArgumentOutOfRangeException(nameof(height), $"height must be between 1 and {MapGenerator.MaxWindowDimension}");
+        }
+
+        if (step < 1 || step > MapGenerator.MaxStep)
+        {
+            throw new ArgumentOutOfRangeException(nameof(step), $"step must be between 1 and {MapGenerator.MaxStep}");
+        }
+
+        if (category is not null && !Categories.Contains(category))
+        {
+            throw new ArgumentException($"category must be one of: {string.Join(", ", Categories)}", nameof(category));
+        }
+
+        var margin = EdgeMargin * step;
+        var minX = originX - margin;
+        var minY = originY - margin;
+        var maxX = originX + (width * step) + margin;
+        var maxY = originY + (height * step) + margin;
+        var probe = new BiomeProbe(seed, step);
+
+        var points = new List<PointOfInterest>();
+        foreach (var (cat, blockSize, density, tries) in Layers)
+        {
+            if (category is not null && category != cat)
+            {
+                continue;
+            }
+
+            // A settlement's satellites sit up to the largest radius from
+            // its anchor, so blocks that far outside the window can still
+            // reach into it.
+            var reach = cat == PointOfInterestCatalog.Settlements
+                ? PointOfInterestCatalog.SettlementSpecs.Max(s => s.Radius) * step
+                : 0;
+            var block = blockSize * step;
+            var minBlockX = FloorDiv(minX - reach, block);
+            var maxBlockX = FloorDiv(maxX + reach, block);
+            var minBlockY = FloorDiv(minY - reach, block);
+            var maxBlockY = FloorDiv(maxY + reach, block);
+            var entries = PointOfInterestCatalog.InCategory(cat).Where(e => e.Kind != PoiKind.Service).ToList();
+            for (var by = minBlockY; by <= maxBlockY; by++)
+            {
+                for (var bx = minBlockX; bx <= maxBlockX; bx++)
+                {
+                    // Each block gets its own stream, so what one block decides
+                    // never depends on the window or on any other block.
+                    var rng = new Rng($"{seed}:poi-{cat}:{bx}:{by}");
+                    if (rng.Float() >= density)
+                    {
+                        continue;
+                    }
+
+                    var placed = TryPlace(rng, probe, entries, bx, by, block, tries, step);
+                    if (placed is null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var point in Expand(rng, probe, placed.Value, cat, step))
+                    {
+                        if (point.X >= minX && point.X < maxX && point.Y >= minY && point.Y < maxY)
+                        {
+                            points.Add(point);
+                        }
+                    }
+                }
+            }
+        }
+
+        return new PointsOfInterest
+        {
+            Seed = seed,
+            OriginX = originX,
+            OriginY = originY,
+            Width = width,
+            Height = height,
+            Points = points,
+        };
+    }
+
+    /// <summary>Try a few jittered positions and keep the first whose biome and terrain suit some icon - lets rare-terrain categories still show up, and stays a pure function of the block.</summary>
+    private static (int X, int Y, PoiEntry Entry, Biome Biome)? TryPlace(Rng rng, BiomeProbe probe, IReadOnlyList<PoiEntry> entries, int bx, int by, int block, int tries, int step)
+    {
+        for (var attempt = 0; attempt < tries; attempt++)
+        {
+            // Kept off the block's edges so neighboring blocks' icons don't collide.
+            var tx = (int)((bx + 0.15 + (rng.Float() * 0.7)) * block);
+            var ty = (int)((by + 0.15 + (rng.Float() * 0.7)) * block);
+            var tierPick = rng.Float();
+            var pick = rng.Float();
+
+            var biome = probe.At(tx, ty);
+            var placementOk = new Dictionary<Placement, bool>();
+            var suitable = new List<PoiEntry>();
+            foreach (var e in entries)
+            {
+                if (e.Biomes.Contains(biome) && PlacementHolds(probe, e.Placement, tx, ty, step, placementOk))
+                {
+                    suitable.Add(e);
+                }
+            }
+
+            if (suitable.Count == 0)
+            {
+                continue;
+            }
+
+            var chosen = suitable.Any(e => e.Kind == PoiKind.Anchor)
+                ? PickAnchor(suitable, tierPick, pick)
+                : WeightedPick(suitable, e => e.Weight, pick);
+            return (tx, ty, chosen, biome);
+        }
+
+        return null;
+    }
+
+    /// <summary>Settlement size is drawn by its own rarity first, then the anchor within that size by its rarity.</summary>
+    private static PoiEntry PickAnchor(IReadOnlyList<PoiEntry> suitable, double tierPick, double pick)
+    {
+        var tiers = PointOfInterestCatalog.SettlementSpecs
+            .Where(s => suitable.Any(e => e.Tier == s.Tier))
+            .ToList();
+        var tier = WeightedPick(tiers, s => s.Weight, tierPick).Tier;
+        return WeightedPick(suitable.Where(e => e.Tier == tier).ToList(), e => e.Weight, pick);
+    }
+
+    private static T WeightedPick<T>(IReadOnlyList<T> items, Func<T, int> weight, double pick)
+    {
+        var total = items.Sum(weight);
+        var target = pick * total;
+        foreach (var item in items)
+        {
+            target -= weight(item);
+            if (target < 0)
+            {
+                return item;
+            }
+        }
+
+        return items[^1];
+    }
+
+    /// <summary>The placed icon itself and, for a settlement anchor, its satellites.</summary>
+    private static IEnumerable<PointOfInterest> Expand(Rng rng, BiomeProbe probe, (int X, int Y, PoiEntry Entry, Biome Biome) placed, string category, int step)
+    {
+        var (x, y, entry, biome) = placed;
+        if (entry.Kind != PoiKind.Anchor)
+        {
+            yield return new PointOfInterest { X = x, Y = y, Category = category, Type = entry.Id, Role = PoiRole.Single };
+            yield break;
+        }
+
+        var tier = entry.Tier!.Value;
+        yield return new PointOfInterest { X = x, Y = y, Category = category, Type = entry.Id, Role = PoiRole.Anchor, Tier = tier };
+
+        var spec = PointOfInterestCatalog.SpecOf(tier);
+        var taken = new List<(int X, int Y)> { (x, y) };
+        var spacing = ClusterSpacing * step;
+        foreach (var slot in spec.Services)
+        {
+            var service = PointOfInterestCatalog.Find(slot.Id)!;
+            var count = rng.Int(slot.Min, slot.Max);
+            for (var n = 0; n < count; n++)
+            {
+                for (var attempt = 0; attempt < SatelliteTries; attempt++)
+                {
+                    var angle = rng.Float() * 2 * Math.PI;
+                    var distance = (0.2 + (0.8 * Math.Sqrt(rng.Float()))) * spec.Radius * step;
+                    var sx = x + (int)(Math.Cos(angle) * distance);
+                    var sy = y + (int)(Math.Sin(angle) * distance);
+                    if (taken.Any(t => Math.Abs(t.X - sx) < spacing && Math.Abs(t.Y - sy) < spacing))
+                    {
+                        continue;
+                    }
+
+                    var local = probe.At(sx, sy);
+                    if (local == Biome.Ocean || (local != biome && local != Biome.Grassland))
+                    {
+                        continue;
+                    }
+
+                    if (!PlacementHolds(probe, service.Placement, sx, sy, step, new()))
+                    {
+                        continue;
+                    }
+
+                    taken.Add((sx, sy));
+                    yield return new PointOfInterest { X = sx, Y = sy, Category = category, Type = service.Id, Role = PoiRole.Satellite, Tier = tier };
+                    break;
+                }
+            }
+        }
+    }
+
+    /// <summary>Whether the terrain around (x, y) meets an icon's placement rule; memoized per candidate spot in `memo`.</summary>
+    private static bool PlacementHolds(BiomeProbe probe, Placement placement, int x, int y, int step, Dictionary<Placement, bool> memo)
+    {
+        if (placement == Placement.Anywhere)
+        {
+            return true;
+        }
+
+        if (memo.TryGetValue(placement, out var known))
+        {
+            return known;
+        }
+
+        var result = placement switch
+        {
+            Placement.Coast => probe.IsLand(x, y) && probe.WaterAt(x, y, CoastReach * step, Cardinal) >= 1,
+            Placement.Waterside => probe.IsLand(x, y) && (probe.WaterAt(x, y, WatersideReach * step, Compass) >= 1 || probe.WaterAt(x, y, WatersideReach * step / 2, Compass) >= 1),
+            Placement.Cape => probe.IsLand(x, y) && probe.WaterAt(x, y, CapeReach * step, Cardinal) >= 3,
+            Placement.Islet => probe.IsLand(x, y) && probe.WaterAt(x, y, IsletReach * step, Compass) == Compass.Length,
+            Placement.Lake => probe.IsWater(x, y) && IsLake(probe, x, y, step),
+            Placement.NearCoast => probe.IsWater(x, y) && probe.LandAt(x, y, NearCoastReach * step, Compass) >= 1,
+            Placement.OpenSea => probe.IsWater(x, y) && probe.LandAt(x, y, OpenSeaReach * step, Compass) == 0 && probe.LandAt(x, y, OpenSeaReach * step * 2, Compass) == 0,
+            _ => true,
+        };
+        memo[placement] = result;
+        return result;
+    }
+
+    /// <summary>
+    /// A lake is water enclosed by land: marching out along each compass
+    /// direction meets land within <see cref="LakeSteps"/> strides, and not
+    /// too close (broad water, not the edge of a bay). Open sea runs out of
+    /// strides in the very first ray, so it costs little to reject.
+    /// </summary>
+    private static bool IsLake(BiomeProbe probe, int x, int y, int step)
+    {
+        var stride = LakeStride * step;
+        foreach (var (dx, dy) in Compass)
+        {
+            var found = false;
+            for (var k = 1; k <= LakeSteps; k++)
+            {
+                if (probe.IsLand(x + (dx * stride * k), y + (dy * stride * k)))
+                {
+                    if (k <= LakeMinStrides)
+                    {
+                        return false;
+                    }
+
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>Biome lookups for one Generate call, cached: rays of neighbouring probes overlap a lot.</summary>
+    private sealed class BiomeProbe(string seed, int step)
+    {
+        private readonly Dictionary<(int, int), Biome> _cache = [];
+
+        public Biome At(int x, int y)
+        {
+            if (!_cache.TryGetValue((x, y), out var biome))
+            {
+                biome = MapGenerator.BiomeAt(seed, x, y, step);
+                _cache[(x, y)] = biome;
+            }
+
+            return biome;
+        }
+
+        public bool IsWater(int x, int y) => At(x, y) == Biome.Ocean;
+
+        public bool IsLand(int x, int y) => At(x, y) != Biome.Ocean;
+
+        /// <summary>How many of `directions` find water exactly `reach` cells away.</summary>
+        public int WaterAt(int x, int y, int reach, (int X, int Y)[] directions) =>
+            directions.Count(d => IsWater(x + (d.X * reach), y + (d.Y * reach)));
+
+        /// <summary>How many of `directions` find land at `reach`, or half of it - a coast that a single ray might skip over.</summary>
+        public int LandAt(int x, int y, int reach, (int X, int Y)[] directions) =>
+            directions.Count(d => IsLand(x + (d.X * reach), y + (d.Y * reach)) || IsLand(x + (d.X * reach / 2), y + (d.Y * reach / 2)));
+    }
+
+    private static int FloorDiv(int value, int divisor) => (int)Math.Floor((double)value / divisor);
+}

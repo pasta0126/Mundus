@@ -120,6 +120,88 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/PointsOfInterest/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PointOfInterestCatalogResponse"];
+                        "application/json": components["schemas"]["PointOfInterestCatalogResponse"];
+                        "text/json": components["schemas"]["PointOfInterestCatalogResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/PointsOfInterest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    seed?: string;
+                    x?: number | string;
+                    y?: number | string;
+                    width?: number | string;
+                    height?: number | string;
+                    step?: number | string;
+                    category?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["PointsOfInterest"];
+                        "application/json": components["schemas"]["PointsOfInterest"];
+                        "text/json": components["schemas"]["PointsOfInterest"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/Regions": {
         parameters: {
             query?: never;
@@ -202,6 +284,61 @@ export interface components {
             height: number | string;
             cells: components["schemas"]["Cell"][];
         };
+        /**
+         * @default Anywhere
+         * @enum {unknown}
+         */
+        Placement: "Anywhere" | "Coast" | "Cape" | "Islet" | "Lake" | "NearCoast" | "OpenSea" | "Waterside";
+        PoiCategory: {
+            id: string;
+            label: string;
+        };
+        PoiEntry: {
+            id: string;
+            label: string;
+            description: string;
+            category: string;
+            kind: components["schemas"]["PoiKind"];
+            rarity: components["schemas"]["Rarity"];
+            biomes: components["schemas"]["Biome"][];
+            placement?: components["schemas"]["Placement"];
+            tier?: null | components["schemas"]["SettlementTier"];
+            /** Format: int32 */
+            weight?: number | string;
+        };
+        /** @enum {unknown} */
+        PoiKind: "Terrain" | "Anchor" | "Service" | "Singular";
+        PointOfInterest: {
+            /** Format: int32 */
+            x: number | string;
+            /** Format: int32 */
+            y: number | string;
+            category: string;
+            type: string;
+            role: components["schemas"]["PoiRole"];
+            tier?: null | components["schemas"]["SettlementTier"];
+        };
+        PointOfInterestCatalogResponse: {
+            categories: components["schemas"]["PoiCategory"][];
+            entries: components["schemas"]["PoiEntry"][];
+            settlements: components["schemas"]["SettlementSpec"][];
+        };
+        PointsOfInterest: {
+            seed: string;
+            /** Format: int32 */
+            originX: number | string;
+            /** Format: int32 */
+            originY: number | string;
+            /** Format: int32 */
+            width: number | string;
+            /** Format: int32 */
+            height: number | string;
+            points: components["schemas"]["PointOfInterest"][];
+        };
+        /** @enum {unknown} */
+        PoiRole: "Single" | "Anchor" | "Satellite";
+        /** @enum {unknown} */
+        Rarity: "Exceptional" | "Rare" | "Uncommon" | "Common";
         RegionBoundaries: {
             seed: string;
             /** Format: int32 */
@@ -214,6 +351,24 @@ export interface components {
             height: number | string;
             points: components["schemas"]["BoundaryPoint"][];
         };
+        ServiceSlot: {
+            id: string;
+            /** Format: int32 */
+            min: number | string;
+            /** Format: int32 */
+            max: number | string;
+        };
+        SettlementSpec: {
+            tier: components["schemas"]["SettlementTier"];
+            rarity: components["schemas"]["Rarity"];
+            /** Format: int32 */
+            radius: number | string;
+            services: components["schemas"]["ServiceSlot"][];
+            /** Format: int32 */
+            weight?: number | string;
+        };
+        /** @enum {unknown} */
+        SettlementTier: "Point" | "Small" | "Medium" | "Large" | "Huge" | null;
     };
     responses: never;
     parameters: never;
