@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Dices, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react"
+import { ArrowLeft, ArrowRight, Dices, Globe, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
@@ -50,7 +50,7 @@ function urlForView(view: View): string {
 
 function describeCentral(system: SystemDto): string {
   const names = system.central.map((body) => KIND_LABELS[body.kind])
-  const kind = names.length === 1 ? "Single" : names.length === 2 ? "Binary" : "Triple"
+  const kind = names.length === 1 ? "Single" : "Binary"
   return `${kind} system: ${names.join(", ")}`
 }
 
@@ -313,11 +313,13 @@ export default function SystemsPage() {
               </div>
             )
           )}
-
-          <a href="/planets" className="text-muted-foreground hover:text-foreground block text-center text-xs">
-            Explore single planets
-          </a>
         </div>
+        <Button asChild variant="outline" className="shadow-lg">
+          <a href="/planets">
+            <Globe />
+            Planets
+          </a>
+        </Button>
       </div>
 
       {loading && (

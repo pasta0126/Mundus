@@ -13,7 +13,7 @@ touching the map engine.
   (type, palette, radius, atmosphere and clouds, rings, own asteroid
   field, 0-3 moons, axial tilt and spin) as a small JSON description.
 - Add deterministic **system generation**: a text seed yields a central
-  group of 1-3 bodies (stars or compact objects), 1-8 planet slots (each with
+  group of one or two bodies (stars, or a lone compact object), 1-8 planet slots (each with
   its own planet seed and orbit), and at most one asteroid belt. Orbits are
   mostly coplanar, with an occasional inclined one.
 - Add a **custom system** mode: a central seed plus an explicit list of

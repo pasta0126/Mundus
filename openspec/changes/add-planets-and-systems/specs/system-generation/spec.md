@@ -1,6 +1,6 @@
 ## Purpose
 Generate a reproducible planetary system from a text seed - a central group of
-one to three bodies, planet slots on orbits, and at most one asteroid belt -
+one or two bodies, planet slots on orbits, and at most one asteroid belt -
 and allow a custom system to be described entirely by a URL.
 
 ## ADDED Requirements
@@ -15,18 +15,23 @@ different systems.
 - **WHEN** the same system seed is requested twice
 - **THEN** both descriptions are identical
 
-### Requirement: Central group of one to three bodies
-Every system SHALL have a central group of one, two, or three bodies, chosen
+### Requirement: Central group of one or two bodies
+Every system SHALL have a central group of one or two bodies (single or binary, never more), chosen
 by the system's seed. Each body SHALL be one of a fixed, documented set of
 kinds: stars of several types (for example red dwarf, yellow, orange, blue
 giant, white dwarf) and compact objects (black hole, pulsar). Each body SHALL
 carry a size, a color, and a deterministic orbit around the group's common
-center; a group of one body sits at the center. Planets orbit the common
-center of the group.
+center; a group of one body sits at the center. A black hole SHALL only
+ever appear alone: a system whose central group has a black hole has no
+other central body. Planets orbit the common center of the group.
 
-#### Scenario: The group has one to three bodies
+#### Scenario: The group has one or two bodies
 - **WHEN** any system is generated
-- **THEN** its central group has one, two, or three bodies, each of a documented kind
+- **THEN** its central group has one or two bodies, each of a documented kind
+
+#### Scenario: A black hole is always alone
+- **WHEN** a system's central group contains a black hole
+- **THEN** the group has exactly one body, the black hole, at the center
 
 #### Scenario: A single body sits at the center
 - **WHEN** a system's central group has one body

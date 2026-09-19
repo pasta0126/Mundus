@@ -415,16 +415,20 @@ function App() {
                     Download
                   </Button>
                 </div>
-                <div className="text-muted-foreground flex items-center justify-center gap-3 text-xs">
-                  <a href="/planets" className="hover:text-foreground flex items-center gap-1.5">
-                    <Globe className="size-3.5" />
+              </div>
+              <div className="flex gap-2">
+                <Button asChild variant="outline" className="flex-1 shadow-lg">
+                  <a href="/planets">
+                    <Globe />
                     Planets
                   </a>
-                  <a href="/systems" className="hover:text-foreground flex items-center gap-1.5">
-                    <Orbit className="size-3.5" />
+                </Button>
+                <Button asChild variant="outline" className="flex-1 shadow-lg">
+                  <a href="/systems">
+                    <Orbit />
                     Systems
                   </a>
-                </div>
+                </Button>
               </div>
             </div>
             <div className="flex items-start gap-3">

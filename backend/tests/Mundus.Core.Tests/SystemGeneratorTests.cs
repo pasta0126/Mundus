@@ -28,15 +28,26 @@ public class SystemGeneratorTests
     }
 
     [Fact]
-    public void CentralGroupHasOneToThreeBodiesOfEveryKind()
+    public void CentralGroupIsSingleOrBinaryAndEveryKindAppears()
     {
         var systems = ManySystems().ToList();
-        Assert.All(systems, s => Assert.InRange(s.Central.Count, 1, 3));
+        Assert.All(systems, s => Assert.InRange(s.Central.Count, 1, SystemGenerator.MaxCentralBodies));
         Assert.Contains(systems, s => s.Central.Count == 1);
         Assert.Contains(systems, s => s.Central.Count == 2);
-        Assert.Contains(systems, s => s.Central.Count == 3);
         var kinds = systems.SelectMany(s => s.Central).Select(b => b.Kind).ToHashSet();
         Assert.Equal(Enum.GetValues<CentralBodyKind>().Length, kinds.Count);
+    }
+
+    [Fact]
+    public void ABlackHoleIsAlwaysAloneAtTheCenter()
+    {
+        var holes = ManySystems(600).Where(s => s.Central.Any(b => b.Kind == CentralBodyKind.BlackHole)).ToList();
+        Assert.NotEmpty(holes);
+        Assert.All(holes, s =>
+        {
+            Assert.Single(s.Central);
+            Assert.Null(s.Central[0].Orbit);
+        });
     }
 
     [Fact]

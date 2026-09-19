@@ -28,7 +28,7 @@ const LIGHT_INTENSITY: Record<components["schemas"]["CentralBodyKind"], number> 
   BlueGiant: 6,
   WhiteDwarf: 2.5,
   Pulsar: 1.5,
-  BlackHole: 0.4,
+  BlackHole: 1.6,
 }
 
 function glowTexture(): THREE.CanvasTexture {
@@ -119,6 +119,8 @@ export function SystemScene({ system, onSelectPlanet }: { system: SystemDto; onS
         )
         disc.rotation.x = Math.PI / 2 - 0.25
         holder.add(disc)
+        // The hot disc, not the hole itself, is what lights the planets.
+        holder.add(new THREE.PointLight("#ff9a3d", LIGHT_INTENSITY[body.kind], 0, 0))
       } else {
         const sprite = new THREE.Sprite(
           new THREE.SpriteMaterial({ map: glow, color: body.color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }),

@@ -14,7 +14,7 @@
 
 ## 3. System generation (backend)
 
-- [x] 3.1 Implement the central group (1-3 bodies, kinds, sizes, colors, orbits around the common center)
+- [x] 3.1 Implement the central group (1 or 2 bodies, a black hole always alone, kinds, sizes, colors, orbits around the common center)
 - [x] 3.2 Implement 1-8 planet slots with `<seed>/<n>` planet seeds and outward-ordered orbits derived from (seed, index)
 - [x] 3.3 Implement inclinations (mostly coplanar, occasional inclined orbit)
 - [x] 3.4 Implement the optional single asteroid belt between two neighboring slots

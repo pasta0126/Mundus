@@ -1,4 +1,4 @@
-import { ArrowRight, Dices, RefreshCw } from "lucide-react"
+import { ArrowRight, Dices, Orbit, RefreshCw } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { api } from "@/api/client"
 import mundusIcon from "@/assets/mundus-icon-header.png"
@@ -114,11 +114,13 @@ export default function PlanetsPage() {
           </form>
 
           {planet && !error && <PlanetSheet planet={planet} />}
-
-          <a href="/systems" className="text-muted-foreground hover:text-foreground block text-center text-xs">
-            Explore whole systems
-          </a>
         </div>
+        <Button asChild variant="outline" className="shadow-lg">
+          <a href="/systems">
+            <Orbit />
+            Systems
+          </a>
+        </Button>
       </div>
 
       {loading && (

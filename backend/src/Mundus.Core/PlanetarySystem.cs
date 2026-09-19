@@ -61,7 +61,7 @@ public sealed record PlanetarySystem
 }
 
 /// <summary>
-/// Derives a whole system from its seed: a central group of one to three
+/// Derives a whole system from its seed: a central group of one or two
 /// bodies, up to eight planet slots, and at most one asteroid belt. A custom
 /// system supplies its own planet seeds and belt position but takes the
 /// central group and every orbit from the central seed exactly as a
@@ -74,8 +74,11 @@ public sealed record PlanetarySystem
 /// </summary>
 public static class SystemGenerator
 {
-    public const int CurrentSpecVersion = 1;
+    public const int CurrentSpecVersion = 2;
     public const int MaxPlanets = 8;
+
+    /// <summary>A system is single or binary; never more.</summary>
+    public const int MaxCentralBodies = 2;
 
     /// <summary>Room for the "/n" suffix of a slot's planet seed.</summary>
     public const int MaxSeedLength = SeedNormalizer.MaxLength - 2;
@@ -86,7 +89,7 @@ public static class SystemGenerator
     ];
 
     private static readonly IReadOnlyList<Rng.WeightedItem<int>> GroupSizeWeights =
-        [new(1, 60), new(2, 30), new(3, 10)];
+        [new(1, 65), new(2, 35)];
 
     private static readonly IReadOnlyList<Rng.WeightedItem<CentralBodyKind>> KindWeights =
     [
@@ -223,7 +226,9 @@ public static class SystemGenerator
     {
         var rng = new Rng($"{seed}|central");
         var count = rng.Weighted(GroupSizeWeights);
-        var kinds = Enumerable.Range(0, count).Select(_ => rng.Weighted(KindWeights)).ToList();
+        // A black hole owns the center: it only ever appears alone.
+        var pool = count == 1 ? KindWeights : KindWeights.Where(w => w.Value != CentralBodyKind.BlackHole).ToList();
+        var kinds = Enumerable.Range(0, count).Select(_ => rng.Weighted(pool)).ToList();
         var looks = kinds.Select(Look).ToList();
 
         if (count == 1)
@@ -232,8 +237,7 @@ public static class SystemGenerator
             return [new CentralBody { Kind = kinds[0], Size = looks[0].Size, Color = looks[0].Color, Orbit = null }];
         }
 
-        // A tight pair orbits the common center in opposite phases; a third
-        // body, if any, circles the pair from further out and more slowly.
+        // A tight pair orbits the common center in opposite phases.
         var pairRadius = Round(Math.Max(looks[0].Size, looks[1].Size) * 1.3 + 0.3);
         var pairPeriod = Round(8 + rng.Float() * 10);
         var phase = Round(rng.Float() * 360);
@@ -255,25 +259,6 @@ public static class SystemGenerator
             });
         }
         extent = pairRadius + Math.Max(looks[0].Size, looks[1].Size);
-
-        if (count == 3)
-        {
-            var radius = Round(pairRadius + looks[2].Size + 2.0 + rng.Float() * 1.5);
-            bodies.Add(new CentralBody
-            {
-                Kind = kinds[2],
-                Size = looks[2].Size,
-                Color = looks[2].Color,
-                Orbit = new Orbit
-                {
-                    Radius = radius,
-                    PeriodSeconds = Round(pairPeriod * 2.5),
-                    PhaseDegrees = Round(rng.Float() * 360),
-                    InclinationDegrees = 0,
-                },
-            });
-            extent = radius + looks[2].Size;
-        }
 
         return bodies;
     }

@@ -54,7 +54,7 @@ which is accepted.
 period, initial phase, and inclination. The frontend computes
 `position(t)` from those, starting `t` at 0 on load, so initial positions
 are identical for everyone and no server-side clock is involved. Central
-bodies (1-3) orbit the group's common center at small radii; planets orbit
+bodies (one or two) orbit the group's common center at small radii; planets orbit
 that center rather than a single star. Inclinations are mostly zero or
 small, with an occasional large tilt.
 
@@ -90,10 +90,10 @@ ask for*, so it does not touch determinism.
   no mitigation beyond the 32-bit space.
 - [Three.js weight added to the bundle] -> Load the 3D code only for the new
   routes (lazy import) so the map page is not slowed.
-- [Inclined orbits and 1-3 bodies make the system view busier] -> Keep sizes
+- [Inclined orbits and binary stars make the system view busier] -> Keep sizes
   and speeds simple, draw orbit lines, and rely on the shared orbit controls.
 - [Low-end devices with many moons, rings, and orbits] -> Bounded counts
-  (at most 8 planets, 3 moons, 3 central bodies, 1 belt) and simple geometry.
+  (at most 8 planets, 3 moons, 2 central bodies, 1 belt) and simple geometry.
 - [Touch-first devices] -> Not optimized yet, consistent with the existing
   phone notice.
 
