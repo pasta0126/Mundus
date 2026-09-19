@@ -82,7 +82,7 @@ public class PointOfInterestCatalogTests
         // A biome no icon may sit on would be a permanent blank on the map.
         foreach (var biome in Enum.GetValues<Biome>())
         {
-            Assert.Contains(PointOfInterestCatalog.Entries, e => e.Kind is PoiKind.Terrain or PoiKind.Singular && e.Biomes.Contains(biome));
+            Assert.Contains(PointOfInterestCatalog.Entries, e => e.Enabled && e.Kind is PoiKind.Terrain or PoiKind.Singular && e.Biomes.Contains(biome));
         }
     }
 
@@ -150,6 +150,17 @@ public class PointOfInterestCatalogTests
         // Every Service entry must be used by at least one settlement spec, or it would never appear.
         var used = PointOfInterestCatalog.SettlementSpecs.SelectMany(s => s.Services).Select(s => s.Id).ToHashSet();
         Assert.All(PointOfInterestCatalog.Entries.Where(e => e.Kind == PoiKind.Service), e => Assert.Contains(e.Id, used));
+    }
+
+    [Fact]
+    public void RetiredIconsStayCataloguedWithTheirArtwork()
+    {
+        // Retiring an icon only stops it being placed: its entry and artwork stay so it can come back.
+        var retired = PointOfInterestCatalog.Entries.Where(e => !e.Enabled).Select(e => e.Id).ToList();
+        Assert.Equal(
+            new[] { "archipelago", "canyon", "desert", "forest", "island", "lake", "mesa", "palm-islands", "pine-forest", "sailboat", "swamp" },
+            retired.Order().ToArray());
+        Assert.All(retired, id => Assert.True(File.Exists(Path.Combine(ArtworkRoot(), $"{id}.png")), $"missing {id}.png"));
     }
 
     [Fact]

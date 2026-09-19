@@ -28,6 +28,17 @@ artwork in every supported style.
 - **WHEN** the catalog is compared with the artwork of every style
 - **THEN** each entry has an image in each style and no image lacks an entry
 
+### Requirement: Icons can be retired without being deleted
+A catalog entry MAY be retired: it stays in the catalog with its placement
+rules and artwork, but SHALL NOT be generated, so it never appears on the
+map, in a settlement's services, or among the icon types the generator can
+place. Bringing an icon back is a catalog change only.
+
+#### Scenario: A retired icon never appears
+- **WHEN** many seeds are generated
+- **THEN** no point has a retired icon's type, while the icon's catalog
+  entry and artwork are still present
+
 ### Requirement: Rarity as a numeric weight
 Each icon SHALL carry a rarity - common (100), uncommon (35), rare (10) or
 exceptional (2) - used as the weight with which it is drawn among the icons

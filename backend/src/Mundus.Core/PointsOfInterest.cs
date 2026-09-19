@@ -58,7 +58,7 @@ public static class PointOfInterestGenerator
     [
         (PointOfInterestCatalog.Relief, PointOfInterestCatalog.Relief, 110, 0.9, 12, 100, false),
         (PointOfInterestCatalog.Nature, PointOfInterestCatalog.Nature, 150, 0.9, 8, 100, false),
-        (PointOfInterestCatalog.Sea, PointOfInterestCatalog.Sea, 170, 0.8, 5, 100, false),
+        (PointOfInterestCatalog.Sea, PointOfInterestCatalog.Sea, 170, 0.8, 5, 40, false),
         (PointOfInterestCatalog.Settlements, PointOfInterestCatalog.Settlements, 420, 0.55, 6, 0, false),
         (PointOfInterestCatalog.Heritage, PointOfInterestCatalog.Heritage, 300, 0.6, 6, 35, false),
         (PointOfInterestCatalog.Legends, PointOfInterestCatalog.Legends, 520, 0.45, 8, 20, false),
@@ -69,17 +69,17 @@ public static class PointOfInterestGenerator
     /// <summary>The icons each layer may place, in <see cref="Layers"/> order (services only ever come with their settlement; shore layers take only the geometry-bound ones).</summary>
     private static readonly IReadOnlyList<PoiEntry>[] LayerEntries = Layers
         .Select(l => (IReadOnlyList<PoiEntry>)PointOfInterestCatalog.InCategory(l.Category)
-            .Where(e => e.Kind != PoiKind.Service && (e.Placement is Placement.Cape or Placement.Islet or Placement.Coast) == l.SeekCoast)
+            .Where(e => e.Enabled && e.Kind != PoiKind.Service && (e.Placement is Placement.Cape or Placement.Islet or Placement.Coast) == l.SeekCoast)
             .ToList())
         .ToArray();
 
     public static IReadOnlyList<string> Categories { get; } = PointOfInterestCatalog.Categories.Select(c => c.Id).ToList();
 
-    /// <summary>Every documented icon type, across all categories.</summary>
-    public static IReadOnlyList<string> Types { get; } = PointOfInterestCatalog.Entries.Select(e => e.Id).ToList();
+    /// <summary>Every icon type the generator can place, across all categories (retired ones excluded).</summary>
+    public static IReadOnlyList<string> Types { get; } = PointOfInterestCatalog.Entries.Where(e => e.Enabled).Select(e => e.Id).ToList();
 
     public static IReadOnlyList<string> TypesOf(string category) =>
-        PointOfInterestCatalog.InCategory(category).Select(e => e.Id).ToList();
+        PointOfInterestCatalog.InCategory(category).Where(e => e.Enabled).Select(e => e.Id).ToList();
 
     /// <summary>How far past the window (in sampled cells) a point still counts as touching it, so an icon straddling the edge is returned by both neighboring windows.</summary>
     public const int EdgeMargin = 40;
@@ -409,6 +409,11 @@ public static class PointOfInterestGenerator
         foreach (var slot in spec.Services)
         {
             var service = PointOfInterestCatalog.Find(slot.Id)!;
+            if (!service.Enabled)
+            {
+                continue;
+            }
+
             var count = rng.Int(slot.Min, slot.Max);
             for (var n = 0; n < count; n++)
             {

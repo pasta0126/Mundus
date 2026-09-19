@@ -305,6 +305,7 @@ export interface components {
             tier?: null | components["schemas"]["SettlementTier"];
             /** Format: int32 */
             weight?: number | string;
+            enabled?: boolean;
         };
         /** @enum {unknown} */
         PoiKind: "Terrain" | "Anchor" | "Service" | "Singular";

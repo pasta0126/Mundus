@@ -201,8 +201,7 @@ public class PointOfInterestGeneratorTests
         }
 
         // Rules are only worth what they were checked on.
-        Assert.Contains("lake", checkedTypes);
-        Assert.Contains("island", checkedTypes);
+        Assert.Contains("fishing-spot", checkedTypes);
         Assert.Contains("whirlpool", checkedTypes);
     }
 
@@ -286,6 +285,17 @@ public class PointOfInterestGeneratorTests
         }
 
         Assert.True(checkedAnchors > 100, "too few settlements were checked - the comparison was vacuous");
+    }
+
+    [Fact]
+    public void RetiredIconsAreNeverPlaced()
+    {
+        var retired = PointOfInterestCatalog.Entries.Where(e => !e.Enabled).Select(e => e.Id).ToHashSet();
+        Assert.NotEmpty(retired);
+        var seen = ManyPoints(120).Select(s => s.Point.Type).ToHashSet();
+        Assert.NotEmpty(seen);
+        Assert.Empty(seen.Intersect(retired));
+        Assert.Empty(PointOfInterestGenerator.Types.Intersect(retired));
     }
 
     [Fact]

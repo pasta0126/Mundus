@@ -74,6 +74,7 @@ public enum Placement
 /// <param name="Id">Also the artwork's file stem: assets/poi/&lt;id&gt;.png.</param>
 /// <param name="Category">A layer the user can switch on/off - one of <see cref="PointOfInterestCatalog.Categories"/>.</param>
 /// <param name="Tier">Only for <see cref="PoiKind.Anchor"/>.</param>
+/// <remarks>See <see cref="PoiEntry.Enabled"/> for retiring an icon without deleting it.</remarks>
 public sealed record PoiEntry(
     string Id,
     string Label,
@@ -86,6 +87,9 @@ public sealed record PoiEntry(
     SettlementTier? Tier = null)
 {
     public int Weight => (int)Rarity;
+
+    /// <summary>False for a retired icon: it stays in the catalog and keeps its artwork, but the generator never places it.</summary>
+    public bool Enabled { get; init; } = true;
 }
 
 public sealed record PoiCategory(string Id, string Label);
@@ -145,8 +149,18 @@ public static class PointOfInterestCatalog
     private static PoiEntry Entry(string id, string label, string description, string category, PoiKind kind, Rarity rarity, Biome[] biomes, Placement placement = Placement.Anywhere, SettlementTier? tier = null) =>
         new(id, label, description, category, kind, rarity, biomes, placement, tier);
 
-    /// <summary>Every icon, in the order of the artwork sheet. Ids are frozen - only ever append.</summary>
-    public static IReadOnlyList<PoiEntry> Entries { get; } =
+    /// <summary>
+    /// Icons switched off for now: still catalogued (their placement rules and
+    /// artwork stay in place) but never generated. To bring one back, remove
+    /// its id here.
+    /// </summary>
+    private static readonly HashSet<string> Retired =
+    [
+        "archipelago", "desert", "canyon", "forest", "island", "lake", "mesa",
+        "palm-islands", "pine-forest", "sailboat", "swamp",
+    ];
+
+    private static readonly PoiEntry[] AllEntries =
     [
         // -- Relief & geology --------------------------------------------------
         Entry("mountain-peak", "Mountain peak", "A lone, snow-capped summit", Relief, PoiKind.Terrain, Rarity.Common, Mountain),
@@ -178,8 +192,8 @@ public static class PointOfInterestCatalog
         Entry("archipelago", "Archipelago", "A scatter of green islets", Sea, PoiKind.Terrain, Rarity.Uncommon, OpenWater, Placement.NearCoast),
         Entry("sea-stacks", "Sea stacks", "Rocks rising from the waves", Sea, PoiKind.Terrain, Rarity.Rare, OpenWater, Placement.NearCoast),
         Entry("whirlpool", "Whirlpool", "A churning maw in the open sea", Sea, PoiKind.Terrain, Rarity.Rare, OpenWater, Placement.OpenSea),
-        Entry("fishing-spot", "Fishing grounds", "Shoals teeming with fish", Sea, PoiKind.Terrain, Rarity.Uncommon, OpenWater, Placement.NearCoast),
-        Entry("shipwreck", "Shipwreck", "A vessel that never made port", Sea, PoiKind.Terrain, Rarity.Rare, OpenWater),
+        Entry("fishing-spot", "Fishing grounds", "Shoals teeming with fish", Sea, PoiKind.Terrain, Rarity.Rare, OpenWater, Placement.NearCoast),
+        Entry("shipwreck", "Shipwreck", "A vessel that never made port", Sea, PoiKind.Terrain, Rarity.Rare, OpenWater, Placement.NearCoast),
 
         // -- Settlements: lone points ------------------------------------------
         Entry("camp", "Camp", "A tent and a fire beside the trail", Settlements, PoiKind.Anchor, Rarity.Common, [Biome.Grassland, Biome.Forest, Biome.Tundra, Biome.Desert], tier: SettlementTier.Point),
@@ -250,6 +264,11 @@ public static class PointOfInterestCatalog
         Entry("treasure", "Treasure", "Riches lost or buried", Legends, PoiKind.Singular, Rarity.Exceptional, Land),
         Entry("balloon", "Balloon", "A hot-air balloon adrift", Legends, PoiKind.Singular, Rarity.Exceptional, Plains),
     ];
+
+    /// <summary>Every icon, in the order of the artwork sheet, retired ones included (see <see cref="PoiEntry.Enabled"/>). Ids are frozen - only ever append.</summary>
+    public static IReadOnlyList<PoiEntry> Entries { get; } = AllEntries
+        .Select(e => Retired.Contains(e.Id) ? e with { Enabled = false } : e)
+        .ToList();
 
     /// <summary>What each core size contains: the icons that cluster around its anchor. Ordered small to huge.</summary>
     public static IReadOnlyList<SettlementSpec> SettlementSpecs { get; } =
