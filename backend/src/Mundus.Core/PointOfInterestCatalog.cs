@@ -71,7 +71,7 @@ public enum Placement
     Waterside,
 }
 
-/// <param name="Id">Also the artwork's file stem: assets/poi-suite/&lt;style&gt;/&lt;id&gt;.png.</param>
+/// <param name="Id">Also the artwork's file stem: assets/poi/&lt;id&gt;.png.</param>
 /// <param name="Category">A layer the user can switch on/off - one of <see cref="PointOfInterestCatalog.Categories"/>.</param>
 /// <param name="Tier">Only for <see cref="PoiKind.Anchor"/>.</param>
 public sealed record PoiEntry(

@@ -5,10 +5,8 @@ namespace Mundus.Core.Tests;
 
 public class PointOfInterestCatalogTests
 {
-    private static readonly string[] Styles = ["color", "fantasy", "line"];
-
     private static string ArtworkRoot() =>
-        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../frontend/src/assets/poi-suite"));
+        Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../frontend/src/assets/poi"));
 
     private static readonly Biome[] WaterBiomes = [Biome.Ocean];
 
@@ -21,16 +19,13 @@ public class PointOfInterestCatalogTests
     }
 
     [Fact]
-    public void EveryEntryHasArtworkInEveryStyle()
+    public void EveryEntryHasArtwork()
     {
         var root = ArtworkRoot();
         Assert.True(Directory.Exists(root), $"artwork folder not found: {root}");
-        foreach (var style in Styles)
+        foreach (var entry in PointOfInterestCatalog.Entries)
         {
-            foreach (var entry in PointOfInterestCatalog.Entries)
-            {
-                Assert.True(File.Exists(Path.Combine(root, style, $"{entry.Id}.png")), $"missing {style}/{entry.Id}.png");
-            }
+            Assert.True(File.Exists(Path.Combine(root, $"{entry.Id}.png")), $"missing {entry.Id}.png");
         }
     }
 
@@ -38,11 +33,8 @@ public class PointOfInterestCatalogTests
     public void NoArtworkIsLeftUncatalogued()
     {
         var known = PointOfInterestCatalog.Entries.Select(e => e.Id).ToHashSet();
-        foreach (var style in Styles)
-        {
-            var files = Directory.GetFiles(Path.Combine(ArtworkRoot(), style), "*.png").Select(f => Path.GetFileNameWithoutExtension(f)!);
-            Assert.All(files, f => Assert.True(known.Contains(f), $"{style}/{f}.png has no catalog entry"));
-        }
+        var files = Directory.GetFiles(ArtworkRoot(), "*.png").Select(f => Path.GetFileNameWithoutExtension(f)!);
+        Assert.All(files, f => Assert.True(known.Contains(f), $"{f}.png has no catalog entry"));
     }
 
     [Fact]

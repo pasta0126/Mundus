@@ -258,6 +258,37 @@ public class PointOfInterestGeneratorTests
     }
 
     [Fact]
+    public void ScatteredIconsKeepOutOfSettlements()
+    {
+        // Nothing but a settlement's own icons may sit within its footprint: its anchor's radius plus a pad.
+        const int pad = 28;
+        var checkedAnchors = 0;
+        for (var i = 0; i < 300; i++)
+        {
+            var points = Window($"poi-zone-{i}", -1024, -1024, 512, 512).Points;
+            var anchors = points.Where(p => p.Role == PoiRole.Anchor).ToList();
+            // Only points far enough inside that any anchor able to reach them was returned too.
+            var inner = points.Where(p => p.Category != PointOfInterestCatalog.Settlements
+                && p.X > -1024 + ((150 + pad) * Step) && p.X < 1024 - ((150 + pad) * Step)
+                && p.Y > -1024 + ((150 + pad) * Step) && p.Y < 1024 - ((150 + pad) * Step)).ToList();
+            foreach (var a in anchors)
+            {
+                var reach = (PointOfInterestCatalog.SpecOf(a.Tier!.Value).Radius + pad) * Step;
+                foreach (var p in inner)
+                {
+                    long dx = a.X - p.X;
+                    long dy = a.Y - p.Y;
+                    Assert.True((dx * dx) + (dy * dy) > (long)reach * reach, $"{p.Type} at ({p.X},{p.Y}) sits inside the {a.Tier} settlement {a.Type} at ({a.X},{a.Y}) in poi-zone-{i}");
+                }
+
+                checkedAnchors++;
+            }
+        }
+
+        Assert.True(checkedAnchors > 100, "too few settlements were checked - the comparison was vacuous");
+    }
+
+    [Fact]
     public void ShoreIconsDoAppear()
     {
         // Capes, islets and shores are found by a dedicated shoreline search; without it these would never show up.

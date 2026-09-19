@@ -14,7 +14,6 @@ import { CHUNK_CONCURRENCY, CHUNK_SIZE, MAX_TOTAL_DIMENSION, ZOOM_LEVELS } from 
 import { MapCanvas } from "@/map/MapCanvas"
 import { MapParamsPanel } from "@/map/MapParamsPanel"
 import { PointsOfInterestLayer } from "@/map/PointsOfInterestLayer"
-import { loadPoiStyle, savePoiStyle, type PoiStyle } from "@/map/poi"
 import { RegionBordersLayer } from "@/map/RegionBordersLayer"
 import { computeChunkGrid, runWithConcurrency } from "@/map/tiling"
 
@@ -57,8 +56,6 @@ function App() {
   const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [regionBordersCanvasEl, setRegionBordersCanvasEl] = useState<HTMLCanvasElement | null>(null)
   const [poiCanvasEl, setPoiCanvasEl] = useState<HTMLCanvasElement | null>(null)
-  const [poiTypes, setPoiTypes] = useState<string[]>([])
-  const [poiStyle, setPoiStyle] = useState<PoiStyle>(loadPoiStyle)
   const [showLegend, setShowLegend] = useState(false)
   const [showLayers, setShowLayers] = useState(false)
   const [layerVisibility, setLayerVisibility] = useState<Record<LayerId, boolean>>(defaultLayerVisibility)
@@ -67,11 +64,6 @@ function App() {
   const visiblePoiCategories = LAYER_REGISTRY.flatMap((layer) =>
     layer.poiCategory && layerVisibility[layer.id] ? [layer.poiCategory] : [],
   )
-
-  function changePoiStyle(style: PoiStyle) {
-    setPoiStyle(style)
-    savePoiStyle(style)
-  }
 
   function toggleLayer(id: LayerId) {
     setLayerVisibility((prev) => ({ ...prev, [id]: !prev[id] }))
@@ -324,10 +316,11 @@ function App() {
           cellPx={viewWindow.cellPx}
           step={viewWindow.step}
           generation={viewWindow.generation}
-          style={poiStyle}
+          // Icons wait for the terrain: the map is what people came for, and
+          // every icon request competes with a terrain chunk for the wire.
+          enabled={!loading}
           visibleCategories={visiblePoiCategories}
           onCanvasReady={setPoiCanvasEl}
-          onTypesPresent={setPoiTypes}
         />
       )}
 
@@ -429,7 +422,7 @@ function App() {
                     exit={{ opacity: 0, x: -8 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <LayersPanel visibility={layerVisibility} onToggle={toggleLayer} poiStyle={poiStyle} onPoiStyleChange={changePoiStyle} />
+                    <LayersPanel visibility={layerVisibility} onToggle={toggleLayer} />
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -441,7 +434,7 @@ function App() {
                     exit={{ opacity: 0, x: -8 }}
                     transition={{ duration: 0.15 }}
                   >
-                    <BiomeLegend poiTypes={poiTypes} poiStyle={poiStyle} />
+                    <BiomeLegend />
                   </motion.div>
                 )}
               </AnimatePresence>

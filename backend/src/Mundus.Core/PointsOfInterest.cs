@@ -66,6 +66,13 @@ public static class PointOfInterestGenerator
         ("coast", PointOfInterestCatalog.Settlements, 260, 0.15, 8, 0, true),
     ];
 
+    /// <summary>The icons each layer may place, in <see cref="Layers"/> order (services only ever come with their settlement; shore layers take only the geometry-bound ones).</summary>
+    private static readonly IReadOnlyList<PoiEntry>[] LayerEntries = Layers
+        .Select(l => (IReadOnlyList<PoiEntry>)PointOfInterestCatalog.InCategory(l.Category)
+            .Where(e => e.Kind != PoiKind.Service && (e.Placement is Placement.Cape or Placement.Islet or Placement.Coast) == l.SeekCoast)
+            .ToList())
+        .ToArray();
+
     public static IReadOnlyList<string> Categories { get; } = PointOfInterestCatalog.Categories.Select(c => c.Id).ToList();
 
     /// <summary>Every documented icon type, across all categories.</summary>
@@ -76,6 +83,9 @@ public static class PointOfInterestGenerator
 
     /// <summary>How far past the window (in sampled cells) a point still counts as touching it, so an icon straddling the edge is returned by both neighboring windows.</summary>
     public const int EdgeMargin = 40;
+
+    /// <summary>Extra room (in cells, i.e. on-screen pixels) kept around a settlement's radius so other icons stay clear of its outermost buildings.</summary>
+    private const int SettlementZonePad = 28;
 
     /// <summary>Tightest a cluster packs its icons (in cells, i.e. on-screen pixels at every zoom) so satellites drawn at about 30px never sit on each other.</summary>
     private const int ClusterSpacing = 26;
@@ -131,9 +141,77 @@ public static class PointOfInterestGenerator
         var maxY = originY + (height * step) + margin;
         var probe = new BiomeProbe(seed, step);
 
-        var points = new List<PointOfInterest>();
-        foreach (var (key, cat, blockSize, density, tries, reference, seekCoast) in Layers)
+        // What each block decides, computed at most once per call and kept with the
+        // stream it used so a settlement can go on to draw its satellites from it.
+        // Other layers read settlement blocks too (to keep clear of them), which is
+        // why this is memoized rather than recomputed per use.
+        var memo = new Dictionary<(int Layer, int Bx, int By), (Rng Rng, (int X, int Y, PoiEntry Entry, Biome Biome)? Placed)>();
+
+        (Rng Rng, (int X, int Y, PoiEntry Entry, Biome Biome)? Placed) Placed(int layer, int bx, int by)
         {
+            if (memo.TryGetValue((layer, bx, by), out var known))
+            {
+                return known;
+            }
+
+            var (key, _, blockSize, density, tries, reference, seekCoast) = Layers[layer];
+            var block = blockSize * step;
+            // Each block gets its own stream, so what one block decides
+            // never depends on the window or on any other block.
+            var rng = new Rng($"{seed}:poi-{key}:{bx}:{by}");
+            (int X, int Y, PoiEntry Entry, Biome Biome)? placed = null;
+            if (rng.Float() < density)
+            {
+                placed = seekCoast
+                    ? TryPlaceOnShore(rng, probe, LayerEntries[layer], bx, by, block, tries, step)
+                    : TryPlace(rng, probe, LayerEntries[layer], bx, by, block, tries, reference, step);
+            }
+
+            return memo[(layer, bx, by)] = (rng, placed);
+        }
+
+        // Whether (x, y) falls inside some settlement's footprint - its anchor's
+        // radius plus room for the icons themselves. Scattered icons keep out of
+        // these so nothing lands on top of a town.
+        bool InsideSettlement(int x, int y)
+        {
+            var padded = SettlementZonePad * step;
+            for (var layer = 0; layer < Layers.Length; layer++)
+            {
+                if (Layers[layer].Category != PointOfInterestCatalog.Settlements)
+                {
+                    continue;
+                }
+
+                var block = Layers[layer].BlockSize * step;
+                var far = (PointOfInterestCatalog.SettlementSpecs.Max(s => s.Radius) * step) + padded;
+                for (var by = FloorDiv(y - far, block); by <= FloorDiv(y + far, block); by++)
+                {
+                    for (var bx = FloorDiv(x - far, block); bx <= FloorDiv(x + far, block); bx++)
+                    {
+                        if (Placed(layer, bx, by).Placed is not { } anchor || anchor.Entry.Kind != PoiKind.Anchor)
+                        {
+                            continue;
+                        }
+
+                        var reach = (PointOfInterestCatalog.SpecOf(anchor.Entry.Tier!.Value).Radius * step) + padded;
+                        long dx = anchor.X - x;
+                        long dy = anchor.Y - y;
+                        if ((dx * dx) + (dy * dy) <= (long)reach * reach)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        var points = new List<PointOfInterest>();
+        for (var layer = 0; layer < Layers.Length; layer++)
+        {
+            var (_, cat, blockSize, _, _, _, _) = Layers[layer];
             if (category is not null && category != cat)
             {
                 continue;
@@ -142,33 +220,15 @@ public static class PointOfInterestGenerator
             // A settlement's satellites sit up to the largest radius from
             // its anchor, so blocks that far outside the window can still
             // reach into it.
-            var reach = cat == PointOfInterestCatalog.Settlements
-                ? PointOfInterestCatalog.SettlementSpecs.Max(s => s.Radius) * step
-                : 0;
+            var isSettlement = cat == PointOfInterestCatalog.Settlements;
+            var reach = isSettlement ? PointOfInterestCatalog.SettlementSpecs.Max(s => s.Radius) * step : 0;
             var block = blockSize * step;
-            var minBlockX = FloorDiv(minX - reach, block);
-            var maxBlockX = FloorDiv(maxX + reach, block);
-            var minBlockY = FloorDiv(minY - reach, block);
-            var maxBlockY = FloorDiv(maxY + reach, block);
-            var entries = PointOfInterestCatalog.InCategory(cat)
-                .Where(e => e.Kind != PoiKind.Service && (e.Placement is Placement.Cape or Placement.Islet or Placement.Coast) == seekCoast)
-                .ToList();
-            for (var by = minBlockY; by <= maxBlockY; by++)
+            for (var by = FloorDiv(minY - reach, block); by <= FloorDiv(maxY + reach, block); by++)
             {
-                for (var bx = minBlockX; bx <= maxBlockX; bx++)
+                for (var bx = FloorDiv(minX - reach, block); bx <= FloorDiv(maxX + reach, block); bx++)
                 {
-                    // Each block gets its own stream, so what one block decides
-                    // never depends on the window or on any other block.
-                    var rng = new Rng($"{seed}:poi-{key}:{bx}:{by}");
-                    if (rng.Float() >= density)
-                    {
-                        continue;
-                    }
-
-                    var placed = seekCoast
-                        ? TryPlaceOnShore(rng, probe, entries, bx, by, block, tries, step)
-                        : TryPlace(rng, probe, entries, bx, by, block, tries, reference, step);
-                    if (placed is null)
+                    var (rng, placed) = Placed(layer, bx, by);
+                    if (placed is null || (!isSettlement && InsideSettlement(placed.Value.X, placed.Value.Y)))
                     {
                         continue;
                     }
