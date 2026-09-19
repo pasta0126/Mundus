@@ -1,4 +1,4 @@
-import { ArrowRight, Dices, Orbit, RefreshCw } from "lucide-react"
+import { ArrowRight, Dices, Map as MapIcon, Orbit, RefreshCw } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { api } from "@/api/client"
 import mundusIcon from "@/assets/mundus-icon-header.png"
@@ -123,12 +123,20 @@ export default function PlanetsPage() {
             </>
           )}
         </div>
-        <Button asChild variant="outline" className="shadow-lg">
-          <a href="/systems">
-            <Orbit />
-            Systems
-          </a>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" className="flex-1 shadow-lg">
+            <a href="/">
+              <MapIcon />
+              Map
+            </a>
+          </Button>
+          <Button asChild variant="outline" className="flex-1 shadow-lg">
+            <a href="/systems">
+              <Orbit />
+              Systems
+            </a>
+          </Button>
+        </div>
       </div>
 
       {loading && (

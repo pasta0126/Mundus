@@ -31,7 +31,7 @@
 
 - [x] 5.1 Add the `three` dependency and lazy-load the 3D code for the new routes only
 - [x] 5.2 Add routing for `/planets` and `/systems` reading the seed from the URL, with an error state for invalid seeds
-- [x] 5.3 Add the entry link on the map page, in the style of the phone notice
+- [x] 5.3 Add the entry buttons on the map page, and matching buttons on the planet and system pages so all three link to each other in the same style
 - [x] 5.4 Add the pronounceable random-name generator and the random control
 
 ## 6. Planet view

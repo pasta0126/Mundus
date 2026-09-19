@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Dices, Globe, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react"
+import { ArrowLeft, ArrowRight, Dices, Globe, Map as MapIcon, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
@@ -320,12 +320,20 @@ export default function SystemsPage() {
             )
           )}
         </div>
-        <Button asChild variant="outline" className="shadow-lg">
-          <a href="/planets">
-            <Globe />
-            Planets
-          </a>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" className="flex-1 shadow-lg">
+            <a href="/">
+              <MapIcon />
+              Map
+            </a>
+          </Button>
+          <Button asChild variant="outline" className="flex-1 shadow-lg">
+            <a href="/planets">
+              <Globe />
+              Planets
+            </a>
+          </Button>
+        </div>
       </div>
 
       {loading && (
