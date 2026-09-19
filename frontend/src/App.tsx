@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "motion/react"
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Info, Layers, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Globe, Info, Layers, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
@@ -415,6 +415,13 @@ function App() {
                     Download
                   </Button>
                 </div>
+                <a
+                  href="/planets"
+                  className="text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 text-xs"
+                >
+                  <Globe className="size-3.5" />
+                  Explore planets
+                </a>
               </div>
             </div>
             <div className="flex items-start gap-3">

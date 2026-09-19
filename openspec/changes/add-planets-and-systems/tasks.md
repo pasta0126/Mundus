@@ -29,19 +29,19 @@
 
 ## 5. Frontend foundation
 
-- [ ] 5.1 Add the `three` dependency and lazy-load the 3D code for the new routes only
+- [x] 5.1 Add the `three` dependency and lazy-load the 3D code for the new routes only
 - [ ] 5.2 Add routing for `/planets` and `/systems` reading the seed from the URL, with an error state for invalid seeds
 - [ ] 5.3 Add the entry link on the map page, in the style of the phone notice
 - [ ] 5.4 Add the pronounceable random-name generator and the random control
 
 ## 6. Planet view
 
-- [ ] 6.1 Draw the sphere with a procedural low-detail surface texture from palette, texture seed, and singularities
-- [ ] 6.2 Add the cloud layer, rings, and asteroid field
-- [ ] 6.3 Animate the planet's spin (period and tilt) and the moons' slow orbits
-- [ ] 6.4 Add drag-to-rotate and wheel zoom
-- [ ] 6.5 Add the planet sheet (name, type, description, features)
-- [ ] 6.6 Add loading and error feedback
+- [x] 6.1 Draw the sphere with a procedural low-detail surface texture from palette, texture seed, and singularities
+- [x] 6.2 Add the cloud layer, rings, and asteroid field
+- [x] 6.3 Animate the planet's spin (period and tilt) and the moons' slow orbits
+- [x] 6.4 Add drag-to-rotate and wheel zoom
+- [x] 6.5 Add the planet sheet (name, type, description, features)
+- [x] 6.6 Add loading and error feedback
 
 ## 7. System view
 
