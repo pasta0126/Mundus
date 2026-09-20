@@ -6,7 +6,6 @@ import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { BiomeLegend } from "@/map/BiomeLegend"
 import { MobileNotice } from "@/components/MobileNotice"
-import { PageNav } from "@/components/PageNav"
 import { Button } from "@/components/ui/button"
 import { CompassRose, type CompassInfo } from "@/map/CompassRose"
 import { LAYER_REGISTRY, defaultLayerVisibility, type LayerId } from "@/map/layers"
@@ -458,7 +457,6 @@ function App() {
                   </Button>
                 </div>
               </div>
-              <PageNav current="maps" />
             </div>
             <div className="flex items-start gap-3">
               <AnimatePresence>

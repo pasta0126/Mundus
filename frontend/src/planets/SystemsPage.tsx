@@ -4,7 +4,6 @@ import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { MobileNotice } from "@/components/MobileNotice"
-import { PageNav } from "@/components/PageNav"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
@@ -321,7 +320,6 @@ export default function SystemsPage() {
             )
           )}
         </div>
-        <PageNav current="systems" />
       </div>
 
       {loading && (

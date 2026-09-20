@@ -4,7 +4,6 @@ import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { MobileNotice } from "@/components/MobileNotice"
-import { PageNav } from "@/components/PageNav"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { loadPoiCatalog } from "@/map/poi"
@@ -157,7 +156,6 @@ export default function DungeonsPage() {
             </>
           )}
         </div>
-        <PageNav current="dungeons" mapHref={back} />
       </div>
 
       {loading && (
