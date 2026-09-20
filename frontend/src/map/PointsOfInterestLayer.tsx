@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
-import { CHUNK_CONCURRENCY, CHUNK_SIZE } from "@/map/constants"
+import { loadDungeonIcons } from "@/dungeons/art"
+import { CHUNK_CONCURRENCY, CHUNK_SIZE, ZOOM_LEVELS } from "@/map/constants"
 import {
   SATELLITE_MAX_STEP,
   loadPoiCatalog,
@@ -19,11 +20,16 @@ interface Poi {
   type: string
   role: PoiRole
   tier: SettlementTier | null
+  /** True when this point holds a dungeon that can be entered. */
+  dungeon: boolean
 }
 
 /** Where one icon was last drawn, in CSS pixels - what hover looks up. */
 interface Hit {
   type: string
+  x: number
+  y: number
+  dungeon: boolean
   left: number
   top: number
   right: number
@@ -49,6 +55,14 @@ interface PointsOfInterestLayerProps {
 /** Tooltip box is kept this far from the viewport edge, and assumed at most this wide, so it flips before it clips. */
 const TOOLTIP_MARGIN = 12
 const TOOLTIP_MAX_WIDTH = 240
+
+/** A press that moves further than this before release is a drag, not a click. */
+const CLICK_SLOP_PX = 5
+
+/** The "!" badge on an icon that holds a dungeon: a share of the icon's size, kept readable on small ones. */
+function badgePx(iconPx: number): number {
+  return Math.min(28, Math.max(18, iconPx * 0.42))
+}
 
 /**
  * One canvas for every points-of-interest category: points for the whole
@@ -79,9 +93,11 @@ export function PointsOfInterestLayer({
   const drawTokenRef = useRef(0)
   const catalogRef = useRef<PoiCatalog | null>(null)
   const [shown, setShown] = useState(false)
-  const [tip, setTip] = useState<{ type: string; x: number; y: number } | null>(null)
+  const [tip, setTip] = useState<{ type: string; dungeon: boolean; x: number; y: number } | null>(null)
 
   // Latest props for the async draw, without re-creating it every render.
+  const seedRef = useRef(seed)
+  seedRef.current = seed
   const viewRef = useRef({ originX, originY, cellPx, step, visible: new Set(visibleCategories) })
   viewRef.current = { originX, originY, cellPx, step, visible: new Set(visibleCategories) }
 
@@ -91,7 +107,10 @@ export function PointsOfInterestLayer({
     const points = [...pointsRef.current.values()]
       .filter((p) => view.visible.has(p.category) && (p.role !== "Satellite" || view.step <= SATELLITE_MAX_STEP))
       .sort((a, b) => a.y - b.y)
-    const icons = await loadPoiIcons(points.map((p) => p.type))
+    const [icons, marks] = await Promise.all([
+      loadPoiIcons(points.map((p) => p.type)),
+      loadDungeonIcons(points.some((p) => p.dungeon) ? ["dungeon-badge"] : []),
+    ])
     if (token !== drawTokenRef.current) return // a newer draw superseded this one
     const canvas = canvasRef.current
     const ctx = canvas?.getContext("2d")
@@ -119,7 +138,19 @@ export function PointsOfInterestLayer({
       const h = img.naturalHeight * scale
       // The point is where the icon stands: its base, centered - not the middle of the picture.
       ctx.drawImage(img, px - w / 2, py - h, w, h)
-      hits.push({ type: p.type, left: px - w / 2, top: py - h, right: px + w / 2, bottom: py })
+      const badge = p.dungeon ? marks.get("dungeon-badge") : undefined
+      // Hovering and clicking follow the drawn area, which for a dungeon includes its badge.
+      let right = px + w / 2
+      let top = py - h
+      if (badge) {
+        // Pinned to the icon's top-right corner, half outside it, like a notification dot.
+        const bh = badgePx(size)
+        const bw = (badge.naturalWidth / badge.naturalHeight) * bh
+        ctx.drawImage(badge, px + w / 2 - bw * 0.7, py - h - bh * 0.3, bw, bh)
+        right = Math.max(right, px + w / 2 + bw * 0.3)
+        top = Math.min(top, py - h - bh * 0.3)
+      }
+      hits.push({ type: p.type, x: p.x, y: p.y, dungeon: p.dungeon, left: px - w / 2, top, right, bottom: py })
     }
     hitsRef.current = hits
   }, [])
@@ -168,6 +199,7 @@ export function PointsOfInterestLayer({
           type: point.type,
           role: point.role,
           tier: point.tier ?? null,
+          dungeon: point.dungeon != null,
         })
       }
     }).then(async () => {
@@ -203,20 +235,22 @@ export function PointsOfInterestLayer({
   // tracked on the window: over the bare map the pointer's target is the page's <main> wrapper (or
   // a canvas); over any panel or button it is something inside them, and then no tooltip is shown.
   useEffect(() => {
-    function onMove(event: MouseEvent) {
+    /** The icon under the pointer, if the pointer is over the bare map (never over a panel or control). */
+    function hitAt(event: MouseEvent): Hit | undefined {
       const overMap = event.target instanceof HTMLCanvasElement || (event.target instanceof HTMLElement && event.target.tagName === "MAIN")
-      let found: Hit | undefined
-      if (overMap) {
-        // Topmost first: later icons were drawn over earlier ones.
-        for (let i = hitsRef.current.length - 1; i >= 0; i--) {
-          const hit = hitsRef.current[i]
-          if (event.clientX >= hit.left && event.clientX <= hit.right && event.clientY >= hit.top && event.clientY <= hit.bottom) {
-            found = hit
-            break
-          }
+      if (!overMap) return undefined
+      // Topmost first: later icons were drawn over earlier ones.
+      for (let i = hitsRef.current.length - 1; i >= 0; i--) {
+        const hit = hitsRef.current[i]
+        if (event.clientX >= hit.left && event.clientX <= hit.right && event.clientY >= hit.top && event.clientY <= hit.bottom) {
+          return hit
         }
       }
+      return undefined
+    }
 
+    function onMove(event: MouseEvent) {
+      const found = hitAt(event)
       if (!found) {
         setTip((current) => (current === null ? current : null))
         return
@@ -227,20 +261,57 @@ export function PointsOfInterestLayer({
       const flipY = event.clientY + 90 > window.innerHeight
       const x = flipX ? event.clientX - TOOLTIP_MARGIN - TOOLTIP_MAX_WIDTH : event.clientX + TOOLTIP_MARGIN
       const y = flipY ? event.clientY - TOOLTIP_MARGIN - 48 : event.clientY + TOOLTIP_MARGIN + 6
-      setTip({ type: found.type, x: Math.max(TOOLTIP_MARGIN, x), y: Math.max(TOOLTIP_MARGIN, y) })
+      setTip({ type: found.type, dungeon: found.dungeon, x: Math.max(TOOLTIP_MARGIN, x), y: Math.max(TOOLTIP_MARGIN, y) })
     }
 
     function onLeave() {
       setTip(null)
     }
 
+    // Only a dungeon's icon reacts to a click; a press that travelled is a drag and does nothing.
+    let pressed: { x: number; y: number } | null = null
+    function onDown(event: MouseEvent) {
+      pressed = { x: event.clientX, y: event.clientY }
+    }
+
+    function onClick(event: MouseEvent) {
+      const start = pressed
+      pressed = null
+      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_SLOP_PX) return
+      const found = hitAt(event)
+      if (!found?.dungeon) return
+      const view = viewRef.current
+      const query = new URLSearchParams({
+        map: seedRef.current,
+        x: String(found.x),
+        y: String(found.y),
+        type: found.type,
+        zoom: String(ZOOM_LEVELS.findIndex((level) => level.step === view.step) + 1),
+      })
+      window.location.assign(`/dungeons?${query}`)
+    }
+
     window.addEventListener("mousemove", onMove)
+    window.addEventListener("mousedown", onDown)
+    window.addEventListener("click", onClick)
     document.addEventListener("mouseleave", onLeave)
     return () => {
       window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mousedown", onDown)
+      window.removeEventListener("click", onClick)
       document.removeEventListener("mouseleave", onLeave)
     }
   }, [])
+
+  // The pointer shows that an icon can be clicked only over a dungeon.
+  const overDungeon = tip?.dungeon === true
+  useEffect(() => {
+    if (!overDungeon) return
+    document.body.style.cursor = "pointer"
+    return () => {
+      document.body.style.cursor = ""
+    }
+  }, [overDungeon])
 
   const entry = tip ? catalogRef.current?.entries.get(tip.type) : undefined
 
@@ -259,6 +330,11 @@ export function PointsOfInterestLayer({
         >
           <div className="text-sm leading-tight font-medium">{entry.label}</div>
           <div className="text-muted-foreground text-xs leading-snug">{entry.description}</div>
+          {tip.dungeon && (
+            <div className="mt-1 text-xs leading-snug font-medium">
+              Dungeon <span className="text-muted-foreground font-normal">– Something lurks below. Click to enter.</span>
+            </div>
+          )}
         </div>
       )}
     </>

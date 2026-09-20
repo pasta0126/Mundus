@@ -43,6 +43,85 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/Dungeons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: {
+                    seed?: string;
+                    x?: number | string;
+                    y?: number | string;
+                    type?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["Dungeon"];
+                        "application/json": components["schemas"]["Dungeon"];
+                        "text/json": components["schemas"]["Dungeon"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/Dungeons/catalog": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["DungeonCatalogResponse"];
+                        "application/json": components["schemas"]["DungeonCatalogResponse"];
+                        "text/json": components["schemas"]["DungeonCatalogResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/Health": {
         parameters: {
             query?: never;
@@ -357,6 +436,15 @@ export interface components {
         };
         /** @enum {unknown} */
         Biome: "Ocean" | "Beach" | "Desert" | "Grassland" | "Swamp" | "Tundra" | "Forest" | "Rainforest" | "Mountains" | "Snow";
+        BossEntry: {
+            id: string;
+            label: string;
+            description: string;
+            rarity: components["schemas"]["Rarity"];
+            styles: components["schemas"]["DungeonStyle"][];
+            /** Format: int32 */
+            weight?: number | string;
+        };
         BoundaryPoint: {
             /** Format: int32 */
             x: number | string;
@@ -388,6 +476,59 @@ export interface components {
             seed: string;
             /** Format: double */
             bearingDegrees: number | string;
+        };
+        Dungeon: {
+            /** Format: int32 */
+            specVersion: number | string;
+            seed: string;
+            /** Format: int32 */
+            x: number | string;
+            /** Format: int32 */
+            y: number | string;
+            type: string;
+            style: components["schemas"]["DungeonStyle"];
+            /** Format: int32 */
+            width: number | string;
+            /** Format: int32 */
+            height: number | string;
+            rows: string[];
+            entrance: components["schemas"]["DungeonCell"];
+            finalBoss: components["schemas"]["DungeonMark"];
+            bosses: components["schemas"]["DungeonMark"][];
+            treasures: components["schemas"]["DungeonMark"][];
+            hoard: components["schemas"]["DungeonMark"];
+        };
+        DungeonCatalogResponse: {
+            styles: components["schemas"]["DungeonStyleEntry"][];
+            bosses: components["schemas"]["BossEntry"][];
+            treasures: components["schemas"]["TreasureEntry"][];
+            hoard: components["schemas"]["TreasureEntry"];
+        };
+        DungeonCell: {
+            /** Format: int32 */
+            x: number | string;
+            /** Format: int32 */
+            y: number | string;
+        };
+        DungeonMark: {
+            id: string;
+            /** Format: int32 */
+            x: number | string;
+            /** Format: int32 */
+            y: number | string;
+        };
+        DungeonSpec: {
+            style: components["schemas"]["DungeonStyle"];
+            /** Format: double */
+            chance: number | string;
+        };
+        /** @enum {unknown} */
+        DungeonStyle: "Cave" | "Halls" | "Maze";
+        DungeonStyleEntry: {
+            style: components["schemas"]["DungeonStyle"];
+            id: string;
+            label: string;
+            description: string;
         };
         Map: {
             /** Format: int32 */
@@ -480,6 +621,7 @@ export interface components {
             tier?: null | components["schemas"]["SettlementTier"];
             /** Format: int32 */
             weight?: number | string;
+            dungeon?: null | components["schemas"]["DungeonSpec"];
             enabled?: boolean;
         };
         /** @enum {unknown} */
@@ -493,6 +635,7 @@ export interface components {
             type: string;
             role: components["schemas"]["PoiRole"];
             tier?: null | components["schemas"]["SettlementTier"];
+            dungeon?: null | components["schemas"]["DungeonStyle"];
         };
         PointOfInterestCatalogResponse: {
             categories: components["schemas"]["PoiCategory"][];
@@ -565,6 +708,14 @@ export interface components {
         };
         /** @enum {unknown} */
         SurfaceFeatureKind: "Crater" | "Ridge" | "Dunes" | "Canyon" | "Continent" | "PolarCap" | "Crack" | "LavaFlow" | "Volcano" | "Lake" | "Band" | "Storm";
+        TreasureEntry: {
+            id: string;
+            label: string;
+            description: string;
+            rarity: components["schemas"]["Rarity"];
+            /** Format: int32 */
+            weight?: number | string;
+        };
     };
     responses: never;
     parameters: never;

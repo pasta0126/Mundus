@@ -13,6 +13,10 @@ Live at [mundus.northernarchive.com](https://mundus.northernarchive.com).
 - `/maps?seed=abc&x=0&y=0&zoom=3` - the 2D map: pan, zoom, layers, points of
   interest, regions. The URL carries the seed, the centre and the zoom step,
   so a link is the whole view; with no seed a random one is picked.
+- `/dungeons?map=abc&x=-1629&y=-1440&type=ruins` - the dungeon under a point
+  of interest of a map: a 2D plan with its entrance, treasures and bosses. On
+  the map, points that hold one carry a "!" badge; click it to go in.
+  `GET /api/Dungeons?seed=&x=&y=&type=` (and `/api/Dungeons/catalog`).
 - `/planets?seed=Kepler` - one planet as a rotatable 3D model with its
   sheet. The seed is the planet's name; the same name always gives the
   same planet.

@@ -71,6 +71,22 @@ public enum Placement
     Waterside,
 }
 
+/// <summary>The layout a dungeon is built as, chosen by the kind of place that holds it.</summary>
+public enum DungeonStyle
+{
+    /// <summary>Organic, winding passages: caves, caverns and mines.</summary>
+    Cave,
+
+    /// <summary>Rooms joined by corridors: ruins, temples, castles, towers and lairs.</summary>
+    Halls,
+
+    /// <summary>A perfect maze, one path between any two cells: hedge mazes.</summary>
+    Maze,
+}
+
+/// <summary>That an icon can hold a dungeon: its layout, and the chance that a given point of that type does.</summary>
+public sealed record DungeonSpec(DungeonStyle Style, double Chance);
+
 /// <param name="Id">Also the artwork's file stem: assets/poi/&lt;id&gt;.png.</param>
 /// <param name="Category">A layer the user can switch on/off - one of <see cref="PointOfInterestCatalog.Categories"/>.</param>
 /// <param name="Tier">Only for <see cref="PoiKind.Anchor"/>.</param>
@@ -87,6 +103,9 @@ public sealed record PoiEntry(
     SettlementTier? Tier = null)
 {
     public int Weight => (int)Rarity;
+
+    /// <summary>Set for the icons that can hold a dungeon (see <see cref="PointOfInterestCatalog"/>); null for the rest. Marking an icon changes nothing about where it is placed.</summary>
+    public DungeonSpec? Dungeon { get; init; }
 
     /// <summary>False for a retired icon: it stays in the catalog and keeps its artwork, but the generator never places it.</summary>
     public bool Enabled { get; init; } = true;
@@ -159,6 +178,28 @@ public static class PointOfInterestCatalog
         "archipelago", "desert", "canyon", "forest", "island", "lake", "mesa",
         "palm-islands", "pine-forest", "sailboat", "swamp",
     ];
+
+    /// <summary>
+    /// The icons that can hold a dungeon, with its layout and the chance that a
+    /// given point of that type does (decided per point, see
+    /// <see cref="PointOfInterestGenerator.DungeonAt"/>). Settlement services
+    /// never hold one: a town's temple is part of the town. Lairs and dark
+    /// castles always do.
+    /// </summary>
+    private static readonly Dictionary<string, DungeonSpec> Dungeons = new()
+    {
+        ["cave"] = new(DungeonStyle.Cave, 0.5),
+        ["ice-cavern"] = new(DungeonStyle.Cave, 0.5),
+        ["crystal-cave"] = new(DungeonStyle.Cave, 0.5),
+        ["mine"] = new(DungeonStyle.Cave, 0.5),
+        ["skull-cave"] = new(DungeonStyle.Cave, 1.0),
+        ["ruins"] = new(DungeonStyle.Halls, 0.5),
+        ["hidden-temple"] = new(DungeonStyle.Halls, 0.5),
+        ["wizard-tower"] = new(DungeonStyle.Halls, 0.5),
+        ["dragon"] = new(DungeonStyle.Halls, 1.0),
+        ["dark-castle"] = new(DungeonStyle.Halls, 1.0),
+        ["hedge-maze"] = new(DungeonStyle.Maze, 0.5),
+    };
 
     private static readonly PoiEntry[] AllEntries =
     [
@@ -267,7 +308,7 @@ public static class PointOfInterestCatalog
 
     /// <summary>Every icon, in the order of the artwork sheet, retired ones included (see <see cref="PoiEntry.Enabled"/>). Ids are frozen - only ever append.</summary>
     public static IReadOnlyList<PoiEntry> Entries { get; } = AllEntries
-        .Select(e => Retired.Contains(e.Id) ? e with { Enabled = false } : e)
+        .Select(e => e with { Enabled = !Retired.Contains(e.Id), Dungeon = Dungeons.GetValueOrDefault(e.Id) })
         .ToList();
 
     /// <summary>What each core size contains: the icons that cluster around its anchor. Ordered small to huge.</summary>

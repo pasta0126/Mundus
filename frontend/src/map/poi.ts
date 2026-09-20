@@ -41,30 +41,33 @@ export function poiIconUrl(id: string): string | undefined {
   return iconUrls[`../assets/poi/${id}.png`]
 }
 
-const iconCache = new Map<string, Promise<HTMLImageElement | null>>()
-
 /** Decodes each requested icon once and caches it, so drawing never waits on the network again. */
-export async function loadPoiIcons(ids: Iterable<string>): Promise<Map<string, HTMLImageElement>> {
-  const wanted = [...new Set(ids)]
-  const loaded = await Promise.all(
-    wanted.map((id) => {
-      let promise = iconCache.get(id)
-      if (!promise) {
-        promise = new Promise<HTMLImageElement | null>((resolve) => {
-          const url = poiIconUrl(id)
-          if (!url) return resolve(null)
-          const img = new Image()
-          img.onload = () => resolve(img)
-          img.onerror = () => resolve(null)
-          img.src = url
-        })
-        iconCache.set(id, promise)
-      }
-      return promise.then((img) => [id, img] as const)
-    }),
-  )
-  return new Map(loaded.filter((entry): entry is [string, HTMLImageElement] => entry[1] !== null))
+export function createIconLoader(urlOf: (id: string) => string | undefined) {
+  const cache = new Map<string, Promise<HTMLImageElement | null>>()
+  return async (ids: Iterable<string>): Promise<Map<string, HTMLImageElement>> => {
+    const wanted = [...new Set(ids)]
+    const loaded = await Promise.all(
+      wanted.map((id) => {
+        let promise = cache.get(id)
+        if (!promise) {
+          promise = new Promise<HTMLImageElement | null>((resolve) => {
+            const url = urlOf(id)
+            if (!url) return resolve(null)
+            const img = new Image()
+            img.onload = () => resolve(img)
+            img.onerror = () => resolve(null)
+            img.src = url
+          })
+          cache.set(id, promise)
+        }
+        return promise.then((img) => [id, img] as const)
+      }),
+    )
+    return new Map(loaded.filter((entry): entry is [string, HTMLImageElement] => entry[1] !== null))
+  }
 }
+
+export const loadPoiIcons = createIconLoader(poiIconUrl)
 
 /**
  * Settlement satellites (the services around a town's anchor) are hidden

@@ -7,12 +7,14 @@ import './index.css'
 // three.js.
 const HomePage = lazy(() => import('./home/HomePage.tsx'))
 const MapPage = lazy(() => import('./App.tsx'))
+const DungeonsPage = lazy(() => import('./dungeons/DungeonsPage.tsx'))
 const PlanetsPage = lazy(() => import('./planets/PlanetsPage.tsx'))
 const SystemsPage = lazy(() => import('./planets/SystemsPage.tsx'))
 
 function Page() {
   const path = window.location.pathname
   if (path.startsWith('/maps')) return <MapPage />
+  if (path.startsWith('/dungeons')) return <DungeonsPage />
   if (path.startsWith('/planets')) return <PlanetsPage />
   if (path.startsWith('/systems')) return <SystemsPage />
   // The root, and any unknown path, gets the hub - never a heavy page.

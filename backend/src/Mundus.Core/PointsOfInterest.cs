@@ -23,6 +23,9 @@ public sealed record PointOfInterest
 
     /// <summary>For anchors and their satellites: the size of the settlement they belong to.</summary>
     public SettlementTier? Tier { get; init; }
+
+    /// <summary>The style of the dungeon this point holds, or null when it holds none. Decided per point and independent of placement.</summary>
+    public DungeonStyle? Dungeon { get; init; }
 }
 
 public sealed record PointsOfInterest
@@ -251,8 +254,24 @@ public static class PointOfInterestGenerator
             OriginY = originY,
             Width = width,
             Height = height,
-            Points = points,
+            Points = points.Select(p => p with { Dungeon = DungeonAt(seed, p.X, p.Y, p.Type) }).ToList(),
         };
+    }
+
+    /// <summary>
+    /// Whether the point of `type` at (x, y) holds a dungeon, and in what style.
+    /// The roll is a pure function of the seed, the coordinate and the type -
+    /// never of the window - and draws from a stream of its own, so it cannot
+    /// disturb the streams that place points.
+    /// </summary>
+    public static DungeonStyle? DungeonAt(string seed, int x, int y, string type)
+    {
+        if (PointOfInterestCatalog.Find(type)?.Dungeon is not { } spec)
+        {
+            return null;
+        }
+
+        return new Rng($"{seed}:dungeon:{x}:{y}:{type}:roll").Float() < spec.Chance ? spec.Style : null;
     }
 
     /// <summary>Try a few jittered positions and keep the first whose biome and terrain suit some icon - lets rare-terrain categories still show up, and stays a pure function of the block. Five draws per attempt, always, so the stream never depends on what happened.</summary>
