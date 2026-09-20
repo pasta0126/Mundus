@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from "motion/react"
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Globe, Info, Layers, Orbit, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Info, Layers, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { BiomeLegend } from "@/map/BiomeLegend"
 import { MobileNotice } from "@/components/MobileNotice"
+import { PageNav } from "@/components/PageNav"
 import { Button } from "@/components/ui/button"
 import { CompassRose, type CompassInfo } from "@/map/CompassRose"
 import { LAYER_REGISTRY, defaultLayerVisibility, type LayerId } from "@/map/layers"
@@ -46,11 +47,42 @@ function windowSizeForViewport(cellPx: number) {
 /** Default zoom step: index 2 - displayed as "3" on the zoom indicator (see ZOOM_LEVELS). */
 const DEFAULT_ZOOM_INDEX = 2
 
+interface UrlView {
+  /** Empty when the URL names no (usable) seed. */
+  seed: string
+  centerX: number
+  centerY: number
+  zoomIndex: number
+}
+
+function integerParam(params: URLSearchParams, name: string): number | undefined {
+  const raw = params.get(name)?.trim()
+  return raw && /^-?\d+$/.test(raw) ? Number(raw) : undefined
+}
+
+/** The view named by /maps?seed=&x=&y=&zoom= - `zoom` is the step number shown on the zoom indicator (1-indexed). Anything missing or malformed falls back to the origin / the default zoom. */
+function viewFromUrl(): UrlView {
+  const params = new URLSearchParams(window.location.search)
+  const zoom = integerParam(params, "zoom")
+  return {
+    seed: params.get("seed")?.trim() ?? "",
+    centerX: integerParam(params, "x") ?? 0,
+    centerY: integerParam(params, "y") ?? 0,
+    zoomIndex: zoom !== undefined && zoom >= 1 && zoom <= ZOOM_LEVELS.length ? zoom - 1 : DEFAULT_ZOOM_INDEX,
+  }
+}
+
+/** Keeps the address bar in step with the view without adding a history entry for every pan or zoom. */
+function writeViewToUrl(seed: string, centerX: number, centerY: number, zoomIndex: number) {
+  const query = new URLSearchParams({ seed, x: String(centerX), y: String(centerY), zoom: String(zoomIndex + 1) })
+  window.history.replaceState(null, "", `/maps?${query}`)
+}
+
 function App() {
   const [phase, setPhase] = useState<Phase>("result")
   const [viewWindow, setViewWindow] = useState<ViewWindow | null>(null)
   const [chunks, setChunks] = useState<MapDto[]>([])
-  const [zoomIndex, setZoomIndex] = useState(DEFAULT_ZOOM_INDEX)
+  const [zoomIndex, setZoomIndex] = useState(() => viewFromUrl().zoomIndex)
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState({ loaded: 0, total: 0 })
   const [errorMessage, setErrorMessage] = useState("")
@@ -104,6 +136,7 @@ function App() {
         setChunks([data])
         setViewWindow({ seed: nextSeed, originX: x, originY: y, width, height, cellPx: px, step, generation })
         setPhase("result")
+        writeViewToUrl(nextSeed, x + Math.floor(width / 2) * step, y + Math.floor(height / 2) * step, ZOOM_LEVELS.findIndex((level) => level.step === step))
       } else {
         setChunks((prev) => [...prev, data])
       }
@@ -123,27 +156,41 @@ function App() {
     // still showing - nothing more to do either way.
   }
 
-  // No user input is collected: the first map generates itself, for a
-  // fresh random seed centered on (0, 0), the moment the page loads.
+  // No user input is collected: the view named by the URL loads itself the
+  // moment the page opens - or, with no seed there, a fresh random seed
+  // centered on (0, 0), which is then written into the URL.
   useEffect(() => {
-    const { cellPx, step } = ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]
-    void fetchTiled(randomSeed(), 0, 0, cellPx, step)
+    const url = viewFromUrl()
+    const { cellPx, step } = ZOOM_LEVELS[url.zoomIndex]
+    const { width, height } = windowSizeForViewport(cellPx)
+    const seed = url.seed || randomSeed()
+    void fetchTiled(
+      seed,
+      url.centerX - Math.floor(width / 2) * step,
+      url.centerY - Math.floor(height / 2) * step,
+      cellPx,
+      step,
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  function regenerate() {
+  /** Loads `seed` centered on the world origin at the default zoom. */
+  function generateAtOrigin(seed: string) {
     setZoomIndex(DEFAULT_ZOOM_INDEX)
     const { cellPx, step } = ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]
-    void fetchTiled(randomSeed(), 0, 0, cellPx, step)
+    const { width, height } = windowSizeForViewport(cellPx)
+    void fetchTiled(seed, -Math.floor(width / 2) * step, -Math.floor(height / 2) * step, cellPx, step)
+  }
+
+  function regenerate() {
+    generateAtOrigin(randomSeed())
   }
 
   /** Generates a fresh view from a user-chosen seed instead of a random one - same reset-to-origin/default-zoom behavior as Regenerate. */
   function generateFromSeed(seed: string) {
     const trimmed = seed.trim()
     if (!trimmed) return
-    setZoomIndex(DEFAULT_ZOOM_INDEX)
-    const { cellPx, step } = ZOOM_LEVELS[DEFAULT_ZOOM_INDEX]
-    void fetchTiled(trimmed, 0, 0, cellPx, step)
+    generateAtOrigin(trimmed)
   }
 
   function pan(dx: number, dy: number) {
@@ -366,15 +413,10 @@ function App() {
               <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
                 <div className="flex items-center justify-between gap-2">
                   <h1 className="text-lg font-semibold tracking-tight">
-                    <button
-                      type="button"
-                      onClick={regenerate}
-                      className="flex items-center gap-2 hover:opacity-80"
-                      aria-label="Back to home"
-                    >
+                    <a href="/" className="flex items-center gap-2 hover:opacity-80" aria-label="Back to home">
                       <img src={mundusIcon} alt="" className="size-6" />
                       Mundus
-                    </button>
+                    </a>
                   </h1>
                   <div className="flex items-center gap-1">
                     <Button
@@ -400,8 +442,8 @@ function App() {
                 </div>
                 <MapParamsPanel
                   seed={viewWindow.seed}
-                  originX={viewWindow.originX}
-                  originY={viewWindow.originY}
+                  originX={viewWindow.originX + Math.floor(viewWindow.width / 2) * viewWindow.step}
+                  originY={viewWindow.originY + Math.floor(viewWindow.height / 2) * viewWindow.step}
                   onGoTo={goToPosition}
                   onGenerateSeed={generateFromSeed}
                 />
@@ -416,20 +458,7 @@ function App() {
                   </Button>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <Button asChild variant="outline" className="flex-1 shadow-lg">
-                  <a href="/planets">
-                    <Globe />
-                    Planets
-                  </a>
-                </Button>
-                <Button asChild variant="outline" className="flex-1 shadow-lg">
-                  <a href="/systems">
-                    <Orbit />
-                    Systems
-                  </a>
-                </Button>
-              </div>
+              <PageNav current="maps" />
             </div>
             <div className="flex items-start gap-3">
               <AnimatePresence>

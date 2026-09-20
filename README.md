@@ -8,7 +8,11 @@ Live at [mundus.northernarchive.com](https://mundus.northernarchive.com).
 
 ## Pages
 
-- `/` - the 2D map: pan, zoom, layers, points of interest, regions.
+- `/` - the home hub: choose to generate a map, a planet or a system. It
+  makes no request until you pick one.
+- `/maps?seed=abc&x=0&y=0&zoom=3` - the 2D map: pan, zoom, layers, points of
+  interest, regions. The URL carries the seed, the centre and the zoom step,
+  so a link is the whole view; with no seed a random one is picked.
 - `/planets?seed=Kepler` - one planet as a rotatable 3D model with its
   sheet. The seed is the planet's name; the same name always gives the
   same planet.

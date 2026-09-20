@@ -1,9 +1,10 @@
-import { ArrowLeft, ArrowRight, Dices, Globe, Map as MapIcon, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react"
+import { ArrowLeft, ArrowRight, Dices, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { MobileNotice } from "@/components/MobileNotice"
+import { PageNav } from "@/components/PageNav"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
@@ -173,7 +174,7 @@ export default function SystemsPage() {
         <div className="bg-card min-h-0 space-y-3 overflow-y-auto rounded-lg border p-3 shadow-lg">
           <div className="flex items-center justify-between gap-2">
             <h1 className="text-lg font-semibold tracking-tight">
-              <a href="/" className="flex items-center gap-2 hover:opacity-80" aria-label="Back to the map">
+              <a href="/" className="flex items-center gap-2 hover:opacity-80" aria-label="Back to home">
                 <img src={mundusIcon} alt="" className="size-6" />
                 Mundus
               </a>
@@ -320,20 +321,7 @@ export default function SystemsPage() {
             )
           )}
         </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" className="flex-1 shadow-lg">
-            <a href="/">
-              <MapIcon />
-              Map
-            </a>
-          </Button>
-          <Button asChild variant="outline" className="flex-1 shadow-lg">
-            <a href="/planets">
-              <Globe />
-              Planets
-            </a>
-          </Button>
-        </div>
+        <PageNav current="systems" />
       </div>
 
       {loading && (
