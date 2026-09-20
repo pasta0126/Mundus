@@ -6,25 +6,6 @@ generate, without generating or loading anything until they choose.
 
 ## Requirements
 
-### Requirement: Home page at the root
-The system SHALL serve a home page at `/`. It SHALL present, as large,
-prominent cards, each thing the site generates: a map, a planet and a
-planetary system, each with an icon, a name and a one-line description, and
-each leading to that thing's own page. It SHALL also present a card for
-dungeons that says they are found on the map and leads to the map.
-
-#### Scenario: The root shows the hub
-- **WHEN** a person opens `/`
-- **THEN** the home page is shown with a card for the map, one for planets, one for systems and one for dungeons
-
-#### Scenario: A card leads to its page
-- **WHEN** the person chooses the map, planet or system card
-- **THEN** the map, planet or system page opens
-
-#### Scenario: The dungeons card points to the map
-- **WHEN** the person chooses the dungeons card
-- **THEN** the map page opens
-
 ### Requirement: Nothing is generated on the home page
 The home page SHALL NOT request any map, planet, system or point-of-interest
 data and SHALL NOT load the code of the map canvas or of the 3D pages, so it
@@ -40,3 +21,42 @@ Every piece of user-facing text on the home page SHALL be in English.
 #### Scenario: All text is English
 - **WHEN** the home page is shown
 - **THEN** all its labels, descriptions and buttons are in English
+
+### Requirement: The home page is the way between pages
+Every page other than the home page SHALL show the "Mundus" title as a link to
+the home page, and SHALL NOT offer buttons that lead directly to the other
+generator pages (map, planet, system). Choosing what to generate is done on the
+home page. A page MAY offer a control that returns to the exact place it was
+opened from (a dungeon returns to its map view).
+
+#### Scenario: The title leads home
+- **WHEN** a person uses the "Mundus" title on the map, planet, system or dungeon page
+- **THEN** the home page opens
+
+#### Scenario: No shortcuts between generator pages
+- **WHEN** the map, planet or system page is shown
+- **THEN** it offers no buttons to the other generator pages below or beside its panel
+
+### Requirement: One large card per generator
+The system SHALL serve a home page at `/`. It SHALL present exactly three large
+vertical cards - taller than they are wide - a map, a planet and a planetary
+system, side by side in three columns, each with an icon, a name and a one-line
+description, each with its own pastel background colour, and each leading to
+that thing's own page. On a window too narrow for three columns the cards MAY
+stack in one. It SHALL NOT present a card for dungeons.
+
+#### Scenario: The root shows three cards in three columns
+- **WHEN** a person opens `/` on a wide window
+- **THEN** the home page shows a card for the map, one for planets and one for systems, side by side, each taller than it is wide
+
+#### Scenario: Each card has its own pastel colour
+- **WHEN** the home page is shown
+- **THEN** the three cards have three different pastel background colours
+
+#### Scenario: A card leads to its page
+- **WHEN** the person chooses the map, planet or system card
+- **THEN** the map, planet or system page opens
+
+#### Scenario: There is no dungeons card
+- **WHEN** the home page is shown
+- **THEN** no card mentions dungeons

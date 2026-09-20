@@ -44,8 +44,8 @@ place), style, and how many treasures and bosses it holds.
 ### Requirement: Returning to the map
 The page SHALL offer a control that returns to the map at `/maps`, with the same
 seed and centred on the dungeon's point, at the zoom the person came from when
-the URL carries it. The page's navigation row SHALL also open the home page and
-the planet and system pages, in the same style as every other page.
+the URL carries it. The page SHALL NOT offer buttons to the other generator
+pages; its "Mundus" title leads to the home page.
 
 #### Scenario: Back to the same map
 - **WHEN** a person uses the map control on a dungeon page
