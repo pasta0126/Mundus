@@ -8,14 +8,15 @@
 
 ### Requirement: One large card per generator
 The system SHALL serve a home page at `/`. It SHALL present exactly three large
-cards, stacked in a single column from top to bottom - a map, a planet and a
-planetary system - each with an icon, a name and a one-line description, each
-with its own pastel background colour, and each leading to that thing's own
-page. It SHALL NOT present a card for dungeons.
+vertical cards - taller than they are wide - a map, a planet and a planetary
+system, side by side in three columns, each with an icon, a name and a one-line
+description, each with its own pastel background colour, and each leading to
+that thing's own page. On a window too narrow for three columns the cards MAY
+stack in one. It SHALL NOT present a card for dungeons.
 
-#### Scenario: The root shows three cards
-- **WHEN** a person opens `/`
-- **THEN** the home page shows a card for the map, one for planets and one for systems, one above the other
+#### Scenario: The root shows three cards in three columns
+- **WHEN** a person opens `/` on a wide window
+- **THEN** the home page shows a card for the map, one for planets and one for systems, side by side, each taller than it is wide
 
 #### Scenario: Each card has its own pastel colour
 - **WHEN** the home page is shown

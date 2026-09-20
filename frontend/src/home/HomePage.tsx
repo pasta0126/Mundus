@@ -39,7 +39,7 @@ const CARDS: readonly Card[] = [
 export default function HomePage() {
   return (
     <main className="flex min-h-screen w-full flex-col items-center gap-8 p-6 sm:p-10">
-      <div className="w-full max-w-xl">
+      <div className="w-full max-w-5xl">
         <MobileNotice />
       </div>
       <header className="flex flex-col items-center gap-3 pt-2 text-center">
@@ -47,16 +47,18 @@ export default function HomePage() {
         <h1 className="text-4xl font-semibold tracking-tight">Mundus</h1>
         <p className="text-muted-foreground max-w-md text-sm">Worlds, planets and systems generated from a name. Same name, same world, every time.</p>
       </header>
-      <nav aria-label="What to generate" className="flex w-full max-w-xl flex-1 flex-col gap-5">
+      <nav aria-label="What to generate" className="grid w-full max-w-5xl flex-1 grid-cols-1 gap-5 md:grid-cols-3">
         {CARDS.map(({ href, title, description, icon: Icon, tint }) => (
           <a
             key={title}
             href={href}
-            className={`${tint} text-foreground flex min-h-44 flex-1 flex-col justify-center gap-3 rounded-2xl border p-8 shadow-md transition-colors`}
+            className={`${tint} text-foreground flex min-h-64 flex-col justify-between gap-6 rounded-2xl border p-8 shadow-md transition-colors md:min-h-[28rem]`}
           >
-            <Icon className="size-10" aria-hidden />
-            <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-            <p className="text-sm leading-snug">{description}</p>
+            <Icon className="size-14" aria-hidden />
+            <div className="min-h-28 space-y-2">
+              <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
+              <p className="text-sm leading-snug">{description}</p>
+            </div>
           </a>
         ))}
       </nav>
