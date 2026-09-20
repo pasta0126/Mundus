@@ -35,4 +35,4 @@
 
 - [x] 6.1 Run the backend tests and the frontend lint and build
 - [x] 6.2 Manually check: badge and tooltip, click into a dungeon and back to the same map view, reload reproduces the dungeon, a plain drag never opens one
-- [ ] 6.3 Update the README, bump the semver (minor) and tag the commit `vX.Y.Z`
+- [x] 6.3 Update the README, bump the semver (minor) and tag the commit `vX.Y.Z`
