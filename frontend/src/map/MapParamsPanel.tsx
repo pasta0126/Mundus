@@ -52,7 +52,7 @@ export function MapParamsPanel({ seed, originX, originY, onGoTo, onGenerateSeed 
   }
 
   return (
-    <div className="w-56 space-y-2">
+    <div className="w-full space-y-2">
       <dl className="divide-border divide-y rounded-lg border text-sm">
         {rows.map(([label, val]) => (
           <div key={label} className="flex items-center justify-between gap-2 px-3 py-1.5">

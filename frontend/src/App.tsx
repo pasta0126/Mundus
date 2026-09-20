@@ -409,7 +409,7 @@ function App() {
           <div className="fixed top-4 left-4 z-10 flex items-start gap-3">
             <div className="flex flex-col gap-2">
               <MobileNotice />
-              <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
+              <div className="bg-card w-72 space-y-3 rounded-lg border p-3 shadow-lg">
                 <div className="flex items-center justify-between gap-2">
                   <h1 className="text-lg font-semibold tracking-tight">
                     <a href="/" className="flex items-center gap-2 hover:opacity-80" aria-label="Back to home">
