@@ -320,8 +320,8 @@ same view, as the planet and system pages do. Whenever the seed, centre or
 zoom changes (Regenerate, going to a coordinate, panning, zooming), the URL
 SHALL be updated to match without adding a history entry for each change. A
 missing or malformed `x`, `y` or `zoom` SHALL fall back to `(0, 0)` and the
-default zoom respectively. A seed the map generation rejects as invalid SHALL
-show a clear error rather than a blank page.
+default zoom respectively. A blank seed SHALL be treated as no seed, and any
+other seed is accepted as it is.
 
 #### Scenario: A URL reproduces the view
 - **WHEN** a person opens `/maps` with a seed, a centre and a zoom
