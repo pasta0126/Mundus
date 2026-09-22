@@ -1,11 +1,11 @@
-import { ArrowRight, Dices, RefreshCw } from "lucide-react"
+import { ArrowRight, Dices, Menu, RefreshCw } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { api } from "@/api/client"
 import mundusIcon from "@/assets/mundus-icon-header.png"
-import { MobileNotice } from "@/components/MobileNotice"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { randomName } from "@/lib/randomName"
 import { CopyButton } from "./CopyButton"
 import { PlanetScene } from "./PlanetScene"
@@ -82,12 +82,37 @@ export default function PlanetsPage() {
     return () => controller.abort()
   }, [seed, attempt])
 
+  const seedForm = (
+    <form
+      className="flex gap-1.5"
+      onSubmit={(e) => {
+        e.preventDefault()
+        goToSeed(draft)
+      }}
+    >
+      <Input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={64} aria-label="Planet name" placeholder="Planet name" />
+      <Button type="submit" variant="outline" size="icon" aria-label="Generate this planet">
+        <ArrowRight />
+      </Button>
+      <Button type="button" variant="outline" size="icon" onClick={() => goToSeed(randomName())} aria-label="Random planet">
+        <Dices />
+      </Button>
+    </form>
+  )
+  const planetDetails = planet && !error && (
+    <>
+      <CopyButton kind="seed" text={planet.name} />
+      <PlanetSheet planet={planet} />
+      <CopyButton kind="specs" text={planetSpecsText(planet)} />
+    </>
+  )
+
   return (
     <div className="bg-background fixed inset-0 overflow-hidden">
       {planet && !error && <PlanetScene planet={planet} />}
 
-      <div className="fixed top-4 left-4 z-10 flex max-w-64 flex-col gap-2">
-        <MobileNotice />
+      {/* Below 768px this panel folds into a sheet (see the Menu trigger below) instead of floating over the scene. */}
+      <div className="fixed top-4 left-4 z-10 hidden max-w-64 flex-col gap-2 md:flex">
         <div className="bg-card space-y-3 rounded-lg border p-3 shadow-lg">
           <div className="flex items-center justify-between gap-2">
             <h1 className="text-lg font-semibold tracking-tight">
@@ -98,32 +123,31 @@ export default function PlanetsPage() {
             </h1>
             <span className="text-muted-foreground font-mono text-xs">v{__APP_VERSION__}</span>
           </div>
-
-          <form
-            className="flex gap-1.5"
-            onSubmit={(e) => {
-              e.preventDefault()
-              goToSeed(draft)
-            }}
-          >
-            <Input value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={64} aria-label="Planet name" placeholder="Planet name" />
-            <Button type="submit" variant="outline" size="icon" aria-label="Generate this planet">
-              <ArrowRight />
-            </Button>
-            <Button type="button" variant="outline" size="icon" onClick={() => goToSeed(randomName())} aria-label="Random planet">
-              <Dices />
-            </Button>
-          </form>
-          {planet && !error && <CopyButton kind="seed" text={planet.name} />}
-
-          {planet && !error && (
-            <>
-              <PlanetSheet planet={planet} />
-              <CopyButton kind="specs" text={planetSpecsText(planet)} />
-            </>
-          )}
+          {seedForm}
+          {planetDetails}
         </div>
       </div>
+
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button variant="outline" size="icon" className="bg-card fixed top-4 left-4 z-10 shadow-lg md:hidden" aria-label="Open planet menu">
+            <Menu />
+          </Button>
+        </SheetTrigger>
+        <SheetContent className="overflow-y-auto md:hidden">
+          <SheetHeader>
+            <SheetTitle>
+              <a href="/" className="flex items-center gap-2" aria-label="Back to home">
+                <img src={mundusIcon} alt="" className="size-6" />
+                Mundus
+                <span className="text-muted-foreground font-mono text-xs font-normal">v{__APP_VERSION__}</span>
+              </a>
+            </SheetTitle>
+          </SheetHeader>
+          {seedForm}
+          {planetDetails}
+        </SheetContent>
+      </Sheet>
 
       {loading && (
         <div className="fixed inset-x-0 top-0 z-20 flex flex-col items-center gap-2 p-4">

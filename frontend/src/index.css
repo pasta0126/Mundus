@@ -4,6 +4,8 @@
 @import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
+/** A touch-first device (coarse pointer, no hover) - used to grow every interactive control to the 44px touch target the mobile-support spec requires, without changing anything for a mouse or trackpad. */
+@custom-variant coarse (@media (pointer: coarse) and (hover: none));
 
 @theme inline {
     --font-heading: var(--font-sans);

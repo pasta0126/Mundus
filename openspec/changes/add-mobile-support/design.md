@@ -38,6 +38,30 @@ tooltip content.
 steps that re-fetch data; a pinch does not scale continuously but crosses a
 threshold and moves one step, with the current view kept while the new one loads.
 
+**A single 768px breakpoint.** Tailwind's `md:` (768px) already splits the home
+page's card grid into columns; below it, panels become sheets and controls go
+touch-sized, matching the project's existing convention rather than adding a
+second cut. Minimum supported width is 360px, per the `mobile-support` spec.
+DungeonCanvas's separate 900px `WIDE_WINDOW` (panel-beside-plan vs.
+panel-above-plan) is a different, narrower concern and is left as is.
+
+**Portrait is the real target; landscape on a phone is tolerated, not
+designed.** Landscape must not scroll sideways or overlap content, but gets no
+dedicated layout (e.g. no side-sheet-instead-of-bottom-sheet treatment). This
+bounds the device/orientation matrix that needs testing.
+
+**Touch handling branches on `PointerEvent.pointerType`, it isn't just "add
+touch listeners."** Two places currently assume a mouse:
+`PointsOfInterestLayer.tsx` binds `mousedown`/`click` on `window` and a plain
+click on a dungeon icon navigates straight to it - there is no tap-then-Enter
+step to insert touch behavior into. `DungeonCanvas.tsx`'s hover tooltip is
+wired through React's `onMouseMove` only. Both need pointer events with a
+branch on `event.pointerType`: `mouse` (and `pen`, treated like mouse) keeps
+today's single-click-enters behavior; `touch` gets the tap-shows/tap-Enter-
+enters flow the `mobile-support` spec requires. This is why "one interaction
+model (pointer events)" (Decisions, above) is a real rewrite of the existing
+mouse-only listeners in both files, not an addition alongside them.
+
 ## Risks / Trade-offs
 
 - [Loading a full-viewport map is heavy on a phone: hundreds of thousands of cells
@@ -47,8 +71,3 @@ threshold and moves one step, with the current view kept while the new one loads
   the same rule already protects dungeon clicks on the desktop.
 - [Bottom sheets and the browser's own address bar changing height] → Use dynamic
   viewport units and test on iOS Safari and Android Chrome.
-
-## Open Questions
-
-- Which minimum device is supported (screen width, browser versions)?
-- Is landscape on a phone a first-class layout or only tolerated?

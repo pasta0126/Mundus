@@ -1,11 +1,11 @@
-import { ArrowLeft, RefreshCw } from "lucide-react"
+import { ArrowLeft, Menu, RefreshCw } from "lucide-react"
 import { useEffect, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
-import { MobileNotice } from "@/components/MobileNotice"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { loadPoiCatalog } from "@/map/poi"
 import { CopyButton } from "@/planets/CopyButton"
 import { dungeonIconUrl } from "./art"
@@ -95,12 +95,58 @@ export default function DungeonsPage() {
   const back = source ? mapHref(source) : "/maps"
   const sourceText = source ? `${source.map}:dungeon:${source.x}:${source.y}:${source.type}` : ""
 
+  const panelBody = (
+    <>
+      <Button asChild variant="outline" size="sm" className="w-full">
+        <a href={back}>
+          <ArrowLeft />
+          Back to map
+        </a>
+      </Button>
+
+      {dungeon && catalog && !error && (
+        <>
+          {sourceText && <CopyButton kind="seed" text={sourceText} />}
+          <div className="space-y-2">
+            <div>
+              <h2 className="font-semibold">{placeName} dungeon</h2>
+              <p className="text-muted-foreground text-xs">{style ? `${style.label} - ${style.description}` : ""}</p>
+            </div>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+              <dt className="text-muted-foreground">Bosses</dt>
+              <dd className="text-right">{dungeon.bosses.length + 1}</dd>
+              <dt className="text-muted-foreground">Treasures</dt>
+              <dd className="text-right">{dungeon.treasures.length + 1}</dd>
+              <dt className="text-muted-foreground">Size</dt>
+              <dd className="text-right">
+                {Number(dungeon.width)} x {Number(dungeon.height)}
+              </dd>
+              <dt className="text-muted-foreground">Found at</dt>
+              <dd className="text-right font-mono text-xs">
+                ({Number(dungeon.x)}, {Number(dungeon.y)})
+              </dd>
+            </dl>
+            <ul className="space-y-1 border-t pt-2 text-xs">
+              {LEGEND.map(({ icon, label }) => (
+                <li key={icon} className="flex items-center gap-2">
+                  <img src={dungeonIconUrl(icon)} alt="" className="h-6 w-6 object-contain" />
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <CopyButton kind="specs" text={JSON.stringify(dungeon, null, 2)} />
+        </>
+      )}
+    </>
+  )
+
   return (
     <div className="bg-background fixed inset-0 overflow-hidden">
       {dungeon && catalog && !error && <DungeonCanvas dungeon={dungeon} catalog={catalog} />}
 
-      <div className="fixed top-4 left-4 z-10 flex max-h-[calc(100vh-2rem)] max-w-64 flex-col gap-2">
-        <MobileNotice />
+      {/* Below 768px this panel folds into a sheet (see the Menu trigger below) instead of floating over the plan. */}
+      <div className="fixed top-4 left-4 z-10 hidden max-h-[calc(100dvh-2rem)] max-w-64 flex-col gap-2 md:flex">
         <div className="bg-card min-h-0 space-y-3 overflow-y-auto rounded-lg border p-3 shadow-lg">
           <div className="flex items-center justify-between gap-2">
             <h1 className="text-lg font-semibold tracking-tight">
@@ -111,52 +157,29 @@ export default function DungeonsPage() {
             </h1>
             <span className="text-muted-foreground font-mono text-xs">v{__APP_VERSION__}</span>
           </div>
-
-          <Button asChild variant="outline" size="sm" className="w-full">
-            <a href={back}>
-              <ArrowLeft />
-              Back to map
-            </a>
-          </Button>
-
-          {dungeon && catalog && !error && (
-            <>
-              {sourceText && <CopyButton kind="seed" text={sourceText} />}
-              <div className="space-y-2">
-                <div>
-                  <h2 className="font-semibold">{placeName} dungeon</h2>
-                  <p className="text-muted-foreground text-xs">
-                    {style ? `${style.label} - ${style.description}` : ""}
-                  </p>
-                </div>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-                  <dt className="text-muted-foreground">Bosses</dt>
-                  <dd className="text-right">{dungeon.bosses.length + 1}</dd>
-                  <dt className="text-muted-foreground">Treasures</dt>
-                  <dd className="text-right">{dungeon.treasures.length + 1}</dd>
-                  <dt className="text-muted-foreground">Size</dt>
-                  <dd className="text-right">
-                    {Number(dungeon.width)} x {Number(dungeon.height)}
-                  </dd>
-                  <dt className="text-muted-foreground">Found at</dt>
-                  <dd className="text-right font-mono text-xs">
-                    ({Number(dungeon.x)}, {Number(dungeon.y)})
-                  </dd>
-                </dl>
-                <ul className="space-y-1 border-t pt-2 text-xs">
-                  {LEGEND.map(({ icon, label }) => (
-                    <li key={icon} className="flex items-center gap-2">
-                      <img src={dungeonIconUrl(icon)} alt="" className="h-6 w-6 object-contain" />
-                      {label}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <CopyButton kind="specs" text={JSON.stringify(dungeon, null, 2)} />
-            </>
-          )}
+          {panelBody}
         </div>
       </div>
+
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button variant="outline" size="icon" className="bg-card fixed top-4 left-4 z-10 shadow-lg md:hidden" aria-label="Open dungeon menu">
+            <Menu />
+          </Button>
+        </SheetTrigger>
+        <SheetContent className="overflow-y-auto md:hidden">
+          <SheetHeader>
+            <SheetTitle>
+              <a href="/" className="flex items-center gap-2" aria-label="Back to home">
+                <img src={mundusIcon} alt="" className="size-6" />
+                Mundus
+                <span className="text-muted-foreground font-mono text-xs font-normal">v{__APP_VERSION__}</span>
+              </a>
+            </SheetTitle>
+          </SheetHeader>
+          {panelBody}
+        </SheetContent>
+      </Sheet>
 
       {loading && (
         <div className="fixed inset-x-0 top-0 z-20 flex flex-col items-center gap-2 p-4">

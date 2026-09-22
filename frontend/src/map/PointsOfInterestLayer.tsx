@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react"
+import { cn } from "cn"
 import { api } from "@/api/client"
+import { Button } from "@/components/ui/button"
 import { loadDungeonIcons } from "@/dungeons/art"
+import { effectiveDpr } from "@/lib/dpr"
 import { CHUNK_CONCURRENCY, CHUNK_SIZE, ZOOM_LEVELS } from "@/map/constants"
 import {
   SATELLITE_MAX_STEP,
@@ -92,8 +95,11 @@ export function PointsOfInterestLayer({
   const hitsRef = useRef<Hit[]>([])
   const drawTokenRef = useRef(0)
   const catalogRef = useRef<PoiCatalog | null>(null)
+  const tipRef = useRef<HTMLDivElement>(null)
   const [shown, setShown] = useState(false)
-  const [tip, setTip] = useState<{ type: string; dungeon: boolean; x: number; y: number } | null>(null)
+  // pinned: shown by a tap (touch) rather than hover (mouse) - stays until the person taps
+  // elsewhere or its "Enter" control, instead of following the pointer.
+  const [tip, setTip] = useState<{ type: string; dungeon: boolean; hitX: number; hitY: number; x: number; y: number; pinned: boolean } | null>(null)
 
   // Latest props for the async draw, without re-creating it every render.
   const seedRef = useRef(seed)
@@ -116,7 +122,7 @@ export function PointsOfInterestLayer({
     const ctx = canvas?.getContext("2d")
     if (!canvas || !ctx) return
 
-    const dpr = window.devicePixelRatio || 1
+    const dpr = effectiveDpr()
     const cssWidth = canvas.width / dpr
     const cssHeight = canvas.height / dpr
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -161,7 +167,7 @@ export function PointsOfInterestLayer({
     if (!canvas) return
     onCanvasReady?.(canvas)
 
-    const dpr = window.devicePixelRatio || 1
+    const dpr = effectiveDpr()
     const cssWidth = window.innerWidth
     const cssHeight = window.innerHeight
     canvas.width = Math.round(cssWidth * dpr)
@@ -231,12 +237,27 @@ export function PointsOfInterestLayer({
     }
   }, [])
 
-  // The canvas is click-through (it sits above the map but must not eat its input), so hover is
-  // tracked on the window: over the bare map the pointer's target is the page's <main> wrapper (or
-  // a canvas); over any panel or button it is something inside them, and then no tooltip is shown.
+  function enter(hit: { x: number; y: number; type: string }) {
+    const view = viewRef.current
+    const query = new URLSearchParams({
+      map: seedRef.current,
+      x: String(hit.x),
+      y: String(hit.y),
+      type: hit.type,
+      zoom: String(ZOOM_LEVELS.findIndex((level) => level.step === view.step) + 1),
+    })
+    window.location.assign(`/dungeons?${query}`)
+  }
+
+  // The canvas is click-through (it sits above the map but must not eat its input), so every
+  // gesture is tracked on the window: over the bare map the pointer's target is the page's
+  // <main> wrapper (or a canvas); over any panel or button it is something inside them, and
+  // then no tooltip is shown and no tap is handled. A mouse keeps hover-shows/click-enters,
+  // unchanged; a touch (or pen) shows a tip on tap that stays until tapping elsewhere or its
+  // "Enter" control - or entering by tapping the same icon again (see mobile-support spec).
   useEffect(() => {
     /** The icon under the pointer, if the pointer is over the bare map (never over a panel or control). */
-    function hitAt(event: MouseEvent): Hit | undefined {
+    function hitAt(event: PointerEvent): Hit | undefined {
       const overMap = event.target instanceof HTMLCanvasElement || (event.target instanceof HTMLElement && event.target.tagName === "MAIN")
       if (!overMap) return undefined
       // Topmost first: later icons were drawn over earlier ones.
@@ -249,62 +270,80 @@ export function PointsOfInterestLayer({
       return undefined
     }
 
-    function onMove(event: MouseEvent) {
+    /** Where the tip box goes for a hit found at (clientX, clientY) - flipped to the other side of the pointer before it would clip the viewport. */
+    function tipPosition(clientX: number, clientY: number) {
+      const flipX = clientX + TOOLTIP_MAX_WIDTH + TOOLTIP_MARGIN * 2 > window.innerWidth
+      const flipY = clientY + 90 > window.innerHeight
+      const x = flipX ? clientX - TOOLTIP_MARGIN - TOOLTIP_MAX_WIDTH : clientX + TOOLTIP_MARGIN
+      const y = flipY ? clientY - TOOLTIP_MARGIN - 48 : clientY + TOOLTIP_MARGIN + 6
+      return { x: Math.max(TOOLTIP_MARGIN, x), y: Math.max(TOOLTIP_MARGIN, y) }
+    }
+
+    function onMove(event: PointerEvent) {
+      if (event.pointerType !== "mouse") return // touch has no hover; its tip is shown on tap instead, below
       const found = hitAt(event)
       if (!found) {
-        setTip((current) => (current === null ? current : null))
+        setTip((current) => (current === null || current.pinned ? current : null))
+        return
+      }
+      setTip({ type: found.type, dungeon: found.dungeon, hitX: found.x, hitY: found.y, ...tipPosition(event.clientX, event.clientY), pinned: false })
+    }
+
+    function onLeave(event: PointerEvent) {
+      if (event.pointerType !== "mouse") return
+      setTip((current) => (current?.pinned ? current : null))
+    }
+
+    // A press that travelled is a drag and does nothing here - the map's own gestures (see
+    // useMapGestures) already treat it as a pan, and a mouse click that travelled is likewise ignored.
+    let pressed: { x: number; y: number; pointerType: string } | null = null
+    function onDown(event: PointerEvent) {
+      pressed = { x: event.clientX, y: event.clientY, pointerType: event.pointerType }
+    }
+
+    function onUp(event: PointerEvent) {
+      const start = pressed
+      pressed = null
+      if (!start || start.pointerType !== event.pointerType) return
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_SLOP_PX) return
+      // A tap on the pinned tip itself (its "Enter" control) is that control's own job - touch
+      // fires pointerup, then a separate "click" a moment later; changing tip state here first
+      // could unmount the button before that click arrives.
+      if (event.target instanceof Node && tipRef.current?.contains(event.target)) return
+
+      if (event.pointerType === "mouse") {
+        // Unchanged from before touch support: a click on a dungeon enters it directly.
+        const found = hitAt(event)
+        if (found?.dungeon) enter(found)
         return
       }
 
-      // Flip to the other side of the pointer before the box would clip.
-      const flipX = event.clientX + TOOLTIP_MAX_WIDTH + TOOLTIP_MARGIN * 2 > window.innerWidth
-      const flipY = event.clientY + 90 > window.innerHeight
-      const x = flipX ? event.clientX - TOOLTIP_MARGIN - TOOLTIP_MAX_WIDTH : event.clientX + TOOLTIP_MARGIN
-      const y = flipY ? event.clientY - TOOLTIP_MARGIN - 48 : event.clientY + TOOLTIP_MARGIN + 6
-      setTip({ type: found.type, dungeon: found.dungeon, x: Math.max(TOOLTIP_MARGIN, x), y: Math.max(TOOLTIP_MARGIN, y) })
-    }
-
-    function onLeave() {
-      setTip(null)
-    }
-
-    // Only a dungeon's icon reacts to a click; a press that travelled is a drag and does nothing.
-    let pressed: { x: number; y: number } | null = null
-    function onDown(event: MouseEvent) {
-      pressed = { x: event.clientX, y: event.clientY }
-    }
-
-    function onClick(event: MouseEvent) {
-      const start = pressed
-      pressed = null
-      if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_SLOP_PX) return
       const found = hitAt(event)
-      if (!found?.dungeon) return
-      const view = viewRef.current
-      const query = new URLSearchParams({
-        map: seedRef.current,
-        x: String(found.x),
-        y: String(found.y),
-        type: found.type,
-        zoom: String(ZOOM_LEVELS.findIndex((level) => level.step === view.step) + 1),
+      setTip((current) => {
+        if (!found) return current?.pinned ? null : current // tapped elsewhere: dismiss a pinned tip, leave nothing else alone
+        if (current?.pinned && current.hitX === found.x && current.hitY === found.y && current.type === found.type) {
+          // Tapping the same icon again: the second half of "tap shows, tap (or Enter) enters".
+          if (found.dungeon) enter(found)
+          return current
+        }
+        return { type: found.type, dungeon: found.dungeon, hitX: found.x, hitY: found.y, ...tipPosition(event.clientX, event.clientY), pinned: true }
       })
-      window.location.assign(`/dungeons?${query}`)
     }
 
-    window.addEventListener("mousemove", onMove)
-    window.addEventListener("mousedown", onDown)
-    window.addEventListener("click", onClick)
-    document.addEventListener("mouseleave", onLeave)
+    window.addEventListener("pointermove", onMove)
+    window.addEventListener("pointerdown", onDown)
+    window.addEventListener("pointerup", onUp)
+    document.addEventListener("pointerleave", onLeave)
     return () => {
-      window.removeEventListener("mousemove", onMove)
-      window.removeEventListener("mousedown", onDown)
-      window.removeEventListener("click", onClick)
-      document.removeEventListener("mouseleave", onLeave)
+      window.removeEventListener("pointermove", onMove)
+      window.removeEventListener("pointerdown", onDown)
+      window.removeEventListener("pointerup", onUp)
+      document.removeEventListener("pointerleave", onLeave)
     }
   }, [])
 
-  // The pointer shows that an icon can be clicked only over a dungeon.
-  const overDungeon = tip?.dungeon === true
+  // The pointer shows that an icon can be clicked only over a dungeon (mouse hover only - touch has no hover cursor).
+  const overDungeon = tip?.dungeon === true && !tip.pinned
   useEffect(() => {
     if (!overDungeon) return
     document.body.style.cursor = "pointer"
@@ -319,21 +358,27 @@ export function PointsOfInterestLayer({
     <>
       <canvas
         ref={canvasRef}
-        className="pointer-events-none fixed inset-0 z-0 h-screen w-screen transition-opacity duration-500"
+        className="pointer-events-none fixed inset-0 z-0 h-dvh w-screen transition-opacity duration-500"
         style={{ opacity: shown ? 1 : 0 }}
       />
       {tip && entry && (
         <div
+          ref={tipRef}
           role="tooltip"
           style={{ maxWidth: TOOLTIP_MAX_WIDTH, transform: `translate(${tip.x}px, ${tip.y}px)` }}
-          className="bg-card pointer-events-none fixed top-0 left-0 z-30 rounded-md border px-2.5 py-1.5 shadow-lg"
+          className={cn("bg-card fixed top-0 left-0 z-30 rounded-md border px-2.5 py-1.5 shadow-lg", tip.pinned ? "pointer-events-auto" : "pointer-events-none")}
         >
           <div className="text-sm leading-tight font-medium">{entry.label}</div>
           <div className="text-muted-foreground text-xs leading-snug">{entry.description}</div>
-          {tip.dungeon && (
+          {tip.dungeon && !tip.pinned && (
             <div className="mt-1 text-xs leading-snug font-medium">
               Dungeon <span className="text-muted-foreground font-normal">– Something lurks below. Click to enter.</span>
             </div>
+          )}
+          {tip.dungeon && tip.pinned && (
+            <Button size="sm" className="mt-1.5 w-full" onClick={() => enter({ x: tip.hitX, y: tip.hitY, type: tip.type })}>
+              Enter
+            </Button>
           )}
         </div>
       )}

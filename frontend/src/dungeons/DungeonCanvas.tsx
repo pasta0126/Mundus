@@ -3,6 +3,7 @@ import type { components } from "@/api/schema"
 import { loadDungeonIcons } from "@/dungeons/art"
 import { paintCaveTerrain } from "@/dungeons/caveRender"
 import { paintHallsTerrain, paintMazeTerrain } from "@/dungeons/gridDressing"
+import { effectiveDpr } from "@/lib/dpr"
 
 type Dungeon = components["schemas"]["Dungeon"]
 type Catalog = components["schemas"]["DungeonCatalogResponse"]
@@ -38,6 +39,8 @@ const MARGIN = 24
 const PANEL_WIDTH = 288
 const WIDE_WINDOW = 900
 const TOOLTIP_OFFSET = 14
+/** A press that moves further than this before release is a drag, not a tap. */
+const CLICK_SLOP_PX = 5
 
 /** Every mark of a dungeon, named from the backend's catalog. Painted back to front by row. */
 function marksOf(dungeon: Dungeon, catalog: Catalog): Placed[] {
@@ -80,8 +83,23 @@ export function DungeonCanvas({ dungeon, catalog }: { dungeon: Dungeon; catalog:
   const hitsRef = useRef<Hit[]>([])
   const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
   const inset = size.w >= WIDE_WINDOW ? PANEL_WIDTH + MARGIN : 0
-  const [tip, setTip] = useState<(Named & { x: number; y: number }) | null>(null)
+  // pinned: shown by a tap (touch) rather than hover (mouse) - stays until the person taps elsewhere.
+  const [tip, setTip] = useState<(Named & { x: number; y: number; pinned: boolean }) | null>(null)
+  const tipRef = useRef<HTMLDivElement>(null)
   const marks = useMemo(() => marksOf(dungeon, catalog), [dungeon, catalog])
+
+  // A tap outside both the canvas (which handles taps on itself, including on a mark, above)
+  // and the pinned tip itself (nothing to dismiss there) still counts as "elsewhere".
+  useEffect(() => {
+    function onPointerDown(event: PointerEvent) {
+      if (event.pointerType === "mouse") return
+      if (canvasRef.current?.contains(event.target as Node)) return
+      if (tipRef.current?.contains(event.target as Node)) return
+      setTip((current) => (current?.pinned ? null : current))
+    }
+    window.addEventListener("pointerdown", onPointerDown)
+    return () => window.removeEventListener("pointerdown", onPointerDown)
+  }, [])
 
   useEffect(() => {
     const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight })
@@ -97,7 +115,7 @@ export function DungeonCanvas({ dungeon, catalog }: { dungeon: Dungeon; catalog:
     const cols = Number(dungeon.width)
     const rows = Number(dungeon.height)
     const cell = Math.max(4, Math.floor(Math.min((size.w - inset - MARGIN * 2) / cols, (size.h - MARGIN * 2) / rows)))
-    const dpr = window.devicePixelRatio || 1
+    const dpr = effectiveDpr()
     const cssW = cols * cell
     const cssH = rows * cell
     canvas.width = Math.round(cssW * dpr)
@@ -144,27 +162,64 @@ export function DungeonCanvas({ dungeon, catalog }: { dungeon: Dungeon; catalog:
     }
   }, [dungeon, marks, size, inset])
 
-  function onMove(event: React.MouseEvent<HTMLCanvasElement>) {
-    const box = event.currentTarget.getBoundingClientRect()
-    const x = event.clientX - box.left
-    const y = event.clientY - box.top
-    // Topmost first: later marks were painted over earlier ones.
-    const found = [...hitsRef.current].reverse().find((h) => x >= h.left && x <= h.right && y >= h.top && y <= h.bottom)
+  /** The mark under (clientX, clientY), if any - topmost first, since later marks were painted over earlier ones. */
+  function hitAt(canvas: HTMLCanvasElement, clientX: number, clientY: number): Hit | undefined {
+    const box = canvas.getBoundingClientRect()
+    const x = clientX - box.left
+    const y = clientY - box.top
+    return [...hitsRef.current].reverse().find((h) => x >= h.left && x <= h.right && y >= h.top && y <= h.bottom)
+  }
+
+  function tipFor(found: Hit, clientX: number, clientY: number, pinned: boolean) {
+    const flip = clientX + 260 > window.innerWidth
+    return { title: found.title, description: found.description, x: flip ? clientX - 250 : clientX + TOOLTIP_OFFSET, y: clientY + TOOLTIP_OFFSET, pinned }
+  }
+
+  function onMove(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (event.pointerType !== "mouse") return // touch has no hover; its tip is shown on tap instead, below
+    const found = hitAt(event.currentTarget, event.clientX, event.clientY)
     if (!found) {
-      setTip((current) => (current === null ? current : null))
+      setTip((current) => (current === null || current.pinned ? current : null))
       return
     }
-    const flip = event.clientX + 260 > window.innerWidth
-    setTip({ title: found.title, description: found.description, x: flip ? event.clientX - 250 : event.clientX + TOOLTIP_OFFSET, y: event.clientY + TOOLTIP_OFFSET })
+    setTip(tipFor(found, event.clientX, event.clientY, false))
+  }
+
+  function onLeave(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (event.pointerType !== "mouse") return
+    setTip((current) => (current?.pinned ? current : null))
+  }
+
+  const pressedRef = useRef<{ x: number; y: number } | null>(null)
+  function onDown(event: React.PointerEvent<HTMLCanvasElement>) {
+    pressedRef.current = { x: event.clientX, y: event.clientY }
+  }
+
+  function onUp(event: React.PointerEvent<HTMLCanvasElement>) {
+    if (event.pointerType === "mouse") return // mouse only ever hovers here; nothing to commit on release
+    const start = pressedRef.current
+    pressedRef.current = null
+    if (start && Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_SLOP_PX) return // a drag, not a tap
+    const found = hitAt(event.currentTarget, event.clientX, event.clientY)
+    setTip(found ? tipFor(found, event.clientX, event.clientY, true) : null)
   }
 
   return (
     <>
       <div className="fixed inset-0 flex items-center justify-center" style={{ paddingLeft: inset }}>
-        <canvas ref={canvasRef} onMouseMove={onMove} onMouseLeave={() => setTip(null)} className="rounded-md shadow-2xl" aria-label="Dungeon map" />
+        <canvas
+          ref={canvasRef}
+          onPointerMove={onMove}
+          onPointerLeave={onLeave}
+          onPointerDown={onDown}
+          onPointerUp={onUp}
+          className="rounded-md shadow-2xl"
+          aria-label="Dungeon map"
+        />
       </div>
       {tip && (
         <div
+          ref={tipRef}
           role="tooltip"
           style={{ maxWidth: 240, transform: `translate(${tip.x}px, ${tip.y}px)` }}
           className="bg-card pointer-events-none fixed top-0 left-0 z-30 rounded-md border px-2.5 py-1.5 shadow-lg"

@@ -1,6 +1,5 @@
 import { Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
-import { MobileNotice } from "@/components/MobileNotice"
 
 interface Card {
   href: string
@@ -38,9 +37,8 @@ const CARDS: readonly Card[] = [
 /** The landing page: a hub that only links out. It makes no request and loads no map or 3D code. */
 export default function HomePage() {
   return (
-    <main className="flex min-h-screen w-full flex-col items-center gap-8 p-6 sm:p-10">
+    <main className="flex min-h-dvh w-full flex-col items-center gap-8 p-6 sm:p-10">
       <div className="w-full max-w-5xl">
-        <MobileNotice />
       </div>
       <header className="flex flex-col items-center gap-3 pt-2 text-center">
         <img src={mundusIcon} alt="" className="size-16" />

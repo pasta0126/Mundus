@@ -1,12 +1,12 @@
-import { ArrowLeft, ArrowRight, Dices, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react"
+import { ArrowLeft, ArrowRight, Dices, Menu, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
-import { MobileNotice } from "@/components/MobileNotice"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { randomName } from "@/lib/randomName"
 import { CopyButton } from "./CopyButton"
 import { PlanetScene } from "./PlanetScene"
@@ -164,24 +164,9 @@ export default function SystemsPage() {
   const selectedSlot = system && selected !== null ? system.slots.find((s) => Number(s.index) === selected) : undefined
   const isCustom = view.planets.length > 0
 
-  return (
-    <div className="bg-background fixed inset-0 overflow-hidden">
-      {system && !error && (selectedSlot ? <PlanetScene key={selectedSlot.planetSeed} planet={selectedSlot.planet} /> : <SystemScene system={system} onSelectPlanet={setSelected} />)}
-
-      <div className="fixed top-4 left-4 z-10 flex max-h-[calc(100vh-2rem)] max-w-64 flex-col gap-2">
-        <MobileNotice />
-        <div className="bg-card min-h-0 space-y-3 overflow-y-auto rounded-lg border p-3 shadow-lg">
-          <div className="flex items-center justify-between gap-2">
-            <h1 className="text-lg font-semibold tracking-tight">
-              <a href="/" className="flex items-center gap-2 hover:opacity-80" aria-label="Back to home">
-                <img src={mundusIcon} alt="" className="size-6" />
-                Mundus
-              </a>
-            </h1>
-            <span className="text-muted-foreground font-mono text-xs">v{__APP_VERSION__}</span>
-          </div>
-
-          <form
+  const panelBody = (
+    <>
+      <form
             className="flex gap-1.5"
             onSubmit={(e) => {
               e.preventDefault()
@@ -230,7 +215,7 @@ export default function SystemsPage() {
                       <button
                         type="button"
                         onClick={() => setSelected(Number(slot.index))}
-                        className="hover:bg-muted flex w-full items-baseline justify-between gap-2 rounded px-1.5 py-0.5 text-left"
+                        className="hover:bg-muted coarse:min-h-11 flex w-full items-baseline justify-between gap-2 rounded px-1.5 py-0.5 text-left"
                       >
                         <span className="truncate">{slot.planet.name}</span>
                         <span className="text-muted-foreground shrink-0 text-xs">{TYPE_LABELS[slot.planet.type]}</span>
@@ -283,7 +268,7 @@ export default function SystemsPage() {
                       <select
                         value={effectiveBelt ?? ""}
                         onChange={(e) => setDraftBelt(e.target.value === "" ? null : Number(e.target.value))}
-                        className="bg-background rounded-md border px-2 py-1"
+                        className="bg-background coarse:min-h-11 rounded-md border px-2 py-1"
                         disabled={beltChoices.length === 0}
                       >
                         <option value="">None</option>
@@ -319,8 +304,48 @@ export default function SystemsPage() {
               </div>
             )
           )}
+    </>
+  )
+
+  return (
+    <div className="bg-background fixed inset-0 overflow-hidden">
+      {system && !error && (selectedSlot ? <PlanetScene key={selectedSlot.planetSeed} planet={selectedSlot.planet} /> : <SystemScene system={system} onSelectPlanet={setSelected} />)}
+
+      {/* Below 768px this panel folds into a sheet (see the Menu trigger below) instead of floating over the scene. */}
+      <div className="fixed top-4 left-4 z-10 hidden max-h-[calc(100dvh-2rem)] max-w-64 flex-col gap-2 md:flex">
+        <div className="bg-card min-h-0 space-y-3 overflow-y-auto rounded-lg border p-3 shadow-lg">
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="text-lg font-semibold tracking-tight">
+              <a href="/" className="flex items-center gap-2 hover:opacity-80" aria-label="Back to home">
+                <img src={mundusIcon} alt="" className="size-6" />
+                Mundus
+              </a>
+            </h1>
+            <span className="text-muted-foreground font-mono text-xs">v{__APP_VERSION__}</span>
+          </div>
+          {panelBody}
         </div>
       </div>
+
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button variant="outline" size="icon" className="bg-card fixed top-4 left-4 z-10 shadow-lg md:hidden" aria-label="Open system menu">
+            <Menu />
+          </Button>
+        </SheetTrigger>
+        <SheetContent className="overflow-y-auto md:hidden">
+          <SheetHeader>
+            <SheetTitle>
+              <a href="/" className="flex items-center gap-2" aria-label="Back to home">
+                <img src={mundusIcon} alt="" className="size-6" />
+                Mundus
+                <span className="text-muted-foreground font-mono text-xs font-normal">v{__APP_VERSION__}</span>
+              </a>
+            </SheetTitle>
+          </SheetHeader>
+          {panelBody}
+        </SheetContent>
+      </Sheet>
 
       {loading && (
         <div className="fixed inset-x-0 top-0 z-20 flex flex-col items-center gap-2 p-4">

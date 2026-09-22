@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import { api } from "@/api/client"
+import { effectiveDpr } from "@/lib/dpr"
 import { CHUNK_CONCURRENCY, CHUNK_SIZE } from "@/map/constants"
 import { computeChunkGrid, runWithConcurrency } from "@/map/tiling"
 
@@ -46,7 +47,7 @@ export function RegionBordersLayer({
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    const dpr = window.devicePixelRatio || 1
+    const dpr = effectiveDpr()
     const cssWidth = window.innerWidth
     const cssHeight = window.innerHeight
     canvas.width = Math.round(cssWidth * dpr)
@@ -93,5 +94,5 @@ export function RegionBordersLayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seed, originX, originY, width, height, cellPx, step, generation])
 
-  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-0 h-screen w-screen" />
+  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-0 h-dvh w-screen" />
 }

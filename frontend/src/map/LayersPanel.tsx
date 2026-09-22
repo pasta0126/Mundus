@@ -1,14 +1,17 @@
+import { cn } from "cn"
 import { LAYER_REGISTRY, type LayerDefinition, type LayerId } from "@/map/layers"
 
 interface LayersPanelProps {
   visibility: Record<LayerId, boolean>
   onToggle: (id: LayerId) => void
+  /** Overrides the default floating-panel width - e.g. "w-full" when stacked inside the mobile sheet instead of floating beside the map. */
+  className?: string
 }
 
 function LayerCheckbox({ layer, checked, onToggle }: { layer: LayerDefinition; checked: boolean; onToggle: (id: LayerId) => void }) {
   return (
     <li>
-      <label className="flex items-center gap-2 text-sm">
+      <label className="coarse:min-h-11 flex items-center gap-2 text-sm">
         <input type="checkbox" checked={checked} onChange={() => onToggle(layer.id)} className="accent-primary size-3.5" />
         {layer.label}
       </label>
@@ -17,12 +20,12 @@ function LayerCheckbox({ layer, checked, onToggle }: { layer: LayerDefinition; c
 }
 
 /** One checkbox per registered overlay layer: ungrouped layers first, then each group (see map/layers.ts) under its own heading, in registry order. */
-export function LayersPanel({ visibility, onToggle }: LayersPanelProps) {
+export function LayersPanel({ visibility, onToggle, className }: LayersPanelProps) {
   const ungrouped = LAYER_REGISTRY.filter((layer) => !layer.group)
   const groups = [...new Set(LAYER_REGISTRY.flatMap((layer) => (layer.group ? [layer.group] : [])))]
 
   return (
-    <div className="bg-card w-52 space-y-2 rounded-lg border p-3 shadow-lg">
+    <div className={cn("bg-card w-52 space-y-2 rounded-lg border p-3 shadow-lg", className)}>
       <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">Layers</h2>
       <ul className="space-y-1.5">
         {ungrouped.map((layer) => (

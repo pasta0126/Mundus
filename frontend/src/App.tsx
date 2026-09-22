@@ -1,13 +1,14 @@
 import { AnimatePresence, motion } from "motion/react"
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Info, Layers, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Download, Info, Layers, Menu, RefreshCw, ZoomIn, ZoomOut } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { api } from "@/api/client"
 import type { components } from "@/api/schema"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { BiomeLegend } from "@/map/BiomeLegend"
-import { MobileNotice } from "@/components/MobileNotice"
 import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { CompassRose, type CompassInfo } from "@/map/CompassRose"
+import { effectiveDpr } from "@/lib/dpr"
 import { LAYER_REGISTRY, defaultLayerVisibility, type LayerId } from "@/map/layers"
 import { LayersPanel } from "@/map/LayersPanel"
 import { Progress } from "@/components/ui/progress"
@@ -17,6 +18,7 @@ import { MapParamsPanel } from "@/map/MapParamsPanel"
 import { PointsOfInterestLayer } from "@/map/PointsOfInterestLayer"
 import { RegionBordersLayer } from "@/map/RegionBordersLayer"
 import { computeChunkGrid, runWithConcurrency } from "@/map/tiling"
+import { useMapGestures } from "@/map/useMapGestures"
 
 type MapDto = components["schemas"]["Map"]
 type Phase = "result" | "error"
@@ -250,6 +252,29 @@ function App() {
   useEffect(() => {
     viewWindowRef.current = viewWindow
   }, [viewWindow])
+
+  // The canvases are wrapped so a drag can translate them together for
+  // immediate visual feedback (see useMapGestures) before the real re-fetch
+  // lands; the translation is cleared once it does, rather than snapping
+  // back to centered while still loading.
+  const dragWrapperRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (dragWrapperRef.current) dragWrapperRef.current.style.transform = ""
+  }, [viewWindow?.generation])
+
+  /** Converts a drag's total on-screen distance to world units at the current zoom, then re-centers there - same math as the "Position" shown in MapParamsPanel. */
+  function onPanBy(dxPx: number, dyPx: number) {
+    const view = viewWindowRef.current
+    if (!view) return
+    const worldDx = (dxPx / view.cellPx) * view.step
+    const worldDy = (dyPx / view.cellPx) * view.step
+    const centerX = view.originX + Math.floor(view.width / 2) * view.step
+    const centerY = view.originY + Math.floor(view.height / 2) * view.step
+    goToPosition(Math.round(centerX - worldDx), Math.round(centerY - worldDy))
+  }
+
+  useMapGestures({ wrapperRef: dragWrapperRef, onPanBy, onZoomStep: zoom })
+
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>
     function onResize() {
@@ -303,7 +328,7 @@ function App() {
     }
 
     if (layerVisibility.compass && compassInfo) {
-      const dpr = window.devicePixelRatio || 1
+      const dpr = effectiveDpr()
       const rect = compassInfo.img.getBoundingClientRect()
       ctx.save()
       ctx.translate((rect.left + rect.width / 2) * dpr, (rect.top + rect.height / 2) * dpr)
@@ -324,52 +349,54 @@ function App() {
   }
 
   return (
-    <main className="relative min-h-screen w-full overflow-hidden">
-      {viewWindow && (
-        <MapCanvas
-          chunks={chunks}
-          originX={viewWindow.originX}
-          originY={viewWindow.originY}
-          width={viewWindow.width}
-          height={viewWindow.height}
-          cellPx={viewWindow.cellPx}
-          step={viewWindow.step}
-          generation={viewWindow.generation}
-          onCanvasReady={setCanvasEl}
-        />
-      )}
+    <main className="relative min-h-dvh w-full overflow-hidden">
+      <div ref={dragWrapperRef}>
+        {viewWindow && (
+          <MapCanvas
+            chunks={chunks}
+            originX={viewWindow.originX}
+            originY={viewWindow.originY}
+            width={viewWindow.width}
+            height={viewWindow.height}
+            cellPx={viewWindow.cellPx}
+            step={viewWindow.step}
+            generation={viewWindow.generation}
+            onCanvasReady={setCanvasEl}
+          />
+        )}
 
-      {viewWindow && layerVisibility.regionBorders && (
-        <RegionBordersLayer
-          seed={viewWindow.seed}
-          originX={viewWindow.originX}
-          originY={viewWindow.originY}
-          width={viewWindow.width}
-          height={viewWindow.height}
-          cellPx={viewWindow.cellPx}
-          step={viewWindow.step}
-          generation={viewWindow.generation}
-          onCanvasReady={setRegionBordersCanvasEl}
-        />
-      )}
+        {viewWindow && layerVisibility.regionBorders && (
+          <RegionBordersLayer
+            seed={viewWindow.seed}
+            originX={viewWindow.originX}
+            originY={viewWindow.originY}
+            width={viewWindow.width}
+            height={viewWindow.height}
+            cellPx={viewWindow.cellPx}
+            step={viewWindow.step}
+            generation={viewWindow.generation}
+            onCanvasReady={setRegionBordersCanvasEl}
+          />
+        )}
 
-      {viewWindow && (
-        <PointsOfInterestLayer
-          seed={viewWindow.seed}
-          originX={viewWindow.originX}
-          originY={viewWindow.originY}
-          width={viewWindow.width}
-          height={viewWindow.height}
-          cellPx={viewWindow.cellPx}
-          step={viewWindow.step}
-          generation={viewWindow.generation}
-          // Icons wait for the terrain: the map is what people came for, and
-          // every icon request competes with a terrain chunk for the wire.
-          enabled={!loading}
-          visibleCategories={visiblePoiCategories}
-          onCanvasReady={setPoiCanvasEl}
-        />
-      )}
+        {viewWindow && (
+          <PointsOfInterestLayer
+            seed={viewWindow.seed}
+            originX={viewWindow.originX}
+            originY={viewWindow.originY}
+            width={viewWindow.width}
+            height={viewWindow.height}
+            cellPx={viewWindow.cellPx}
+            step={viewWindow.step}
+            generation={viewWindow.generation}
+            // Icons wait for the terrain: the map is what people came for, and
+            // every icon request competes with a terrain chunk for the wire.
+            enabled={!loading}
+            visibleCategories={visiblePoiCategories}
+            onCanvasReady={setPoiCanvasEl}
+          />
+        )}
+      </div>
 
       <AnimatePresence mode="wait">
         {phase === "error" && (
@@ -406,9 +433,9 @@ function App() {
         <>
           <CompassRose seed={viewWindow.seed} visible={layerVisibility.compass} onReady={setCompassInfo} />
 
-          <div className="fixed top-4 left-4 z-10 flex items-start gap-3">
+          {/* Below 768px the panel, layers and legend fold into one sheet (see the Menu trigger below) instead of floating beside the map. */}
+          <div className="fixed top-4 left-4 z-10 hidden items-start gap-3 md:flex">
             <div className="flex flex-col gap-2">
-              <MobileNotice />
               <div className="bg-card w-72 space-y-3 rounded-lg border p-3 shadow-lg">
                 <div className="flex items-center justify-between gap-2">
                   <h1 className="text-lg font-semibold tracking-tight">
@@ -485,6 +512,48 @@ function App() {
               </AnimatePresence>
             </div>
           </div>
+
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon" className="bg-card fixed top-4 left-4 z-10 shadow-lg md:hidden" aria-label="Open map menu">
+                <Menu />
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="overflow-y-auto md:hidden">
+              <SheetHeader>
+                <SheetTitle>
+                  <a href="/" className="flex items-center gap-2" aria-label="Back to home">
+                    <img src={mundusIcon} alt="" className="size-6" />
+                    Mundus
+                    <span className="text-muted-foreground font-mono text-xs font-normal">v{__APP_VERSION__}</span>
+                  </a>
+                </SheetTitle>
+              </SheetHeader>
+              <MapParamsPanel
+                seed={viewWindow.seed}
+                originX={viewWindow.originX + Math.floor(viewWindow.width / 2) * viewWindow.step}
+                originY={viewWindow.originY + Math.floor(viewWindow.height / 2) * viewWindow.step}
+                onGoTo={goToPosition}
+                onGenerateSeed={generateFromSeed}
+              />
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={regenerate} className="flex-1">
+                  <RefreshCw />
+                  Regenerate
+                </Button>
+                <Button variant="outline" onClick={downloadMap} className="flex-1">
+                  <Download />
+                  Download
+                </Button>
+              </div>
+              <div className="space-y-3 border-t pt-3">
+                <LayersPanel visibility={layerVisibility} onToggle={toggleLayer} className="w-full border-none p-0 shadow-none" />
+              </div>
+              <div className="space-y-3 border-t pt-3">
+                <BiomeLegend className="max-h-none w-full border-none p-0 shadow-none" />
+              </div>
+            </SheetContent>
+          </Sheet>
 
           <div className="fixed right-4 bottom-4 z-10 flex items-end gap-3">
             <div className="bg-card flex flex-col items-center gap-1 rounded-lg border p-1 shadow-lg">

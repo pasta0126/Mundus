@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react"
 import type { components } from "@/api/schema"
 import { BIOME_COLORS } from "@/map/biomeColors"
+import { effectiveDpr } from "@/lib/dpr"
 
 type MapDto = components["schemas"]["Map"]
 
@@ -47,7 +48,7 @@ export function MapCanvas({ chunks, originX, originY, width, height, cellPx, ste
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    const dpr = window.devicePixelRatio || 1
+    const dpr = effectiveDpr()
     const cssWidth = window.innerWidth
     const cssHeight = window.innerHeight
     canvas.width = Math.round(cssWidth * dpr)
@@ -86,5 +87,6 @@ export function MapCanvas({ chunks, originX, originY, width, height, cellPx, ste
     drawnCountRef.current = chunks.length
   }, [chunks, cellPx, step, originX, originY])
 
-  return <canvas ref={canvasRef} className="fixed inset-0 -z-10 h-screen w-screen" />
+  // touch-none: dragging/pinching on the map (see useMapGestures) must not also scroll or refresh the page.
+  return <canvas ref={canvasRef} className="fixed inset-0 -z-10 h-dvh w-screen touch-none" />
 }
