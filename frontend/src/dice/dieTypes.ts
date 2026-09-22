@@ -1,4 +1,5 @@
 import * as THREE from "three"
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js"
 
 /** Every die shape the tray can summon. `d100` is not built here - it is two `d10` bodies (see DicePage.tsx), one printed 00/10/.../90, one 0-9. */
 export type DieKind = "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | "d100"
@@ -196,8 +197,33 @@ export function buildD4(): DieShape {
 
   return { positions, faces, vertices, radius, color: "#c0392b" }
 }
+/**
+ * A cube with its edges truncated (chamfered) - a low segment count keeps
+ * the bevel as flat facets rather than a smooth round-over, matching a
+ * traditional "truncated edge" d6's look. Its 6 flat faces stay exactly
+ * where a plain cube's would (the chamfer only shrinks each face's flat
+ * area, not its centre), so face normals/centroids are given directly
+ * rather than read off the (now much larger) triangle soup - the generic
+ * `platonicShape`/`facesFromTriangles` grouping would otherwise also pick
+ * up every little bevel facet as its own (undesired) face.
+ */
 export function buildD6(): DieShape {
-  return platonicShape(new THREE.BoxGeometry(0.7, 0.7, 0.7), 0.61, "#2c3e50")
+  const size = 0.72
+  const halfSize = size / 2
+  const geometry = new RoundedBoxGeometry(size, size, size, 1, size * 0.16)
+  const nonIndexed = geometry.index ? geometry.toNonIndexed() : geometry
+  const positions = (nonIndexed.attributes.position.array as Float32Array).slice()
+
+  const axisFaces: RawFace[] = [
+    { normal: new THREE.Vector3(1, 0, 0), centroid: new THREE.Vector3(halfSize, 0, 0), samples: 1 },
+    { normal: new THREE.Vector3(-1, 0, 0), centroid: new THREE.Vector3(-halfSize, 0, 0), samples: 1 },
+    { normal: new THREE.Vector3(0, 1, 0), centroid: new THREE.Vector3(0, halfSize, 0), samples: 1 },
+    { normal: new THREE.Vector3(0, -1, 0), centroid: new THREE.Vector3(0, -halfSize, 0), samples: 1 },
+    { normal: new THREE.Vector3(0, 0, 1), centroid: new THREE.Vector3(0, 0, halfSize), samples: 1 },
+    { normal: new THREE.Vector3(0, 0, -1), centroid: new THREE.Vector3(0, 0, -halfSize), samples: 1 },
+  ]
+  const faces = assignAntipodalValues(axisFaces)
+  return { positions, faces, radius: 0.61, color: "#2c3e50" }
 }
 export function buildD8(): DieShape {
   return platonicShape(new THREE.OctahedronGeometry(0.55), 0.55, "#16a085")

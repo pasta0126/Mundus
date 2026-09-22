@@ -177,6 +177,12 @@ const SHADE = {
 /** Fixed ink for a d6's pips, which has no dark/light-shade distinction of its own. */
 const PLAIN_INK = "#1c1c1c"
 
+/** A kind whose numeral ink is fixed regardless of shade - a d4 and d12 always print white, since both keep a dark base colour where dark ink would be unreadable. */
+const FIXED_INK: Partial<Record<DieKind, string>> = {
+  d4: "#ffffff",
+  d12: "#ffffff",
+}
+
 /**
  * Builds every face's decal for a die of `kind`, from the same `faces` its
  * physics/settle-read already uses. `shade` only matters for a `d10` that's
@@ -184,10 +190,12 @@ const PLAIN_INK = "#1c1c1c"
  * uses "light" (dark ink) like an ordinary inked die.
  */
 export function buildDecals(kind: DieKind, shape: DieShape, shade: "dark" | "light" = "light"): THREE.Object3D[] {
-  const { ink } = SHADE[shade]
+  const ink = FIXED_INK[kind] ?? SHADE[shade].ink
 
   if (kind === "d6") {
-    const decalSize = shape.radius * 0.9
+    // The truncated-edge cube's flat face area is smaller than its full
+    // side (the chamfer eats into it), so this sits well inside `radius`.
+    const decalSize = shape.radius * 0.62
     return shape.faces.map((face) => {
       if (face.value === 1) {
         const { canvas, texture } = mutableTexture()
@@ -223,7 +231,7 @@ export function buildDecals(kind: DieKind, shape: DieShape, shade: "dark" | "lig
   }
 
   // d8, d10, d12, d20, and either half of a d100 - print the numeral centred on each face.
-  const decalSize = kind === "d20" ? shape.radius * 0.6 : shape.radius * 0.9
+  const decalSize = kind === "d20" ? shape.radius * 0.6 : kind === "d10" ? shape.radius * 0.62 : shape.radius * 0.9
   return shape.faces.map((face) => createDecal(face, textureFrom((ctx) => drawNumeral(ctx, String(face.value), ink)), decalSize))
 }
 

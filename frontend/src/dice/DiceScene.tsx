@@ -326,7 +326,7 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
           if (currentTrayIds.size >= MAX_DICE) return false
           const trayId = crypto.randomUUID()
           const usedColors = [...colorByTrayIdRef.current.entries()].filter(([id]) => kindByTrayIdRef.current.get(id) === kind).map(([, c]) => c)
-          const color = nextColorFor(usedColors)
+          const color = nextColorFor(kind, usedColors)
           kindByTrayIdRef.current.set(trayId, kind)
           colorByTrayIdRef.current.set(trayId, color)
           const index = currentTrayIds.size
