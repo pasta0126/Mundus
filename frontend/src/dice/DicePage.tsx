@@ -8,7 +8,6 @@ import { DIE_KINDS, type DieKind } from "./dieTypes"
 import { appendHistoryEntry, downloadHistory, loadHistory, type HistoryEntry } from "./history"
 
 const DIE_LABELS: Record<DieKind, string> = {
-  d2: "D2",
   d4: "D4",
   d6: "D6",
   d8: "D8",

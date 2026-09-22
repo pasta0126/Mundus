@@ -1,26 +1,21 @@
 import * as THREE from "three"
+import mundusIcon from "@/assets/mundus-icon-header.png"
 import { type DieFace, type DieKind, type DieShape, orientationForNormal } from "./dieTypes"
 
-const DECAL_SIZE = 128
+const DECAL_SIZE = 256
 
 /**
- * A digit (or short run of digits) on a filled circular chip, with an
- * underline baked under any 6 or 9 so the two can never be confused for
- * one another from any angle. The chip - not just the ink - is what keeps
- * this legible against any base die colour (see palette.ts): at a die's
- * small on-screen size, a thin ink fill's own colour gets blended away by
- * mipmapping well before its outline would, but a solid filled area does
- * not. It's also what makes a d100 pair's dark-tens/light-units shading
- * (see the `dice-roller` spec) read clearly at a glance rather than
- * relying on a thin stroke of ink.
+ * A digit (or short run of digits), with an underline baked under any 6 or
+ * 9 so the two can never be confused for one another from any angle. Ink
+ * sits directly on a transparent canvas - no background chip - so legibility
+ * against any base die colour (see palette.ts) instead comes from this
+ * canvas's own resolution and the on-die size the decal is rendered at
+ * (both raised - see design.md), which is enough for the ink's own shape to
+ * survive mipmapping at a die's small on-screen size.
  */
-function drawNumeral(ctx: CanvasRenderingContext2D, text: string, ink: string, chip: string) {
+function drawNumeral(ctx: CanvasRenderingContext2D, text: string, ink: string) {
   const size = DECAL_SIZE
   ctx.clearRect(0, 0, size, size)
-  ctx.fillStyle = chip
-  ctx.beginPath()
-  ctx.arc(size / 2, size / 2, size * 0.46, 0, Math.PI * 2)
-  ctx.fill()
 
   ctx.font = `bold ${Math.round(size * 0.56)}px "Geist Variable", sans-serif`
   ctx.textAlign = "center"
@@ -87,35 +82,23 @@ function drawPips(ctx: CanvasRenderingContext2D, count: number, ink: string) {
   }
 }
 
-/** A circle (face, value 1) or a cross (value 0), on the same kind of chip a numeral gets, for the same reason - legible against any base colour the coin is tinted. */
-function drawCoinSymbol(ctx: CanvasRenderingContext2D, symbol: "face" | "cross", ink: string, chip: string) {
+/** The Mundus icon, drawn centred on a transparent canvas - used in place of a single pip on a d6's "1" face. */
+function drawMundusIcon(ctx: CanvasRenderingContext2D, image: HTMLImageElement) {
   const size = DECAL_SIZE
   ctx.clearRect(0, 0, size, size)
-  ctx.fillStyle = chip
-  ctx.beginPath()
-  ctx.arc(size / 2, size / 2, size * 0.46, 0, Math.PI * 2)
-  ctx.fill()
+  const w = size * 0.72
+  const h = w * (image.naturalHeight / image.naturalWidth || 1)
+  ctx.drawImage(image, (size - w) / 2, (size - h) / 2, w, h)
+}
 
-  ctx.strokeStyle = ink
-  ctx.fillStyle = ink
-  ctx.lineWidth = size * 0.08
-  ctx.lineCap = "round"
-  if (symbol === "face") {
-    ctx.beginPath()
-    ctx.arc(size / 2, size / 2, size * 0.3, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.arc(size / 2, size / 2, size * 0.06, 0, Math.PI * 2)
-    ctx.fill()
-  } else {
-    const o = size * 0.28
-    ctx.beginPath()
-    ctx.moveTo(size / 2 - o, size / 2 - o)
-    ctx.lineTo(size / 2 + o, size / 2 + o)
-    ctx.moveTo(size / 2 + o, size / 2 - o)
-    ctx.lineTo(size / 2 - o, size / 2 + o)
-    ctx.stroke()
+let mundusIconImage: HTMLImageElement | null = null
+/** Lazily loads the Mundus icon once, shared by every d6 decal that needs it. */
+function getMundusIconImage(): HTMLImageElement {
+  if (!mundusIconImage) {
+    mundusIconImage = new Image()
+    mundusIconImage.src = mundusIcon
   }
+  return mundusIconImage
 }
 
 function textureFrom(draw: (ctx: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
@@ -128,9 +111,19 @@ function textureFrom(draw: (ctx: CanvasRenderingContext2D) => void): THREE.Canva
   return texture
 }
 
+/** A `textureFrom` canvas/texture pair the caller can redraw later (used for the Mundus icon, which may still be loading when the decal is first built). */
+function mutableTexture(): { canvas: HTMLCanvasElement; texture: THREE.CanvasTexture } {
+  const canvas = document.createElement("canvas")
+  canvas.width = DECAL_SIZE
+  canvas.height = DECAL_SIZE
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  return { canvas, texture }
+}
+
 const DECAL_GEOMETRY = new THREE.PlaneGeometry(1, 1)
 
-/** One face's numeral/pip/symbol, as a small transparent plane flush against that face - offset a hair outward along its normal, oriented so the artwork reads right-side-up, and parented under the die's own mesh so it settles and tumbles with it for free. */
+/** One face's numeral/pip/icon, as a small transparent plane flush against that face - offset a hair outward along its normal, oriented so the artwork reads right-side-up, and parented under the die's own mesh so it settles and tumbles with it for free. */
 function createDecal(face: DieFace, texture: THREE.CanvasTexture, size: number): THREE.Mesh {
   const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 })
   const mesh = new THREE.Mesh(DECAL_GEOMETRY, material)
@@ -141,48 +134,82 @@ function createDecal(face: DieFace, texture: THREE.CanvasTexture, size: number):
 }
 
 /**
- * A shade's ink/chip pair: "dark" is a dark chip with light ink (a d100's
- * tens die); "light" is the reverse (everything else, including a d100's
- * units die) - see design.md "Numerals and pips" and the `dice-roller`
- * spec's dark-tens/light-units requirement.
+ * A face's numeral repeated near one of its three corners - a d4's look on
+ * a real die, where every corner shared with a neighbouring face carries
+ * its own copy of the number, upright from that corner. `angle` (0, 2π/3,
+ * 4π/3) spins both the numeral and the direction it's offset toward around
+ * the face's own normal, so the three copies land ~120° apart same as an
+ * equilateral triangle's corners.
  */
-const SHADE = {
-  dark: { ink: "#f5f5f5", chip: "#26221f" },
-  light: { ink: "#1c1c1c", chip: "#f2ede2" },
+function createCornerDecal(face: DieFace, texture: THREE.CanvasTexture, size: number, angle: number): THREE.Mesh {
+  const baseQuat = orientationForNormal(face.normal)
+  const spin = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle)
+  const quat = baseQuat.clone().multiply(spin)
+  const outward = new THREE.Vector3(0, 1, 0).applyQuaternion(quat)
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 })
+  const mesh = new THREE.Mesh(DECAL_GEOMETRY, material)
+  mesh.scale.setScalar(size)
+  mesh.position
+    .copy(face.centroid)
+    .addScaledVector(outward, size * 0.9)
+    .addScaledVector(face.normal, 0.01)
+  mesh.quaternion.copy(quat)
+  return mesh
 }
 
-/** Fixed ink/chip for a d2's symbol and a d6's pips, which have no dark/light-shade distinction of their own. */
+/**
+ * A shade's ink colour: "dark" is light ink on a die meant to read dark (a
+ * d100's tens die); "light" is dark ink (everything else, including a
+ * d100's units die) - see design.md "Numerals and pips" and the
+ * `dice-roller` spec's dark-tens/light-units requirement.
+ */
+const SHADE = {
+  dark: { ink: "#f5f5f5" },
+  light: { ink: "#1c1c1c" },
+}
+
+/** Fixed ink for a d6's pips, which has no dark/light-shade distinction of its own. */
 const PLAIN_INK = "#1c1c1c"
-const PLAIN_CHIP = "#f2ede2"
 
 /**
  * Builds every face's decal for a die of `kind`, from the same `faces` its
  * physics/settle-read already uses. `shade` only matters for a `d10` that's
  * one half of a d100 pair; a standalone d10, and every other numeral die,
- * uses "light" (a light chip, dark ink) like an ordinary inked die.
+ * uses "light" (dark ink) like an ordinary inked die.
  */
 export function buildDecals(kind: DieKind, shape: DieShape, shade: "dark" | "light" = "light"): THREE.Object3D[] {
-  const { ink, chip } = SHADE[shade]
-  const decalSize = shape.radius * 0.85
-
-  if (kind === "d2") {
-    return shape.faces.map((face) =>
-      createDecal(face, textureFrom((ctx) => drawCoinSymbol(ctx, face.value === 1 ? "face" : "cross", PLAIN_INK, PLAIN_CHIP)), decalSize),
-    )
-  }
+  const { ink } = SHADE[shade]
 
   if (kind === "d6") {
-    return shape.faces.map((face) => createDecal(face, textureFrom((ctx) => drawPips(ctx, face.value, PLAIN_INK)), decalSize))
+    const decalSize = shape.radius * 0.9
+    return shape.faces.map((face) => {
+      if (face.value === 1) {
+        const { canvas, texture } = mutableTexture()
+        const image = getMundusIconImage()
+        const redraw = () => {
+          const ctx = canvas.getContext("2d")!
+          drawMundusIcon(ctx, image)
+          texture.needsUpdate = true
+        }
+        if (image.complete && image.naturalWidth > 0) redraw()
+        else image.addEventListener("load", redraw, { once: true })
+        return createDecal(face, texture, decalSize)
+      }
+      return createDecal(face, textureFrom((ctx) => drawPips(ctx, face.value, PLAIN_INK)), decalSize)
+    })
   }
 
-  // d4, d8, d10, d12, d20, and either half of a d100 - print the numeral.
-  return shape.faces.map((face) => {
-    // A d4's numeral sits near the base of its triangular face - the vertex/edge farthest below the face's own centre in local space reads as its "base."
-    const isTriangleFace = kind === "d4"
-    const anchor = isTriangleFace ? new THREE.Vector3(face.centroid.x, face.centroid.y - decalSize * 0.18, face.centroid.z) : face.centroid
-    const positioned: DieFace = { ...face, centroid: anchor }
-    return createDecal(positioned, textureFrom((ctx) => drawNumeral(ctx, String(face.value), ink, chip)), decalSize)
-  })
+  if (kind === "d4") {
+    const decalSize = shape.radius * 0.46
+    return shape.faces.flatMap((face) => {
+      const texture = textureFrom((ctx) => drawNumeral(ctx, String(face.value), ink))
+      return [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((angle) => createCornerDecal(face, texture, decalSize, angle))
+    })
+  }
+
+  // d8, d10, d12, d20, and either half of a d100 - print the numeral centred on each face.
+  const decalSize = kind === "d20" ? shape.radius * 0.6 : shape.radius * 0.9
+  return shape.faces.map((face) => createDecal(face, textureFrom((ctx) => drawNumeral(ctx, String(face.value), ink)), decalSize))
 }
 
 /**

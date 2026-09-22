@@ -1,7 +1,7 @@
 import * as THREE from "three"
 
 /** Every die shape the tray can summon. `d100` is not built here - it is two `d10` bodies (see DicePage.tsx), one printed 00/10/.../90, one 0-9. */
-export type DieKind = "d2" | "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | "d100"
+export type DieKind = "d4" | "d6" | "d8" | "d10" | "d12" | "d20" | "d100"
 
 /** A resting face eligible to be "the" face a settled die is read from. */
 export interface DieFace {
@@ -137,7 +137,7 @@ export function buildD12(): DieShape {
   return platonicShape(new THREE.DodecahedronGeometry(0.5), 0.5, "#8e44ad")
 }
 export function buildD20(): DieShape {
-  return platonicShape(new THREE.IcosahedronGeometry(0.5), 0.5, "#2980b9")
+  return platonicShape(new THREE.IcosahedronGeometry(0.62), 0.62, "#2980b9")
 }
 
 /**
@@ -154,8 +154,8 @@ export function buildD20(): DieShape {
  */
 export function buildD10(tens: boolean): DieShape {
   const R = 0.5
-  const ringHeight = 0.16
-  const apexHeight = 0.5
+  const ringHeight = 0.1
+  const apexHeight = 0.62
   const upper: THREE.Vector3[] = []
   const lower: THREE.Vector3[] = []
   for (let i = 0; i < 5; i++) {
@@ -203,46 +203,9 @@ export function buildD10(tens: boolean): DieShape {
   return { positions: flat, faces, flatShadedFaceNormals: new Float32Array(flatNormals), radius: apexHeight, color: tens ? "#d35400" : "#e67e22" }
 }
 
-/**
- * A flattened, many-sided prism ("coin"). Its two flat faces are the
- * ordinary eligible faces (face = 1, cross = 0); its rim is deliberately
- * given enough height that landing balanced on it is physically plausible
- * rather than a near-zero-probability event, and is read via `edgeValue`
- * (2) rather than as a face.
- */
-export function buildD2(): DieShape {
-  const radius = 0.55
-  const halfHeight = 0.34
-  const sides = 28
-  const top: THREE.Vector3[] = []
-  const bottom: THREE.Vector3[] = []
-  for (let i = 0; i < sides; i++) {
-    const a = (i / sides) * Math.PI * 2
-    top.push(new THREE.Vector3(Math.cos(a) * radius, halfHeight, Math.sin(a) * radius))
-    bottom.push(new THREE.Vector3(Math.cos(a) * radius, -halfHeight, Math.sin(a) * radius))
-  }
-  const topCentre = new THREE.Vector3(0, halfHeight, 0)
-  const bottomCentre = new THREE.Vector3(0, -halfHeight, 0)
-  const positions: number[] = []
-  for (let i = 0; i < sides; i++) {
-    const j = (i + 1) % sides
-    pushTriangle(positions, topCentre, top[i], top[j]) // cap (face = 1)
-    pushTriangle(positions, bottomCentre, bottom[j], bottom[i]) // cap (cross = 0)
-    pushTriangle(positions, top[i], bottom[i], bottom[j]) // rim (edge = 2)
-    pushTriangle(positions, top[i], bottom[j], top[j]) // rim
-  }
-  const faces: DieFace[] = [
-    { normal: new THREE.Vector3(0, 1, 0), centroid: topCentre.clone(), value: 1 },
-    { normal: new THREE.Vector3(0, -1, 0), centroid: bottomCentre.clone(), value: 0 },
-  ]
-  return { positions: new Float32Array(positions), faces, edgeValue: 2, radius, color: "#f1c40f" }
-}
-
 /** Builds the shape for every summonable kind except `d100`, which is two `d10` bodies (see DicePage.tsx). */
 export function buildDieShape(kind: Exclude<DieKind, "d100">): DieShape {
   switch (kind) {
-    case "d2":
-      return buildD2()
     case "d4":
       return buildD4()
     case "d6":
@@ -258,7 +221,7 @@ export function buildDieShape(kind: Exclude<DieKind, "d100">): DieShape {
   }
 }
 
-export const DIE_KINDS: readonly DieKind[] = ["d2", "d4", "d6", "d8", "d10", "d12", "d20", "d100"]
+export const DIE_KINDS: readonly DieKind[] = ["d4", "d6", "d8", "d10", "d12", "d20", "d100"]
 
 /**
  * An orthonormal basis for `normal` as a local +Z axis, with +Y chosen from

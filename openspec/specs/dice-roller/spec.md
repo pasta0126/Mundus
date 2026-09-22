@@ -17,11 +17,11 @@ tray (floor and walls) empty of dice until at least one is summoned.
 
 ### Requirement: Summoning dice
 The tray SHALL let a person summon any number of dice, individually, in any
-of these types: d2 (a two-sided "coin"), d4, d6, d8, d10, d12, d20 and d100
-(a percentile die resolved from a paired tens-die and units-die, shown and
-thrown as its own single die). The tray SHALL support having multiple dice
-of the same type, and multiple different types, present at once. Summoning a
-die SHALL place it in the tray without a throw.
+of these types: d4, d6, d8, d10, d12, d20 and d100 (a percentile die
+resolved from a paired tens-die and units-die, shown and thrown as its own
+single die). The tray SHALL support having multiple dice of the same type,
+and multiple different types, present at once. Summoning a die SHALL place
+it in the tray without a throw.
 
 #### Scenario: Summoning adds a die without rolling it
 - **WHEN** a person summons a die of any supported type
@@ -91,20 +91,14 @@ resting face on its own, so a roll always finishes.
 - **WHEN** a thrown die has not come to rest by the maximum wait
 - **THEN** the system settles it onto a stable face so the roll still finishes
 
-### Requirement: Reading each die's result
+### Requirement: Reading each settled die's face value
 Once a die settles from a throw, the system SHALL determine its value from
 the face it is resting on (for a d100, from its settled tens-die and
-units-die pair) and display it next to that die. A d2 SHALL read 1 when
-resting on its face side, 0 when resting on its cross side, and 2 when it
-comes to rest balanced on its edge rather than either flat side.
+units-die pair) and display it next to that die.
 
 #### Scenario: Every die shows its value
 - **WHEN** a die settles from a throw
-- **THEN** it shows the value of the face (or, for a d2, the side or edge) it landed on
-
-#### Scenario: A coin can land on its edge
-- **WHEN** a thrown d2 comes to rest balanced on its edge rather than on either flat side
-- **THEN** its value is 2
+- **THEN** it shows the value of the face it landed on
 
 ### Requirement: Live roll total
 The system SHALL display the sum of every die's most recently thrown value
