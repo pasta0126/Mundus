@@ -133,13 +133,19 @@ function createDecal(face: DieFace, texture: THREE.CanvasTexture, size: number):
   return mesh
 }
 
+/** The signed angle to rotate `from` by, around `axis`, to reach `to` - both assumed already tangent to a plane perpendicular to `axis`. */
+function signedAngleAround(axis: THREE.Vector3, from: THREE.Vector3, to: THREE.Vector3): number {
+  const cross = new THREE.Vector3().crossVectors(from, to)
+  const sign = cross.dot(axis) < 0 ? -1 : 1
+  return Math.atan2(cross.length() * sign, from.dot(to))
+}
+
 /**
- * A face's numeral repeated near one of its three corners - a d4's look on
- * a real die, where every corner shared with a neighbouring face carries
- * its own copy of the number, upright from that corner. `angle` (0, 2π/3,
- * 4π/3) spins both the numeral and the direction it's offset toward around
- * the face's own normal, so the three copies land ~120° apart same as an
- * equilateral triangle's corners.
+ * A face's numeral offset toward one of its three corners and rotated to
+ * match - a d4's look on a real die, where every corner shared with a
+ * neighbouring face carries a numeral upright from that corner. `angle`
+ * spins both the numeral and the direction it's offset toward around the
+ * face's own normal.
  */
 function createCornerDecal(face: DieFace, texture: THREE.CanvasTexture, size: number, angle: number): THREE.Mesh {
   const baseQuat = orientationForNormal(face.normal)
@@ -200,10 +206,19 @@ export function buildDecals(kind: DieKind, shape: DieShape, shade: "dark" | "lig
   }
 
   if (kind === "d4") {
+    // Read the traditional d4 way: by the top-pointing *vertex*, not a face
+    // (see dieTypes.ts buildD4). Each face prints its 3 corners' actual
+    // vertex values - not 3 copies of its own value - so whichever vertex
+    // ends up on top shows the same number on all 3 faces meeting there.
     const decalSize = shape.radius * 0.46
     return shape.faces.flatMap((face) => {
-      const texture = textureFrom((ctx) => drawNumeral(ctx, String(face.value), ink))
-      return [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3].map((angle) => createCornerDecal(face, texture, decalSize, angle))
+      const defaultUp = new THREE.Vector3(0, 1, 0).applyQuaternion(orientationForNormal(face.normal))
+      return (face.corners ?? []).map((corner) => {
+        const direction = corner.position.clone().sub(face.centroid).normalize()
+        const angle = signedAngleAround(face.normal, defaultUp, direction)
+        const texture = textureFrom((ctx) => drawNumeral(ctx, String(corner.value), ink))
+        return createCornerDecal(face, texture, decalSize, angle)
+      })
     })
   }
 

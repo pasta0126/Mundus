@@ -3,7 +3,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { buildDecals, getMarbleTile } from "./decals"
-import { buildD10, buildDieShape, EDGE_FACE_THRESHOLD, type DieFace, type DieKind, type DieShape } from "./dieTypes"
+import { buildD10, buildDieShape, EDGE_FACE_THRESHOLD, type DieFace, type DieKind, type DieShape, type DieVertex } from "./dieTypes"
 import { nextColorFor } from "./palette"
 
 /** Half the floor's side length - the tray spans roughly [-FLOOR_HALF, FLOOR_HALF] in X and Z. */
@@ -101,8 +101,29 @@ function bestFace(faces: DieFace[], rotation: THREE.Quaternion): { face: DieFace
   return { face: best, dot: bestDot }
 }
 
-/** A settled die's value: its best face, unless the shape has an `edgeValue` and no face came close enough to pointing up - then it's balanced on its edge (a d2 landing on its rim). */
+/** The eligible vertex whose current world-space direction points most nearly straight up - the d4's read rule (see dieTypes.ts's `DieShape.vertices`). */
+function bestVertex(vertices: DieVertex[], rotation: THREE.Quaternion): { vertex: DieVertex; dot: number } {
+  let best = vertices[0]
+  let bestDot = -Infinity
+  const world = new THREE.Vector3()
+  for (const vertex of vertices) {
+    world.copy(vertex.direction).applyQuaternion(rotation)
+    if (world.y > bestDot) {
+      bestDot = world.y
+      best = vertex
+    }
+  }
+  return { vertex: best, dot: bestDot }
+}
+
+/**
+ * A settled die's value. A shape with `vertices` (the d4) is read from
+ * whichever vertex points most nearly up - it has no face that can. Every
+ * other shape reads its best face, unless it also has an `edgeValue` and no
+ * face came close enough to pointing up - then it's balanced on its edge.
+ */
 function readValue(shape: DieShape, rotation: THREE.Quaternion): number {
+  if (shape.vertices) return bestVertex(shape.vertices, rotation).vertex.value
   const { face, dot } = bestFace(shape.faces, rotation)
   if (shape.edgeValue !== undefined && dot < EDGE_FACE_THRESHOLD) return shape.edgeValue
   return face.value
@@ -392,9 +413,11 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
       function forceSettle(die: PhysicalDie) {
         const r = die.body.rotation()
         const rotation = new THREE.Quaternion(r.x, r.y, r.z, r.w)
-        const { face } = bestFace(die.shape.faces, rotation)
-        // Rotate so `face`'s normal points exactly up, keeping the die's current heading otherwise.
-        const target = new THREE.Quaternion().setFromUnitVectors(face.normal.clone().applyQuaternion(rotation).normalize(), new THREE.Vector3(0, 1, 0))
+        // A d4 (`vertices` set) has no face that can point straight up while
+        // resting stably - only its top vertex does - so snap that instead.
+        const localDirection = die.shape.vertices ? bestVertex(die.shape.vertices, rotation).vertex.direction : bestFace(die.shape.faces, rotation).face.normal
+        // Rotate so that direction points exactly up, keeping the die's current heading otherwise.
+        const target = new THREE.Quaternion().setFromUnitVectors(localDirection.clone().applyQuaternion(rotation).normalize(), new THREE.Vector3(0, 1, 0))
         const snapped = target.multiply(rotation)
         die.body.setRotation({ x: snapped.x, y: snapped.y, z: snapped.z, w: snapped.w }, true)
         die.body.setLinvel({ x: 0, y: 0, z: 0 }, true)

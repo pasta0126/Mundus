@@ -10,6 +10,20 @@ export interface DieFace {
   /** A point on the die's surface at this face's centre, in local space - where a numeral/pip decal for this face is anchored (see decals.ts). */
   centroid: THREE.Vector3
   value: number
+  /**
+   * Only set for a d4: this face's 3 corners, in local space, each carrying
+   * the *vertex* value assigned to it (see `DieShape.vertices`) rather than
+   * this face's own `value`. Used to draw a d4's traditional
+   * three-numerals-per-face markings (see decals.ts).
+   */
+  corners?: { position: THREE.Vector3; value: number }[]
+}
+
+/** One vertex of a shape read by its top-pointing vertex rather than an up-facing face (currently just the d4 - see `DieShape.vertices`). */
+export interface DieVertex {
+  /** Direction from the die's centre to this vertex, in local space. */
+  direction: THREE.Vector3
+  value: number
 }
 
 /** A die's shape and its face-value map - the single source of truth both the visual mesh and the physics collider (see DiceScene.tsx) are built from. */
@@ -18,6 +32,15 @@ export interface DieShape {
   positions: Float32Array
   /** Only the faces a settled die can be read from. */
   faces: DieFace[]
+  /**
+   * Set only for a d4: every vertex's direction and assigned value. A
+   * tetrahedron has no face whose normal points straight up while it
+   * rests stably on another face - only the vertex opposite the resting
+   * face does - so a shape with this set is read (and force-settled) from
+   * whichever vertex points most nearly up, not from `faces` (see
+   * DiceScene.tsx's `readValue`/`forceSettle` and design.md).
+   */
+  vertices?: DieVertex[]
   /**
    * Set only for a die that can settle in a stable orientation touching
    * none of `faces` squarely - a d2 balanced on its rim. When set, and no
@@ -124,8 +147,54 @@ function platonicShape(geometry: THREE.BufferGeometry, radius: number, color: st
   return { positions, faces, radius, color }
 }
 
+/**
+ * A tetrahedron, read the traditional d4 way: by its top-pointing
+ * *vertex*, not an up-facing face - a stably resting tetrahedron always
+ * has one face down and the single vertex not on that face pointing
+ * straight up, and never a face pointing up (unlike every other die
+ * built here). Each of the 4 vertices gets a fixed value (1-4, in
+ * whatever order they're first encountered - no natural pairing exists
+ * for an odd vertex count, so this is arbitrary but fixed); every face
+ * carries its 3 corners' vertex values for `decals.ts` to print, once
+ * per corner, so all 3 upward faces show the same number at the corner
+ * they share with the top vertex - confirming the read from any angle.
+ */
 export function buildD4(): DieShape {
-  return platonicShape(new THREE.TetrahedronGeometry(0.62), 0.62, "#c0392b")
+  const radius = 0.62
+  const geometry = new THREE.TetrahedronGeometry(radius)
+  const nonIndexed = geometry.index ? geometry.toNonIndexed() : geometry
+  const positions = (nonIndexed.attributes.position.array as Float32Array).slice()
+
+  const uniqueVertices: THREE.Vector3[] = []
+  function vertexIndex(v: THREE.Vector3): number {
+    const existing = uniqueVertices.findIndex((u) => u.distanceTo(v) < 1e-3)
+    if (existing >= 0) return existing
+    uniqueVertices.push(v.clone())
+    return uniqueVertices.length - 1
+  }
+
+  const faceCorners: number[][] = []
+  const a = new THREE.Vector3()
+  const b = new THREE.Vector3()
+  const c = new THREE.Vector3()
+  for (let i = 0; i < positions.length; i += 9) {
+    a.set(positions[i], positions[i + 1], positions[i + 2])
+    b.set(positions[i + 3], positions[i + 4], positions[i + 5])
+    c.set(positions[i + 6], positions[i + 7], positions[i + 8])
+    faceCorners.push([vertexIndex(a), vertexIndex(b), vertexIndex(c)])
+  }
+
+  const vertices: DieVertex[] = uniqueVertices.map((v, i) => ({ direction: v.clone().normalize(), value: i + 1 }))
+
+  const rawFaces = facesFromTriangles(positions)
+  const faces: DieFace[] = rawFaces.map((raw, i) => ({
+    normal: raw.normal,
+    centroid: raw.centroid,
+    value: i + 1,
+    corners: faceCorners[i].map((vi) => ({ position: uniqueVertices[vi].clone(), value: vertices[vi].value })),
+  }))
+
+  return { positions, faces, vertices, radius, color: "#c0392b" }
 }
 export function buildD6(): DieShape {
   return platonicShape(new THREE.BoxGeometry(0.7, 0.7, 0.7), 0.61, "#2c3e50")
