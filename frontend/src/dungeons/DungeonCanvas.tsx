@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { components } from "@/api/schema"
 import { loadDungeonIcons } from "@/dungeons/art"
+import { FLOOR, paintCaveTerrain, WALL } from "@/dungeons/caveRender"
 
 type Dungeon = components["schemas"]["Dungeon"]
 type Catalog = components["schemas"]["DungeonCatalogResponse"]
@@ -30,8 +31,6 @@ interface Hit extends Named {
   bottom: number
 }
 
-const WALL = "#26232e"
-const FLOOR = "#d8cdb4"
 const MARGIN = 24
 
 /** The left-hand panel's footprint: on a wide window the plan sits beside it rather than under it. */
@@ -108,12 +107,17 @@ export function DungeonCanvas({ dungeon, catalog }: { dungeon: Dungeon; catalog:
     void loadDungeonIcons([...marks.map((m) => m.icon), "boss", "final-boss"]).then((icons) => {
       if (cancelled) return
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      ctx.fillStyle = WALL
-      ctx.fillRect(0, 0, cssW, cssH)
-      ctx.fillStyle = FLOOR
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < cols; x++) {
-          if (dungeon.rows[y][x] === ".") ctx.fillRect(x * cell, y * cell, cell, cell)
+      if (dungeon.style === "Cave") {
+        // Smooth, organic contours instead of the square grid - halls and mazes below keep the plain per-cell fill.
+        paintCaveTerrain(ctx, dungeon.rows, cols, rows, cell * dpr, canvas.width, canvas.height)
+      } else {
+        ctx.fillStyle = WALL
+        ctx.fillRect(0, 0, cssW, cssH)
+        ctx.fillStyle = FLOOR
+        for (let y = 0; y < rows; y++) {
+          for (let x = 0; x < cols; x++) {
+            if (dungeon.rows[y][x] === ".") ctx.fillRect(x * cell, y * cell, cell, cell)
+          }
         }
       }
 

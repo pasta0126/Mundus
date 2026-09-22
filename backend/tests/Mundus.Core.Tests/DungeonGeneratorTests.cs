@@ -7,6 +7,7 @@ namespace Mundus.Core.Tests;
 public class DungeonGeneratorTests
 {
     private static readonly string[] Types = ["cave", "skull-cave", "mine", "ruins", "wizard-tower", "dark-castle", "dragon", "hedge-maze"];
+    private static readonly string[] CaveTypes = ["cave", "skull-cave", "mine", "ice-cavern", "crystal-cave"];
     private static readonly (int X, int Y)[] Cardinal = [(1, 0), (-1, 0), (0, 1), (0, -1)];
 
     private static string Json(Dungeon d) => JsonSerializer.Serialize(d);
@@ -197,6 +198,158 @@ public class DungeonGeneratorTests
     {
         Assert.Throws<ArgumentException>(() => DungeonGenerator.Generate("s", 0, 0, "cottage"));
         Assert.Throws<ArgumentException>(() => DungeonGenerator.Generate("", 0, 0, "cave"));
+    }
+
+    [Fact]
+    public void CavesAreNotAnOpenField()
+    {
+        for (var i = 0; i < 40; i++)
+        {
+            foreach (var t in CaveTypes)
+            {
+                var d = DungeonGenerator.Generate($"cave-open-{i}", i * 13, -i * 7, t);
+                var share = (double)Cells(d).Count() / (d.Width * d.Height);
+                Assert.InRange(share, 0.25, 0.45);
+                Assert.False(HasOpenSquare(d, 10), $"{t} seed {i} has a 10x10 open block");
+            }
+        }
+    }
+
+    [Fact]
+    public void CavesHaveNoSpecksOrPockets()
+    {
+        for (var i = 0; i < 40; i++)
+        {
+            foreach (var t in CaveTypes)
+            {
+                var d = DungeonGenerator.Generate($"cave-clean-{i}", i * 13, -i * 7, t);
+                Assert.Equal(0, CountFloorPockets(d));
+                Assert.Equal(0, CountWallSpecks(d));
+            }
+        }
+    }
+
+    [Fact]
+    public void CavesAreDeterministicAcrossTypes()
+    {
+        foreach (var t in CaveTypes)
+        {
+            Assert.Equal(Json(DungeonGenerator.Generate("fixed-cave", 5, -9, t)), Json(DungeonGenerator.Generate("fixed-cave", 5, -9, t)));
+        }
+    }
+
+    private static bool HasOpenSquare(Dungeon d, int size)
+    {
+        for (var x = 0; x <= d.Width - size; x++)
+        {
+            for (var y = 0; y <= d.Height - size; y++)
+            {
+                var all = true;
+                for (var dx = 0; dx < size && all; dx++)
+                {
+                    for (var dy = 0; dy < size; dy++)
+                    {
+                        if (!Floor(d, x + dx, y + dy))
+                        {
+                            all = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (all)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static int CountFloorPockets(Dungeon d) =>
+        Cells(d).Count(c => !Cardinal.Any(s => Floor(d, c.X + s.X, c.Y + s.Y)));
+
+    /// <summary>Wall groups not reachable from the grid border without crossing floor, and smaller than 4 cells.</summary>
+    private static int CountWallSpecks(Dungeon d)
+    {
+        var w = d.Width;
+        var h = d.Height;
+        var borderConnected = new bool[w, h];
+        var queue = new Queue<(int X, int Y)>();
+        void Seed(int x, int y)
+        {
+            if (!Floor(d, x, y) && !borderConnected[x, y])
+            {
+                borderConnected[x, y] = true;
+                queue.Enqueue((x, y));
+            }
+        }
+
+        for (var x = 0; x < w; x++)
+        {
+            Seed(x, 0);
+            Seed(x, h - 1);
+        }
+
+        for (var y = 0; y < h; y++)
+        {
+            Seed(0, y);
+            Seed(w - 1, y);
+        }
+
+        while (queue.Count > 0)
+        {
+            var c = queue.Dequeue();
+            foreach (var s in Cardinal)
+            {
+                var n = (X: c.X + s.X, Y: c.Y + s.Y);
+                if (n.X >= 0 && n.Y >= 0 && n.X < w && n.Y < h && !Floor(d, n.X, n.Y) && !borderConnected[n.X, n.Y])
+                {
+                    borderConnected[n.X, n.Y] = true;
+                    queue.Enqueue(n);
+                }
+            }
+        }
+
+        var visited = new bool[w, h];
+        var speckCount = 0;
+        for (var x = 0; x < w; x++)
+        {
+            for (var y = 0; y < h; y++)
+            {
+                if (Floor(d, x, y) || borderConnected[x, y] || visited[x, y])
+                {
+                    continue;
+                }
+
+                var size = 0;
+                var region = new Queue<(int X, int Y)>();
+                visited[x, y] = true;
+                region.Enqueue((x, y));
+                while (region.Count > 0)
+                {
+                    var c = region.Dequeue();
+                    size++;
+                    foreach (var s in Cardinal)
+                    {
+                        var n = (X: c.X + s.X, Y: c.Y + s.Y);
+                        if (n.X >= 0 && n.Y >= 0 && n.X < w && n.Y < h && !Floor(d, n.X, n.Y) && !borderConnected[n.X, n.Y] && !visited[n.X, n.Y])
+                        {
+                            visited[n.X, n.Y] = true;
+                            region.Enqueue(n);
+                        }
+                    }
+                }
+
+                if (size < 4)
+                {
+                    speckCount++;
+                }
+            }
+        }
+
+        return speckCount;
     }
 
     [Fact]

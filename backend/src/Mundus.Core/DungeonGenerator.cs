@@ -9,7 +9,7 @@ namespace Mundus.Core;
 public static class DungeonGenerator
 {
     /// <summary>Incremented whenever any rule here changes what a given input produces.</summary>
-    public const int SpecVersion = 1;
+    public const int SpecVersion = 2;
 
     public const int MinSize = 32;
     public const int MaxSize = 96;
@@ -227,7 +227,20 @@ public static class DungeonGenerator
 
     // ---- layouts ---------------------------------------------------------------
 
-    /// <summary>Winding natural passages: random fill smoothed by a cellular automaton, keeping only the largest connected cavern.</summary>
+    /// <summary>Bounds a cave layout must satisfy - see the `dungeon-generation` spec, "Caves are tunnels and chambers".</summary>
+    private const double CaveMinFloorShare = 0.25;
+    private const double CaveMaxFloorShare = 0.45;
+    private const int CaveMaxOpenSquare = 10; // a fully-floor square of this size or larger is forbidden (spec: none larger than 9x9)
+    private const int CaveMinWallGroup = 4; // a wall group smaller than this, surrounded by floor, is a forbidden "speck"
+
+    /// <summary>
+    /// Winding tunnels joining chambers, not one smoothed-open cavern: chamber
+    /// blobs are grown from random centres, joined by a minimum spanning tree
+    /// of winding, variable-width tunnels, then cleaned of stray specks and
+    /// pockets and repaired if any block still reads as one open room. Several
+    /// attempts are tried (as the previous cellular-automaton cave did) and the
+    /// one that best satisfies the bounds is kept.
+    /// </summary>
     private static bool[,] Cave(string baseSeed)
     {
         var sizeRng = new Rng($"{baseSeed}:size");
@@ -235,61 +248,433 @@ public static class DungeonGenerator
         var height = sizeRng.Int(40, 60);
 
         bool[,]? best = null;
-        var bestArea = 0;
-        for (var attempt = 0; attempt < 25; attempt++)
+        var bestScore = double.MaxValue;
+        for (var attempt = 0; attempt < 30; attempt++)
         {
             var rng = new Rng($"{baseSeed}:cave:{attempt}");
-            var floor = new bool[width, height];
-            for (var x = 1; x < width - 1; x++)
+            var floor = BuildCaveLayout(rng, width, height);
+            var score = CaveViolationScore(floor, width, height, out var passes);
+            if (passes)
             {
-                for (var y = 1; y < height - 1; y++)
-                {
-                    floor[x, y] = rng.Float() >= 0.45;
-                }
+                return floor;
             }
 
-            for (var pass = 0; pass < 5; pass++)
+            if (score < bestScore)
             {
-                var next = new bool[width, height];
-                for (var x = 1; x < width - 1; x++)
-                {
-                    for (var y = 1; y < height - 1; y++)
-                    {
-                        var walls = 0;
-                        for (var dx = -1; dx <= 1; dx++)
-                        {
-                            for (var dy = -1; dy <= 1; dy++)
-                            {
-                                if (!IsFloor(floor, x + dx, y + dy))
-                                {
-                                    walls++;
-                                }
-                            }
-                        }
-
-                        next[x, y] = walls < 5;
-                    }
-                }
-
-                floor = next;
-            }
-
-            floor = KeepLargest(floor);
-            var area = Cells(floor).Count();
-            if (area > bestArea)
-            {
+                bestScore = score;
                 best = floor;
-                bestArea = area;
-            }
-
-            if (area >= width * height / 4)
-            {
-                break;
             }
         }
 
         return best!;
     }
+
+    /// <summary>Grows a handful of chamber blobs, joins them with winding tunnels, then cleans up the result.</summary>
+    private static bool[,] BuildCaveLayout(Rng rng, int width, int height)
+    {
+        var floor = new bool[width, height];
+        var chamberCount = rng.Int(10, 15);
+        var centres = new List<(int X, int Y)>();
+        for (var i = 0; i < chamberCount; i++)
+        {
+            var center = PickChamberCentre(rng, centres, width, height);
+            centres.Add(center);
+            GrowChamber(floor, rng, center, rng.Int(30, 60), width, height);
+        }
+
+        foreach (var (a, b) in MinimumSpanningTree(centres))
+        {
+            CarveTunnel(floor, rng, centres[a], centres[b], width, height);
+        }
+
+        RemoveFloorPockets(floor, width, height);
+        RemoveWallSpecks(floor, width, height);
+        BreakLargeOpenSquares(floor, width, height);
+        RemoveFloorPockets(floor, width, height);
+
+        return KeepLargest(floor);
+    }
+
+    /// <summary>A chamber centre kept at least 10 cells from every earlier one where possible, so chambers don't all pile up together.</summary>
+    private static (int X, int Y) PickChamberCentre(Rng rng, List<(int X, int Y)> existing, int width, int height)
+    {
+        var best = (X: rng.Int(6, width - 7), Y: rng.Int(6, height - 7));
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            var candidate = (X: rng.Int(6, width - 7), Y: rng.Int(6, height - 7));
+            if (existing.All(c => Chebyshev(c, candidate) >= 10))
+            {
+                return candidate;
+            }
+
+            best = candidate;
+        }
+
+        return best;
+    }
+
+    /// <summary>Grows an organic blob of roughly `areaTarget` cells from `center` by randomly expanding its frontier - never a filled rectangle.</summary>
+    private static void GrowChamber(bool[,] floor, Rng rng, (int X, int Y) center, int areaTarget, int width, int height)
+    {
+        if (!IsInterior(center.X, center.Y, width, height))
+        {
+            return;
+        }
+
+        var queued = new HashSet<(int X, int Y)> { center };
+        var frontier = new List<(int X, int Y)> { center };
+        var placed = 0;
+        while (placed < areaTarget && frontier.Count > 0)
+        {
+            var index = rng.Int(0, frontier.Count - 1);
+            var cell = frontier[index];
+            frontier.RemoveAt(index);
+            floor[cell.X, cell.Y] = true;
+            placed++;
+
+            foreach (var d in Cardinal)
+            {
+                var n = (X: cell.X + d.X, Y: cell.Y + d.Y);
+                if (IsInterior(n.X, n.Y, width, height) && queued.Add(n))
+                {
+                    frontier.Add(n);
+                }
+            }
+        }
+    }
+
+    /// <summary>Prim's algorithm over chamber centres, by Euclidean distance - the fewest tunnels that still join every chamber.</summary>
+    private static List<(int A, int B)> MinimumSpanningTree(List<(int X, int Y)> centres)
+    {
+        var inTree = new bool[centres.Count];
+        var edges = new List<(int A, int B)>();
+        inTree[0] = true;
+        for (var added = 1; added < centres.Count; added++)
+        {
+            var bestA = -1;
+            var bestB = -1;
+            var bestDistance = long.MaxValue;
+            for (var a = 0; a < centres.Count; a++)
+            {
+                if (!inTree[a])
+                {
+                    continue;
+                }
+
+                for (var b = 0; b < centres.Count; b++)
+                {
+                    if (inTree[b])
+                    {
+                        continue;
+                    }
+
+                    var dx = centres[a].X - centres[b].X;
+                    var dy = centres[a].Y - centres[b].Y;
+                    var distance = ((long)dx * dx) + ((long)dy * dy);
+                    if (distance < bestDistance)
+                    {
+                        bestDistance = distance;
+                        bestA = a;
+                        bestB = b;
+                    }
+                }
+            }
+
+            inTree[bestB] = true;
+            edges.Add((bestA, bestB));
+        }
+
+        return edges;
+    }
+
+    /// <summary>
+    /// Carves a winding passage, 2 to 5 cells wide, from `from` to `to`: mostly
+    /// steps toward the target but sometimes jitters sideways, and its width is
+    /// re-rolled now and then, so it winds and varies rather than running straight.
+    /// </summary>
+    private static void CarveTunnel(bool[,] floor, Rng rng, (int X, int Y) from, (int X, int Y) to, int width, int height)
+    {
+        var current = from;
+        var thickness = rng.Int(2, 5);
+        var maxSteps = ((Math.Abs(to.X - from.X) + Math.Abs(to.Y - from.Y)) * 3) + 20;
+        StampBrush(floor, current, thickness, width, height);
+        for (var step = 0; step < maxSteps && current != to; step++)
+        {
+            if (rng.Bool(0.12))
+            {
+                thickness = rng.Int(2, 5);
+            }
+
+            if (rng.Bool(0.75))
+            {
+                if (Math.Abs(to.X - current.X) >= Math.Abs(to.Y - current.Y) && current.X != to.X)
+                {
+                    current = (current.X + Math.Sign(to.X - current.X), current.Y);
+                }
+                else if (current.Y != to.Y)
+                {
+                    current = (current.X, current.Y + Math.Sign(to.Y - current.Y));
+                }
+                else if (current.X != to.X)
+                {
+                    current = (current.X + Math.Sign(to.X - current.X), current.Y);
+                }
+            }
+            else if (rng.Bool())
+            {
+                current = (Math.Clamp(current.X + rng.Int(-1, 1), 1, width - 2), current.Y);
+            }
+            else
+            {
+                current = (current.X, Math.Clamp(current.Y + rng.Int(-1, 1), 1, height - 2));
+            }
+
+            StampBrush(floor, current, thickness, width, height);
+        }
+
+        StampBrush(floor, to, thickness, width, height);
+    }
+
+    /// <summary>Fills a square of `thickness` cells centred on `center`, clipped to the interior.</summary>
+    private static void StampBrush(bool[,] floor, (int X, int Y) center, int thickness, int width, int height)
+    {
+        var half = thickness / 2;
+        var extra = thickness % 2;
+        for (var dx = -half; dx <= half - 1 + extra; dx++)
+        {
+            for (var dy = -half; dy <= half - 1 + extra; dy++)
+            {
+                var x = center.X + dx;
+                var y = center.Y + dy;
+                if (IsInterior(x, y, width, height))
+                {
+                    floor[x, y] = true;
+                }
+            }
+        }
+    }
+
+    /// <summary>Fills any floor cell with no floor neighbour - a one-cell pocket with nothing around it to belong to.</summary>
+    private static void RemoveFloorPockets(bool[,] floor, int width, int height)
+    {
+        for (var x = 1; x <= width - 2; x++)
+        {
+            for (var y = 1; y <= height - 2; y++)
+            {
+                if (floor[x, y] && !Cardinal.Any(d => IsFloor(floor, x + d.X, y + d.Y)))
+                {
+                    floor[x, y] = false;
+                }
+            }
+        }
+    }
+
+    /// <summary>Every wall cell reachable from the grid border without crossing floor - the "outside rock", as opposed to a stray speck sitting inside the floor.</summary>
+    private static bool[,] BorderConnectedWalls(bool[,] floor, int width, int height)
+    {
+        var borderConnected = new bool[width, height];
+        var queue = new Queue<(int X, int Y)>();
+        void Seed(int x, int y)
+        {
+            if (!IsFloor(floor, x, y) && !borderConnected[x, y])
+            {
+                borderConnected[x, y] = true;
+                queue.Enqueue((x, y));
+            }
+        }
+
+        for (var x = 0; x < width; x++)
+        {
+            Seed(x, 0);
+            Seed(x, height - 1);
+        }
+
+        for (var y = 0; y < height; y++)
+        {
+            Seed(0, y);
+            Seed(width - 1, y);
+        }
+
+        while (queue.Count > 0)
+        {
+            var c = queue.Dequeue();
+            foreach (var d in Cardinal)
+            {
+                var n = (X: c.X + d.X, Y: c.Y + d.Y);
+                if (n.X >= 0 && n.Y >= 0 && n.X < width && n.Y < height && !IsFloor(floor, n.X, n.Y) && !borderConnected[n.X, n.Y])
+                {
+                    borderConnected[n.X, n.Y] = true;
+                    queue.Enqueue(n);
+                }
+            }
+        }
+
+        return borderConnected;
+    }
+
+    /// <summary>Finds every isolated wall island (not reachable from the border) and, if it's smaller than the minimum group size, turns it to floor.</summary>
+    private static void RemoveWallSpecks(bool[,] floor, int width, int height)
+    {
+        var borderConnected = BorderConnectedWalls(floor, width, height);
+        var visited = new bool[width, height];
+        for (var x = 0; x < width; x++)
+        {
+            for (var y = 0; y < height; y++)
+            {
+                if (IsFloor(floor, x, y) || borderConnected[x, y] || visited[x, y])
+                {
+                    continue;
+                }
+
+                var region = new List<(int X, int Y)>();
+                var queue = new Queue<(int X, int Y)>();
+                visited[x, y] = true;
+                queue.Enqueue((x, y));
+                while (queue.Count > 0)
+                {
+                    var c = queue.Dequeue();
+                    region.Add(c);
+                    foreach (var d in Cardinal)
+                    {
+                        var n = (X: c.X + d.X, Y: c.Y + d.Y);
+                        if (n.X >= 0 && n.Y >= 0 && n.X < width && n.Y < height && !IsFloor(floor, n.X, n.Y) && !borderConnected[n.X, n.Y] && !visited[n.X, n.Y])
+                        {
+                            visited[n.X, n.Y] = true;
+                            queue.Enqueue(n);
+                        }
+                    }
+                }
+
+                if (region.Count < CaveMinWallGroup)
+                {
+                    foreach (var c in region)
+                    {
+                        floor[c.X, c.Y] = true;
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>Finds the top-left corner of a fully-floor square of the given size, using a summed-area table so the scan is a single pass.</summary>
+    private static (int X, int Y)? FindOpenSquare(bool[,] floor, int width, int height, int size)
+    {
+        if (width < size || height < size)
+        {
+            return null;
+        }
+
+        var prefix = new int[width + 1, height + 1];
+        for (var x = 0; x < width; x++)
+        {
+            for (var y = 0; y < height; y++)
+            {
+                prefix[x + 1, y + 1] = prefix[x, y + 1] + prefix[x + 1, y] - prefix[x, y] + (floor[x, y] ? 1 : 0);
+            }
+        }
+
+        for (var x = 0; x <= width - size; x++)
+        {
+            for (var y = 0; y <= height - size; y++)
+            {
+                var sum = prefix[x + size, y + size] - prefix[x, y + size] - prefix[x + size, y] + prefix[x, y];
+                if (sum == size * size)
+                {
+                    return (x, y);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Breaks up any block that still reads as one open room by dropping a
+    /// 2x2 rock formation (never smaller - a 1-cell pillar would itself be a
+    /// forbidden speck) into its centre, repeating until none remain.
+    /// </summary>
+    private static void BreakLargeOpenSquares(bool[,] floor, int width, int height)
+    {
+        for (var iteration = 0; iteration < 50; iteration++)
+        {
+            var found = FindOpenSquare(floor, width, height, CaveMaxOpenSquare);
+            if (found is null)
+            {
+                break;
+            }
+
+            var cx = found.Value.X + (CaveMaxOpenSquare / 2);
+            var cy = found.Value.Y + (CaveMaxOpenSquare / 2);
+            floor[cx, cy] = false;
+            floor[cx + 1, cy] = false;
+            floor[cx, cy + 1] = false;
+            floor[cx + 1, cy + 1] = false;
+        }
+    }
+
+    /// <summary>How far a layout is from satisfying every cave bound (0 = it does); used to pick the best of several attempts when none pass outright.</summary>
+    private static double CaveViolationScore(bool[,] floor, int width, int height, out bool passes)
+    {
+        var floorCount = Cells(floor).Count();
+        var share = (double)floorCount / (width * height);
+        var shareDeviation = share < CaveMinFloorShare ? CaveMinFloorShare - share : share > CaveMaxFloorShare ? share - CaveMaxFloorShare : 0;
+        var hasBigSquare = FindOpenSquare(floor, width, height, CaveMaxOpenSquare) is not null;
+
+        var borderConnected = BorderConnectedWalls(floor, width, height);
+        var visited = new bool[width, height];
+        var speckCount = 0;
+        for (var x = 0; x < width; x++)
+        {
+            for (var y = 0; y < height; y++)
+            {
+                if (IsFloor(floor, x, y) || borderConnected[x, y] || visited[x, y])
+                {
+                    continue;
+                }
+
+                var size = 0;
+                var queue = new Queue<(int X, int Y)>();
+                visited[x, y] = true;
+                queue.Enqueue((x, y));
+                while (queue.Count > 0)
+                {
+                    var c = queue.Dequeue();
+                    size++;
+                    foreach (var d in Cardinal)
+                    {
+                        var n = (X: c.X + d.X, Y: c.Y + d.Y);
+                        if (n.X >= 0 && n.Y >= 0 && n.X < width && n.Y < height && !IsFloor(floor, n.X, n.Y) && !borderConnected[n.X, n.Y] && !visited[n.X, n.Y])
+                        {
+                            visited[n.X, n.Y] = true;
+                            queue.Enqueue(n);
+                        }
+                    }
+                }
+
+                if (size < CaveMinWallGroup)
+                {
+                    speckCount++;
+                }
+            }
+        }
+
+        var pocketCount = 0;
+        for (var x = 1; x <= width - 2; x++)
+        {
+            for (var y = 1; y <= height - 2; y++)
+            {
+                if (floor[x, y] && !Cardinal.Any(d => IsFloor(floor, x + d.X, y + d.Y)))
+                {
+                    pocketCount++;
+                }
+            }
+        }
+
+        passes = shareDeviation == 0 && !hasBigSquare && speckCount == 0 && pocketCount == 0;
+        return (shareDeviation * 10) + (hasBigSquare ? 5 : 0) + (speckCount * 2) + (pocketCount * 2);
+    }
+
+    private static bool IsInterior(int x, int y, int width, int height) => x >= 1 && x <= width - 2 && y >= 1 && y <= height - 2;
 
     /// <summary>Rooms joined by corridors: the grid is split in halves, a room is set in each leaf, and every pair of halves is joined by a corridor.</summary>
     private static bool[,] Halls(string baseSeed)
