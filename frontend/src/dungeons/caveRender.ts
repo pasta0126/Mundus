@@ -34,27 +34,34 @@ const WALL_RGB = hexToRgb(WALL)
 const RIM_RGB = hexToRgb(WALL_RIM)
 const SHADOW_RGB = hexToRgb(WALL_SHADOW)
 
-/** A small tileable mottled-stone pattern, built once and reused for every cave's floor (purely decorative - not part of the deterministic generation). */
-let floorNoiseTile: HTMLCanvasElement | null = null
-function getFloorNoiseTile(): HTMLCanvasElement {
-  if (floorNoiseTile) return floorNoiseTile
-  const size = 48
+/**
+ * Builds a small tileable canvas: a solid base colour with randomized
+ * circular speckles of a given RGB tint and alpha range - a cheap mottled
+ * texture usable for stone, foliage, or anything similarly grainy. Callers
+ * memoize the result themselves; this is purely decorative and not part of
+ * any deterministic generation.
+ */
+export function makeSpeckleTile(size: number, baseColor: string, speckleRgb: string, alphaMin: number, alphaMax: number, count = 110): HTMLCanvasElement {
   const tile = document.createElement("canvas")
   tile.width = size
   tile.height = size
   const ctx = tile.getContext("2d")!
-  // White base: multiplying it onto the flat floor colour below leaves it
-  // unchanged, so only the darker speckles drawn on top show through.
-  ctx.fillStyle = "#fff"
+  ctx.fillStyle = baseColor
   ctx.fillRect(0, 0, size, size)
-  for (let i = 0; i < 110; i++) {
-    ctx.fillStyle = `rgba(0, 0, 0, ${(0.04 + Math.random() * 0.06).toFixed(3)})`
+  for (let i = 0; i < count; i++) {
+    ctx.fillStyle = `rgba(${speckleRgb}, ${(alphaMin + Math.random() * (alphaMax - alphaMin)).toFixed(3)})`
     ctx.beginPath()
     ctx.arc(Math.random() * size, Math.random() * size, 1 + Math.random() * 2.5, 0, Math.PI * 2)
     ctx.fill()
   }
-  floorNoiseTile = tile
   return tile
+}
+
+/** A small tileable mottled-stone pattern, built once and reused for every cave's floor. White base: multiplying it onto the flat floor colour below leaves it unchanged, so only the darker speckles drawn on top show through. */
+let floorNoiseTile: HTMLCanvasElement | null = null
+function getFloorNoiseTile(): HTMLCanvasElement {
+  floorNoiseTile ??= makeSpeckleTile(48, "#fff", "0, 0, 0", 0.04, 0.1)
+  return floorNoiseTile
 }
 
 /**

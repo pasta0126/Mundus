@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import type { components } from "@/api/schema"
 import { loadDungeonIcons } from "@/dungeons/art"
-import { FLOOR, paintCaveTerrain, WALL } from "@/dungeons/caveRender"
+import { paintCaveTerrain } from "@/dungeons/caveRender"
+import { paintHallsTerrain, paintMazeTerrain } from "@/dungeons/gridDressing"
 
 type Dungeon = components["schemas"]["Dungeon"]
 type Catalog = components["schemas"]["DungeonCatalogResponse"]
@@ -108,17 +109,12 @@ export function DungeonCanvas({ dungeon, catalog }: { dungeon: Dungeon; catalog:
       if (cancelled) return
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       if (dungeon.style === "Cave") {
-        // Smooth, organic contours instead of the square grid - halls and mazes below keep the plain per-cell fill.
+        // Smooth, organic contours instead of the square grid.
         paintCaveTerrain(ctx, dungeon.rows, cols, rows, cell * dpr, canvas.width, canvas.height)
+      } else if (dungeon.style === "Halls") {
+        paintHallsTerrain(ctx, dungeon.rows, cols, rows, cell)
       } else {
-        ctx.fillStyle = WALL
-        ctx.fillRect(0, 0, cssW, cssH)
-        ctx.fillStyle = FLOOR
-        for (let y = 0; y < rows; y++) {
-          for (let x = 0; x < cols; x++) {
-            if (dungeon.rows[y][x] === ".") ctx.fillRect(x * cell, y * cell, cell, cell)
-          }
-        }
+        paintMazeTerrain(ctx, dungeon.rows, cols, rows, cell)
       }
 
       ctx.imageSmoothingQuality = "high"
