@@ -145,15 +145,17 @@ export default function DicePage() {
     </ul>
   )
 
-  const trayFooter = (liveTotal !== null || anyAirborne) && (
+  // Always mounted at a fixed height (never conditionally added/removed) once the
+  // tray itself is shown - toggling this in and out was exactly what shifted the
+  // last row's buttons out from under a click the moment a throw or removal
+  // changed whether it rendered (see the "always visible" tray-footer request).
+  const trayFooter = (
     <div className="shrink-0 space-y-1 border-t pt-2">
-      {liveTotal !== null && (
-        <div className="flex items-center justify-between text-sm font-semibold">
-          <span>Total</span>
-          <span className="font-mono">{liveTotal}</span>
-        </div>
-      )}
-      {anyAirborne && <p className="text-muted-foreground text-xs">Rolling…</p>}
+      <div className="flex items-center justify-between text-sm font-semibold">
+        <span>Total</span>
+        <span className="font-mono">{liveTotal ?? "–"}</span>
+      </div>
+      <p className="text-muted-foreground h-4 text-xs">{anyAirborne ? "Rolling…" : " "}</p>
     </div>
   )
 
@@ -226,7 +228,9 @@ export default function DicePage() {
           <h2 className="text-muted-foreground shrink-0 pb-2 text-xs font-semibold tracking-wide uppercase">
             Tray ({tray.length}/{MAX_DICE})
           </h2>
-          <div className="min-h-0 flex-1 overflow-y-auto">{trayRows}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
+            {trayRows}
+          </div>
           {trayFooter}
         </div>
       )}
@@ -250,7 +254,9 @@ export default function DicePage() {
             <p className="text-muted-foreground text-sm">No dice yet - add one below.</p>
           ) : (
             <>
-              <div className="min-h-0 flex-1 overflow-y-auto">{trayRows}</div>
+              <div className="min-h-0 flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
+                {trayRows}
+              </div>
               {trayFooter}
             </>
           )}
