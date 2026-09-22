@@ -48,7 +48,7 @@ export default function HomePage() {
       <header className="flex flex-col items-center gap-3 pt-2 text-center">
         <img src={mundusIcon} alt="" className="size-16" />
         <h1 className="text-4xl font-semibold tracking-tight">Mundus</h1>
-        <p className="text-muted-foreground max-w-md text-sm">Worlds, planets and systems generated from a name. Same name, same world, every time.</p>
+        <p className="text-muted-foreground max-w-md text-sm">Say a name, and a whole world stirs awake - the same one, every time you call it.</p>
       </header>
       <nav aria-label="What to generate" className="grid w-full max-w-6xl flex-1 grid-cols-1 gap-5 md:grid-cols-4">
         {CARDS.map(({ href, title, description, icon: Icon, tint }) => (

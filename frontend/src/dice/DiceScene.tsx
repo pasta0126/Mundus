@@ -2,7 +2,9 @@ import RAPIER from "@dimforge/rapier3d-compat"
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react"
 import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
-import { buildD10, buildDieShape, type DieFace, type DieKind, type DieShape } from "./dieTypes"
+import { buildDecals, getMarbleTile } from "./decals"
+import { buildD10, buildDieShape, EDGE_FACE_THRESHOLD, type DieFace, type DieKind, type DieShape } from "./dieTypes"
+import { nextColorFor } from "./palette"
 
 /** Half the floor's side length - the tray spans roughly [-FLOOR_HALF, FLOOR_HALF] in X and Z. */
 const FLOOR_HALF = 3.2
@@ -15,28 +17,42 @@ const SETTLE_LINEAR_EPS = 0.05
 const SETTLE_ANGULAR_EPS = 0.05
 /** Consecutive slow physics steps (at a 60Hz fixed step, ~0.5s) before a die counts as settled - debounced so a momentary near-stop mid-tumble doesn't count (design.md). */
 const SETTLE_STEPS = 30
-/** A roll that hasn't finished by this long gets its stragglers snapped to a face and force-settled (the `dice-roller` spec's "a stuck die still resolves"). */
-const ROLL_TIMEOUT_MS = 6000
+/** A throw that hasn't finished by this long gets its stragglers snapped to a face and force-settled (the `dice-roller` spec's "a stuck die still resolves"). */
+const THROW_TIMEOUT_MS = 6000
+/** A press that moves further than this before release is a drag (orbiting the camera), not a click-to-throw. */
+const CLICK_SLOP_PX = 5
+/** Magnitude jump (m/s^2) between consecutive motion readings that counts as a shake. */
+const SHAKE_THRESHOLD = 18
+const SHAKE_COOLDOWN_MS = 1500
 
 export interface TrayItem {
   trayId: string
   kind: DieKind
+  color: string
+  /** True while this die (or, for a d100, either half) is airborne from a throw - not throwable again, and blocks summon/remove/clear until every throw in flight settles. */
+  airborne: boolean
 }
 
 export interface DiceSceneHandle {
-  /** Adds a die of `kind` at rest; returns false (and adds nothing) if the tray is already at MAX_DICE or physics isn't ready yet. */
+  /** Adds a die of `kind` at rest; returns false (and adds nothing) if the tray is already at MAX_DICE, something is still airborne, or physics isn't ready yet. */
   summon(kind: DieKind): boolean
   remove(trayId: string): void
   clear(): void
-  /** Throws every die currently in the tray as one event; does nothing if the tray is empty or a roll is already in progress. */
+  /** Throws every die currently in the tray as one event; does nothing if the tray is empty or anything is already airborne. */
   roll(): void
+  /** Throws just this trayId's die(s); does nothing if it's already airborne. */
+  throwOne(trayId: string): void
+  setColor(trayId: string, color: string): void
+  /** Requests iOS's motion-permission prompt (must be called from a user gesture) and attaches shake detection if granted; resolves true if shake detection is (now) active. On a platform that never needed permission, shake detection is already active and this just resolves true. */
+  enableShakeDetection(): Promise<boolean>
 }
 
 interface DiceSceneProps {
-  onReady?: () => void
+  /** `needsMotionPermission` is true only on a platform (iOS) that requires a user gesture before shake detection can be enabled - DicePage shows an "Enable shake to roll" control only then. */
+  onReady?: (needsMotionPermission: boolean) => void
   onTrayChange?: (items: TrayItem[]) => void
-  onRollStateChange?: (rolling: boolean) => void
-  onSettled?: (values: Record<string, number>, total: number) => void
+  /** Fired once a whole throw event (the whole tray, or a single die) has settled, with every trayId it involved. */
+  onThrowSettled?: (values: Record<string, number>, total: number) => void
 }
 
 /** One physical rigid body + its mesh - a plain die is one of these; a d100 tray entry is two, sharing a `trayId`. */
@@ -45,9 +61,10 @@ interface PhysicalDie {
   shape: DieShape
   mesh: THREE.Mesh
   body: RAPIER.RigidBody
-  collider: RAPIER.Collider
   slowSteps: number
   settled: boolean
+  /** Which throw this die is currently part of - null when it's at rest and throwable. */
+  eventId: string | null
   /** For a d100 pair: which half this is, so results can be combined the right way round. */
   tens?: boolean
 }
@@ -69,7 +86,7 @@ function spawnPoint(index: number): { x: number; z: number } {
   }
 }
 
-/** The eligible face whose current world-space normal points most nearly straight up - the settle-read rule from design.md. */
+/** The eligible face whose current world-space normal points most nearly straight up, and how close it came - the settle-read rule from design.md. Below `EDGE_FACE_THRESHOLD` and a shape with an `edgeValue`, the caller should read that instead (see readValue). */
 function bestFace(faces: DieFace[], rotation: THREE.Quaternion): { face: DieFace; dot: number } {
   let best = faces[0]
   let bestDot = -Infinity
@@ -84,17 +101,40 @@ function bestFace(faces: DieFace[], rotation: THREE.Quaternion): { face: DieFace
   return { face: best, dot: bestDot }
 }
 
+/** A settled die's value: its best face, unless the shape has an `edgeValue` and no face came close enough to pointing up - then it's balanced on its edge (a d2 landing on its rim). */
+function readValue(shape: DieShape, rotation: THREE.Quaternion): number {
+  const { face, dot } = bestFace(shape.faces, rotation)
+  if (shape.edgeValue !== undefined && dot < EDGE_FACE_THRESHOLD) return shape.edgeValue
+  return face.value
+}
+
 /** Draws the dice tray: an enclosed floor and walls, a physics world matching it, and every summoned die - see the `dice-roller` spec. */
-export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function DiceScene({ onReady, onTrayChange, onRollStateChange, onSettled }, ref) {
+export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function DiceScene({ onReady, onTrayChange, onThrowSettled }, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const diceRef = useRef<PhysicalDie[]>([])
-  const worldRef = useRef<RAPIER.World | null>(null)
-  const rollingRef = useRef(false)
-  const rollStartedAtRef = useRef(0)
   const shapeCacheRef = useRef<Map<string, DieShape>>(new Map())
+  const eventStartedAtRef = useRef<Map<string, number>>(new Map())
 
-  // A physical die doesn't carry its own summon-time kind name (a d100's two halves are both just "d10" shapes), so summon() stashes it here, keyed by trayId, purely to report it back out via onTrayChange.
+  // The mount-time effect below (deps: []) runs its async setup only once, so
+  // it would otherwise close over these callbacks' very first values forever
+  // - stale, since DicePage passes new function instances every render.
+  // Reading them through a ref updated on every render (same pattern as
+  // PointsOfInterestLayer's viewRef) keeps every call using whatever the
+  // latest render passed.
+  const onReadyRef = useRef(onReady)
+  onReadyRef.current = onReady
+  const onTrayChangeRef = useRef(onTrayChange)
+  onTrayChangeRef.current = onTrayChange
+  const onThrowSettledRef = useRef(onThrowSettled)
+  onThrowSettledRef.current = onThrowSettled
+
+  // A physical die doesn't carry its own summon-time kind name or colour (a d100's two halves are both just "d10" shapes), so summon()/setColor() stash them here, keyed by trayId, purely to report them back out via onTrayChange.
   const kindByTrayIdRef = useRef<Map<string, DieKind>>(new Map())
+  const colorByTrayIdRef = useRef<Map<string, string>>(new Map())
+
+  function anyAirborne(): boolean {
+    return diceRef.current.some((d) => d.eventId !== null)
+  }
 
   function reportTray() {
     const seen = new Set<string>()
@@ -102,9 +142,14 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
     for (const die of diceRef.current) {
       if (seen.has(die.trayId)) continue
       seen.add(die.trayId)
-      items.push({ trayId: die.trayId, kind: kindByTrayIdRef.current.get(die.trayId) ?? "d6" })
+      items.push({
+        trayId: die.trayId,
+        kind: kindByTrayIdRef.current.get(die.trayId) ?? "d6",
+        color: colorByTrayIdRef.current.get(die.trayId) ?? "#ffffff",
+        airborne: die.eventId !== null,
+      })
     }
-    onTrayChange?.(items)
+    onTrayChangeRef.current?.(items)
   }
 
   useEffect(() => {
@@ -119,11 +164,10 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
       if (cancelled || !container) return
 
       const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 })
-      worldRef.current = world
 
       renderer = new THREE.WebGLRenderer({ antialias: true })
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-      renderer.domElement.className = "absolute inset-0 size-full"
+      renderer.domElement.className = "absolute inset-0 size-full touch-none"
       container.appendChild(renderer.domElement)
 
       const scene = new THREE.Scene()
@@ -192,13 +236,25 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
         return shape
       }
 
-      function addPhysicalDie(trayId: string, shape: DieShape, tens: boolean | undefined, index: number) {
+      const marblePattern = new THREE.CanvasTexture(getMarbleTile())
+      marblePattern.wrapS = THREE.RepeatWrapping
+      marblePattern.wrapT = THREE.RepeatWrapping
+      marblePattern.repeat.set(2, 2)
+
+      function addPhysicalDie(trayId: string, kind: DieKind, shape: DieShape, tens: boolean | undefined, color: string, index: number) {
         const spawn = spawnPoint(index)
         const geometry = new THREE.BufferGeometry()
         geometry.setAttribute("position", new THREE.BufferAttribute(shape.positions, 3))
-        geometry.computeVertexNormals()
-        const material = new THREE.MeshStandardMaterial({ color: shape.color, roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide })
+        if (shape.flatShadedFaceNormals) {
+          geometry.setAttribute("normal", new THREE.BufferAttribute(shape.flatShadedFaceNormals, 3))
+        } else {
+          geometry.computeVertexNormals()
+        }
+        const material = new THREE.MeshStandardMaterial({ color, map: marblePattern, roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide })
         const mesh = new THREE.Mesh(geometry, material)
+        // Only a d100's two halves pass `tens` at all; a standalone die (tens undefined) uses the ordinary light shade like every other numeral die.
+        const shade = tens === true ? "dark" : "light"
+        for (const decal of buildDecals(tens === undefined ? kind : "d10", shape, shade)) mesh.add(decal)
         scene.add(mesh)
 
         const restHeight = shape.radius * 1.02
@@ -212,78 +268,108 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
         )
         const hull = RAPIER.ColliderDesc.convexHull(shape.positions)
         const colliderDesc = (hull ?? RAPIER.ColliderDesc.ball(shape.radius)).setFriction(0.6).setRestitution(0.35).setDensity(1.2)
-        const collider = world.createCollider(colliderDesc, body)
+        world.createCollider(colliderDesc, body)
 
-        diceRef.current.push({ trayId, shape, mesh, body, collider, slowSteps: 0, settled: false, tens })
+        diceRef.current.push({ trayId, shape, mesh, body, slowSteps: 0, settled: false, eventId: null, tens })
       }
 
       function disposePhysicalDie(die: PhysicalDie) {
         die.mesh.geometry.dispose()
         ;(die.mesh.material as THREE.Material).dispose()
+        for (const child of die.mesh.children) {
+          if (child instanceof THREE.Mesh) (child.material as THREE.Material).dispose()
+        }
         die.mesh.removeFromParent()
         world.removeRigidBody(die.body)
       }
 
+      function throwDice(dice: PhysicalDie[]) {
+        if (dice.length === 0) return
+        const eventId = crypto.randomUUID()
+        eventStartedAtRef.current.set(eventId, performance.now())
+        for (const die of dice) {
+          die.eventId = eventId
+          die.settled = false
+          die.slowSteps = 0
+          die.body.wakeUp()
+          die.body.setLinvel({ x: randomRange(-2.5, 2.5), y: randomRange(3.5, 6), z: randomRange(-2.5, 2.5) }, true)
+          die.body.setAngvel({ x: randomRange(-18, 18), y: randomRange(-18, 18), z: randomRange(-18, 18) }, true)
+        }
+        reportTray()
+      }
+
       const handle: DiceSceneHandle = {
         summon(kind) {
-          if (rollingRef.current) return false
+          if (anyAirborne()) return false
           const currentTrayIds = new Set(diceRef.current.map((d) => d.trayId))
           if (currentTrayIds.size >= MAX_DICE) return false
           const trayId = crypto.randomUUID()
+          const usedColors = [...colorByTrayIdRef.current.entries()].filter(([id]) => kindByTrayIdRef.current.get(id) === kind).map(([, c]) => c)
+          const color = nextColorFor(usedColors)
           kindByTrayIdRef.current.set(trayId, kind)
+          colorByTrayIdRef.current.set(trayId, color)
           const index = currentTrayIds.size
           if (kind === "d100") {
-            addPhysicalDie(trayId, shapeFor("d10", true), true, index)
-            addPhysicalDie(trayId, shapeFor("d10", false), false, index)
+            addPhysicalDie(trayId, kind, shapeFor("d10", true), true, color, index)
+            addPhysicalDie(trayId, kind, shapeFor("d10", false), false, color, index)
           } else {
-            addPhysicalDie(trayId, shapeFor(kind), undefined, index)
+            addPhysicalDie(trayId, kind, shapeFor(kind), undefined, color, index)
           }
           reportTray()
           return true
         },
         remove(trayId) {
-          if (rollingRef.current) return
+          if (anyAirborne()) return
           const [keep, drop] = [diceRef.current.filter((d) => d.trayId !== trayId), diceRef.current.filter((d) => d.trayId === trayId)]
           for (const die of drop) disposePhysicalDie(die)
           diceRef.current = keep
           kindByTrayIdRef.current.delete(trayId)
+          colorByTrayIdRef.current.delete(trayId)
           reportTray()
         },
         clear() {
-          if (rollingRef.current) return
+          if (anyAirborne()) return
           for (const die of diceRef.current) disposePhysicalDie(die)
           diceRef.current = []
           kindByTrayIdRef.current.clear()
+          colorByTrayIdRef.current.clear()
           reportTray()
         },
         roll() {
-          if (rollingRef.current || diceRef.current.length === 0) return
-          rollingRef.current = true
-          rollStartedAtRef.current = performance.now()
-          onRollStateChange?.(true)
+          if (anyAirborne() || diceRef.current.length === 0) return
+          throwDice([...diceRef.current])
+        },
+        throwOne(trayId) {
+          const dice = diceRef.current.filter((d) => d.trayId === trayId)
+          if (dice.length === 0 || dice.some((d) => d.eventId !== null)) return
+          throwDice(dice)
+        },
+        setColor(trayId, color) {
+          colorByTrayIdRef.current.set(trayId, color)
           for (const die of diceRef.current) {
-            die.settled = false
-            die.slowSteps = 0
-            die.body.wakeUp()
-            die.body.setLinvel({ x: randomRange(-2.5, 2.5), y: randomRange(3.5, 6), z: randomRange(-2.5, 2.5) }, true)
-            die.body.setAngvel({ x: randomRange(-18, 18), y: randomRange(-18, 18), z: randomRange(-18, 18) }, true)
+            if (die.trayId === trayId) (die.mesh.material as THREE.MeshStandardMaterial).color.set(color)
           }
+          reportTray()
+        },
+        async enableShakeDetection() {
+          return enableShake()
         },
       }
       exposeHandle(handle)
 
-      function finishRoll() {
-        rollingRef.current = false
-        onRollStateChange?.(false)
+      function finalizeEvent(eventId: string) {
+        const dice = diceRef.current.filter((d) => d.eventId === eventId)
+        eventStartedAtRef.current.delete(eventId)
         const perTray = new Map<string, { units?: number; tens?: number; plain?: number }>()
-        for (const die of diceRef.current) {
-          const rotation = new THREE.Quaternion(die.body.rotation().x, die.body.rotation().y, die.body.rotation().z, die.body.rotation().w)
-          const { face } = bestFace(die.shape.faces, rotation)
+        for (const die of dice) {
+          const r = die.body.rotation()
+          const value = readValue(die.shape, new THREE.Quaternion(r.x, r.y, r.z, r.w))
           const entry = perTray.get(die.trayId) ?? {}
-          if (die.tens === true) entry.tens = face.value
-          else if (die.tens === false) entry.units = face.value
-          else entry.plain = face.value
+          if (die.tens === true) entry.tens = value
+          else if (die.tens === false) entry.units = value
+          else entry.plain = value
           perTray.set(die.trayId, entry)
+          die.eventId = null
         }
         const values: Record<string, number> = {}
         let total = 0
@@ -299,7 +385,8 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
           values[trayId] = value
           total += value
         }
-        onSettled?.(values, total)
+        onThrowSettledRef.current?.(values, total)
+        reportTray()
       }
 
       function forceSettle(die: PhysicalDie) {
@@ -315,15 +402,82 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
         die.settled = true
       }
 
+      // -- Click/tap a die to throw it on its own -------------------------------
+      const raycaster = new THREE.Raycaster()
+      const pointer = new THREE.Vector2()
+      let pressedAt: { x: number; y: number } | null = null
+      function onPointerDown(event: PointerEvent) {
+        pressedAt = { x: event.clientX, y: event.clientY }
+      }
+      function onPointerUp(event: PointerEvent) {
+        const start = pressedAt
+        pressedAt = null
+        if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) > CLICK_SLOP_PX) return
+        const rect = renderer.domElement.getBoundingClientRect()
+        pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1)
+        raycaster.setFromCamera(pointer, camera)
+        const hit = raycaster.intersectObjects(diceRef.current.map((d) => d.mesh), false)[0]
+        if (!hit) return
+        const die = diceRef.current.find((d) => d.mesh === hit.object)
+        if (die) handle.throwOne(die.trayId)
+      }
+      renderer.domElement.addEventListener("pointerdown", onPointerDown)
+      renderer.domElement.addEventListener("pointerup", onPointerUp)
+
+      // -- Shake to roll ---------------------------------------------------------
+      let shakeAttached = false
+      let lastMagnitude: number | null = null
+      let lastShakeAt = 0
+      function onDeviceMotion(event: DeviceMotionEvent) {
+        const acc = event.acceleration?.x != null ? event.acceleration : event.accelerationIncludingGravity
+        if (!acc || acc.x == null || acc.y == null || acc.z == null) return
+        const magnitude = Math.hypot(acc.x, acc.y, acc.z)
+        if (lastMagnitude !== null) {
+          const now = performance.now()
+          if (Math.abs(magnitude - lastMagnitude) > SHAKE_THRESHOLD && now - lastShakeAt > SHAKE_COOLDOWN_MS) {
+            lastShakeAt = now
+            handle.roll()
+          }
+        }
+        lastMagnitude = magnitude
+      }
+      function attachShake() {
+        if (shakeAttached) return
+        shakeAttached = true
+        window.addEventListener("devicemotion", onDeviceMotion)
+      }
+      interface MotionPermissionApi {
+        requestPermission: () => Promise<"granted" | "denied">
+      }
+      const motionCtor = window.DeviceMotionEvent as unknown as Partial<MotionPermissionApi> | undefined
+      const needsMotionPermission = typeof motionCtor?.requestPermission === "function"
+      async function enableShake(): Promise<boolean> {
+        if (shakeAttached) return true
+        if (needsMotionPermission) {
+          try {
+            const result = await (motionCtor as MotionPermissionApi).requestPermission()
+            if (result !== "granted") return false
+          } catch {
+            return false
+          }
+        }
+        attachShake()
+        return true
+      }
+      if (!needsMotionPermission && typeof window.DeviceMotionEvent !== "undefined") {
+        attachShake()
+      }
+
       const animate = () => {
         world.step()
+        const settledEventIds = new Set<string>()
         for (const die of diceRef.current) {
           const t = die.body.translation()
           const r = die.body.rotation()
           die.mesh.position.set(t.x, t.y, t.z)
           die.mesh.quaternion.set(r.x, r.y, r.z, r.w)
 
-          if (rollingRef.current && !die.settled) {
+          if (die.eventId && !die.settled) {
             const lin = die.body.linvel()
             const ang = die.body.angvel()
             const slow = Math.hypot(lin.x, lin.y, lin.z) < SETTLE_LINEAR_EPS && Math.hypot(ang.x, ang.y, ang.z) < SETTLE_ANGULAR_EPS
@@ -332,14 +486,17 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
           }
         }
 
-        if (rollingRef.current) {
-          if (diceRef.current.every((d) => d.settled)) {
-            finishRoll()
-          } else if (performance.now() - rollStartedAtRef.current > ROLL_TIMEOUT_MS) {
-            for (const die of diceRef.current) if (!die.settled) forceSettle(die)
-            finishRoll()
+        const activeEventIds = new Set(diceRef.current.filter((d) => d.eventId).map((d) => d.eventId as string))
+        const now = performance.now()
+        for (const eventId of activeEventIds) {
+          const eventDice = diceRef.current.filter((d) => d.eventId === eventId)
+          const timedOut = now - (eventStartedAtRef.current.get(eventId) ?? now) > THROW_TIMEOUT_MS
+          if (timedOut) {
+            for (const die of eventDice) if (!die.settled) forceSettle(die)
           }
+          if (eventDice.every((d) => d.settled)) settledEventIds.add(eventId)
         }
+        for (const eventId of settledEventIds) finalizeEvent(eventId)
 
         controls.update()
         renderer.render(scene, camera)
@@ -347,12 +504,15 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
       }
       animate()
 
-      onReady?.()
+      onReadyRef.current?.(needsMotionPermission)
 
       cleanupRef.current = () => {
         cancelAnimationFrame(frame)
         observer.disconnect()
         controls.dispose()
+        renderer.domElement.removeEventListener("pointerdown", onPointerDown)
+        renderer.domElement.removeEventListener("pointerup", onPointerUp)
+        window.removeEventListener("devicemotion", onDeviceMotion)
         for (const die of diceRef.current) {
           die.mesh.geometry.dispose()
           ;(die.mesh.material as THREE.Material).dispose()
@@ -362,7 +522,6 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
         // (dice, floor, walls) - freeing it releases all of them at once,
         // rather than removing each individually.
         world.free()
-        worldRef.current = null
         renderer.dispose()
         renderer.domElement.remove()
       }
@@ -386,6 +545,9 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
     remove: (trayId) => handleRef.current?.remove(trayId),
     clear: () => handleRef.current?.clear(),
     roll: () => handleRef.current?.roll(),
+    throwOne: (trayId) => handleRef.current?.throwOne(trayId),
+    setColor: (trayId, color) => handleRef.current?.setColor(trayId, color),
+    enableShakeDetection: () => handleRef.current?.enableShakeDetection() ?? Promise.resolve(false),
   }))
 
   return <div ref={containerRef} className="absolute inset-0 touch-none" />
