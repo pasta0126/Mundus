@@ -1,4 +1,4 @@
-import { Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
+import { Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 
 interface Card {
@@ -32,20 +32,25 @@ const CARDS: readonly Card[] = [
     icon: Orbit,
     tint: "bg-amber-100 hover:bg-amber-200/80 dark:bg-amber-950 dark:hover:bg-amber-900",
   },
+  {
+    href: "/dice",
+    title: "Dice",
+    description: "Drop any mix of dice into a physics-real tray and roll them all at once.",
+    icon: Dices,
+    tint: "bg-rose-100 hover:bg-rose-200/80 dark:bg-rose-950 dark:hover:bg-rose-900",
+  },
 ]
 
 /** The landing page: a hub that only links out. It makes no request and loads no map or 3D code. */
 export default function HomePage() {
   return (
     <main className="flex min-h-dvh w-full flex-col items-center gap-8 p-6 sm:p-10">
-      <div className="w-full max-w-5xl">
-      </div>
       <header className="flex flex-col items-center gap-3 pt-2 text-center">
         <img src={mundusIcon} alt="" className="size-16" />
         <h1 className="text-4xl font-semibold tracking-tight">Mundus</h1>
         <p className="text-muted-foreground max-w-md text-sm">Worlds, planets and systems generated from a name. Same name, same world, every time.</p>
       </header>
-      <nav aria-label="What to generate" className="grid w-full max-w-5xl flex-1 grid-cols-1 gap-5 md:grid-cols-3">
+      <nav aria-label="What to generate" className="grid w-full max-w-6xl flex-1 grid-cols-1 gap-5 md:grid-cols-4">
         {CARDS.map(({ href, title, description, icon: Icon, tint }) => (
           <a
             key={title}
