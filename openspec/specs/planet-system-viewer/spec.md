@@ -132,21 +132,6 @@ indication of what is happening.
 - **WHEN** a planet or system is being fetched, or the fetch fails
 - **THEN** a progress indicator or an error message is shown
 
-### Requirement: Touch-first notice
-On a phone or tablet - a device whose primary input is a touch screen - the
-planet page and the system page SHALL show the same small, dismissible notice
-the map page shows, saying the page is not optimized for phones or tablets
-yet. A computer with a mouse or trackpad, including a touch-screen laptop,
-SHALL NOT see it.
-
-#### Scenario: A touch-first device sees the notice
-- **WHEN** the planet page or the system page is opened on a phone or tablet
-- **THEN** a dismissible notice says the page is not optimized for phones or tablets yet
-
-#### Scenario: A computer does not see the notice
-- **WHEN** either page is opened on a computer with a mouse or trackpad
-- **THEN** no such notice is shown
-
 ### Requirement: English text
 Every piece of user-facing text on the new pages SHALL be in English.
 
