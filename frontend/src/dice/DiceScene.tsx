@@ -4,7 +4,7 @@ import * as THREE from "three"
 import { OrbitControls } from "three/addons/controls/OrbitControls.js"
 import { buildDecals, getMarbleTile } from "./decals"
 import { buildD10, buildDieShape, EDGE_FACE_THRESHOLD, type DieFace, type DieKind, type DieShape, type DieVertex } from "./dieTypes"
-import { nextColorFor } from "./palette"
+import { nextColor } from "./palette"
 
 /** Half the floor's side length - the tray spans roughly [-FLOOR_HALF, FLOOR_HALF] in X and Z. */
 const FLOOR_HALF = 3.2
@@ -343,8 +343,8 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
           const currentTrayIds = new Set(diceRef.current.map((d) => d.trayId))
           if (currentTrayIds.size >= MAX_DICE) return false
           const trayId = crypto.randomUUID()
-          const usedColors = [...colorByTrayIdRef.current.entries()].filter(([id]) => kindByTrayIdRef.current.get(id) === kind).map(([, c]) => c)
-          const color = nextColorFor(kind, usedColors)
+          const usedColors = [...colorByTrayIdRef.current.values()]
+          const color = nextColor(usedColors)
           kindByTrayIdRef.current.set(trayId, kind)
           colorByTrayIdRef.current.set(trayId, color)
           const index = currentTrayIds.size
