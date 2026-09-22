@@ -228,7 +228,7 @@ export default function DicePage() {
           <h2 className="text-muted-foreground shrink-0 pb-2 text-xs font-semibold tracking-wide uppercase">
             Tray ({tray.length}/{MAX_DICE})
           </h2>
-          <div className="min-h-0 flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
+          <div className="min-h-0 flex-1 overflow-y-auto pb-1.5" style={{ scrollbarGutter: "stable" }}>
             {trayRows}
           </div>
           {trayFooter}
@@ -254,7 +254,7 @@ export default function DicePage() {
             <p className="text-muted-foreground text-sm">No dice yet - add one below.</p>
           ) : (
             <>
-              <div className="min-h-0 flex-1 overflow-y-auto" style={{ scrollbarGutter: "stable" }}>
+              <div className="min-h-0 flex-1 overflow-y-auto pb-1.5" style={{ scrollbarGutter: "stable" }}>
                 {trayRows}
               </div>
               {trayFooter}
