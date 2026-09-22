@@ -25,6 +25,19 @@ const CLICK_SLOP_PX = 5
 const SHAKE_THRESHOLD = 18
 const SHAKE_COOLDOWN_MS = 1500
 
+/**
+ * A generous box around the tray - well outside the walls (`FLOOR_HALF`)
+ * and well above/below any legitimate bounce - a die outside it has been
+ * launched clean out of the tray (a fast spin catching a wall or another
+ * die can convert into far more velocity than the throw itself gave it,
+ * occasionally clearing the open-topped walls entirely) rather than just
+ * thrown hard within it. Recovered every frame (see `recoverIfOutOfBounds`)
+ * instead of ever being left to fall forever or sit stuck out of view.
+ */
+const BOUNDS_MARGIN = 1.5
+const BOUNDS_Y_MIN = -1.5
+const BOUNDS_Y_MAX = 8
+
 export interface TrayItem {
   trayId: string
   kind: DieKind
@@ -71,6 +84,11 @@ interface PhysicalDie {
 
 function randomRange(min: number, max: number): number {
   return min + Math.random() * (max - min)
+}
+
+/** True once a die's position leaves the generous box described at `BOUNDS_MARGIN`. */
+function isOutOfBounds(t: { x: number; y: number; z: number }): boolean {
+  return Math.abs(t.x) > FLOOR_HALF + BOUNDS_MARGIN || Math.abs(t.z) > FLOOR_HALF + BOUNDS_MARGIN || t.y < BOUNDS_Y_MIN || t.y > BOUNDS_Y_MAX
 }
 
 /** Arranges up to MAX_DICE spawn points across the floor with enough spacing that fresh dice don't spawn overlapping. */
@@ -495,7 +513,15 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
         world.step()
         const settledEventIds = new Set<string>()
         for (const die of diceRef.current) {
-          const t = die.body.translation()
+          let t = die.body.translation()
+          if (isOutOfBounds(t)) {
+            const spawn = spawnPoint(Math.floor(Math.random() * MAX_DICE))
+            die.body.setTranslation({ x: spawn.x, y: die.shape.radius * 1.02 + 1, z: spawn.z }, true)
+            die.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
+            die.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+            die.slowSteps = 0
+            t = die.body.translation()
+          }
           const r = die.body.rotation()
           die.mesh.position.set(t.x, t.y, t.z)
           die.mesh.quaternion.set(r.x, r.y, r.z, r.w)
