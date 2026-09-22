@@ -124,12 +124,12 @@ Every die SHALL carry its face values as visible markings, not only in a
 results display: a d6 SHALL show the traditional arrangement of dots (pips)
 for 1 through 6; a d4, d8, d10, d12 and d20 SHALL each show its printed
 numeral on every eligible face (a d4's positioned near that face's base,
-matching a real d4's look); a d100 pair's tens die and units die SHALL be
-printed in two different shades (one dark, one light) so the two are told
-apart at a glance. Every printed 6 and every printed 9 SHALL carry a
-distinguishing mark (an underline) so the two can never be confused for one
-another. Every die's surface SHALL carry a subtle marbled texture in
-addition to its base colour.
+matching a real d4's look). Every marking's ink colour SHALL be chosen
+(dark or light) for contrast against that specific die's own base colour,
+so it stays legible whatever colour the die was given. Every printed 6 and
+every printed 9 SHALL carry a distinguishing mark (an underline) so the two
+can never be confused for one another. Every die's surface SHALL carry a
+subtle marbled texture in addition to its base colour.
 
 #### Scenario: A d6 shows pips, not a digit
 - **WHEN** a d6 is summoned
@@ -143,9 +143,9 @@ addition to its base colour.
 - **WHEN** a die shows a printed 6 or a printed 9
 - **THEN** that numeral carries an underline distinguishing it from the other
 
-#### Scenario: A d100 pair reads unambiguously
-- **WHEN** a d100 is summoned
-- **THEN** its tens die's numerals are a dark shade and its units die's numerals are a light shade
+#### Scenario: Markings stay legible on any colour
+- **WHEN** a die is given a light base colour or a dark one
+- **THEN** its markings' ink is dark on a light colour and light on a dark one
 
 ### Requirement: Each die has its own colour and an editable name
 Each die summoned SHALL be given a base colour drawn from a curated palette,

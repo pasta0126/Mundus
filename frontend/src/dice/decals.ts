@@ -164,33 +164,29 @@ function createCornerDecal(face: DieFace, texture: THREE.CanvasTexture, size: nu
 }
 
 /**
- * A shade's ink colour: "dark" is light ink on a die meant to read dark (a
- * d100's tens die); "light" is dark ink (everything else, including a
- * d100's units die) - see design.md "Numerals and pips" and the
- * `dice-roller` spec's dark-tens/light-units requirement.
+ * The ink colour that reads clearly against `color` - dark ink on a light
+ * base, white ink on a dark one. Every die's colour is now a random pick
+ * from one shared palette (see palette.ts) rather than a fixed per-kind
+ * shade, so ink has to follow the actual assigned colour instead of the
+ * kind: a fixed ink table would go illegible the moment a kind landed on
+ * a colour it wasn't tuned for. Perceived brightness (ITU-R BT.601) rather
+ * than plain average, so a saturated colour with a bright single channel
+ * (e.g. a pure blue) isn't mistaken for dark just because red/green are low.
  */
-const SHADE = {
-  dark: { ink: "#f5f5f5" },
-  light: { ink: "#1c1c1c" },
-}
-
-/** Fixed ink for a d6's pips, which has no dark/light-shade distinction of its own. */
-const PLAIN_INK = "#1c1c1c"
-
-/** A kind whose numeral ink is fixed regardless of shade - a d4 and d12 always print white, since both keep a dark base colour where dark ink would be unreadable. */
-const FIXED_INK: Partial<Record<DieKind, string>> = {
-  d4: "#ffffff",
-  d12: "#ffffff",
+function inkForColor(color: string): string {
+  const r = Number.parseInt(color.slice(1, 3), 16)
+  const g = Number.parseInt(color.slice(3, 5), 16)
+  const b = Number.parseInt(color.slice(5, 7), 16)
+  const brightness = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return brightness > 0.6 ? "#1c1c1c" : "#ffffff"
 }
 
 /**
- * Builds every face's decal for a die of `kind`, from the same `faces` its
- * physics/settle-read already uses. `shade` only matters for a `d10` that's
- * one half of a d100 pair; a standalone d10, and every other numeral die,
- * uses "light" (dark ink) like an ordinary inked die.
+ * Builds every face's decal for a die of `kind` and base `color`, from the
+ * same `faces` its physics/settle-read already uses.
  */
-export function buildDecals(kind: DieKind, shape: DieShape, shade: "dark" | "light" = "light"): THREE.Object3D[] {
-  const ink = FIXED_INK[kind] ?? SHADE[shade].ink
+export function buildDecals(kind: DieKind, shape: DieShape, color: string): THREE.Object3D[] {
+  const ink = inkForColor(color)
 
   if (kind === "d6") {
     // The truncated-edge cube's flat face area is smaller than its full
@@ -209,7 +205,7 @@ export function buildDecals(kind: DieKind, shape: DieShape, shade: "dark" | "lig
         else image.addEventListener("load", redraw, { once: true })
         return createDecal(face, texture, decalSize)
       }
-      return createDecal(face, textureFrom((ctx) => drawPips(ctx, face.value, PLAIN_INK)), decalSize)
+      return createDecal(face, textureFrom((ctx) => drawPips(ctx, face.value, ink)), decalSize)
     })
   }
 

@@ -108,59 +108,53 @@ export default function DicePage() {
   const liveTotal = tray.some((t) => t.trayId in values) ? tray.reduce((sum, t) => (t.trayId in values ? sum + values[t.trayId] : sum), 0) : null
 
   const trayRows = (
-    <ul className="space-y-2">
+    <ul className="space-y-1.5">
       {tray.map((item) => (
-        <li key={item.trayId} className="space-y-1 border-b pb-2 last:border-b-0 last:pb-0">
-          <div className="flex items-center gap-1.5">
-            <input
-              type="color"
-              value={item.color}
-              onChange={(e) => sceneRef.current?.setColor(item.trayId, e.target.value)}
-              className="coarse:min-h-11 size-7 shrink-0 rounded border"
-              aria-label={`Colour for this ${DIE_LABELS[item.kind]}`}
-            />
-            <span className="shrink-0 text-sm font-semibold">{DIE_LABELS[item.kind]}</span>
-            <Input
-              value={labels[item.trayId] ?? ""}
-              onChange={(e) => setLabels((prev) => ({ ...prev, [item.trayId]: e.target.value }))}
-              placeholder="Name (optional)"
-              className="h-7 flex-1 text-xs"
-              aria-label={`Name for this ${DIE_LABELS[item.kind]}`}
-            />
-            <Button variant="ghost" size="icon-sm" onClick={() => remove(item.trayId)} disabled={disabled} aria-label={`Remove this ${DIE_LABELS[item.kind]}`}>
-              <X />
-            </Button>
-          </div>
-          <div className="flex items-center justify-between gap-2 pl-9 text-sm">
-            <span className="text-muted-foreground truncate">{labels[item.trayId] ? `${DIE_LABELS[item.kind]} ${labels[item.trayId]}` : ""}</span>
-            <div className="flex items-center gap-2">
-              {item.trayId in values && <span className="font-mono font-semibold">{values[item.trayId]}</span>}
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => throwOne(item.trayId, item.airborne)}
-                disabled={!ready || item.airborne}
-                aria-label={`Throw this ${DIE_LABELS[item.kind]}`}
-              >
-                <RotateCw />
-              </Button>
-            </div>
-          </div>
+        <li key={item.trayId} className="flex items-center gap-1.5">
+          <input
+            type="color"
+            value={item.color}
+            onChange={(e) => sceneRef.current?.setColor(item.trayId, e.target.value)}
+            className="coarse:min-h-11 size-7 shrink-0 rounded border"
+            aria-label={`Colour for this ${DIE_LABELS[item.kind]}`}
+          />
+          <span className="shrink-0 text-sm font-semibold">{DIE_LABELS[item.kind]}</span>
+          <Input
+            value={labels[item.trayId] ?? ""}
+            onChange={(e) => setLabels((prev) => ({ ...prev, [item.trayId]: e.target.value }))}
+            placeholder="Name (optional)"
+            className="h-7 min-w-0 flex-1 truncate text-xs"
+            aria-label={`Name for this ${DIE_LABELS[item.kind]}`}
+          />
+          {item.trayId in values && <span className="shrink-0 font-mono text-sm font-semibold">{values[item.trayId]}</span>}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            onClick={() => throwOne(item.trayId, item.airborne)}
+            disabled={!ready || item.airborne}
+            aria-label={`Throw this ${DIE_LABELS[item.kind]}`}
+          >
+            <RotateCw />
+          </Button>
+          <Button variant="ghost" size="icon-sm" className="shrink-0" onClick={() => remove(item.trayId)} disabled={disabled} aria-label={`Remove this ${DIE_LABELS[item.kind]}`}>
+            <X />
+          </Button>
         </li>
       ))}
     </ul>
   )
 
-  const trayFooter = (
-    <>
+  const trayFooter = (liveTotal !== null || anyAirborne) && (
+    <div className="shrink-0 space-y-1 border-t pt-2">
       {liveTotal !== null && (
-        <div className="flex items-center justify-between border-t pt-2 text-sm font-semibold">
+        <div className="flex items-center justify-between text-sm font-semibold">
           <span>Total</span>
           <span className="font-mono">{liveTotal}</span>
         </div>
       )}
       {anyAirborne && <p className="text-muted-foreground text-xs">Rolling…</p>}
-    </>
+    </div>
   )
 
   const historySheetContent = (
@@ -226,13 +220,13 @@ export default function DicePage() {
         </div>
       )}
 
-      {/* Desktop: the tray is always visible in a side panel. Below md, it moves into a sheet (see the mobile bottom bar). */}
+      {/* Desktop: the tray is always visible in a side panel. Below md, it moves into a sheet (see the mobile bottom bar). Only the die list itself scrolls - the header and the total/rolling footer stay pinned in view. */}
       {tray.length > 0 && (
-        <div className="bg-card fixed top-4 right-4 z-10 hidden max-h-[calc(100dvh-2rem)] w-72 space-y-2 overflow-y-auto rounded-lg border p-3 shadow-lg md:block">
-          <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+        <div className="bg-card fixed top-4 right-4 z-10 hidden max-h-[calc(100dvh-2rem)] w-72 flex-col rounded-lg border p-3 shadow-lg md:flex">
+          <h2 className="text-muted-foreground shrink-0 pb-2 text-xs font-semibold tracking-wide uppercase">
             Tray ({tray.length}/{MAX_DICE})
           </h2>
-          {trayRows}
+          <div className="min-h-0 flex-1 overflow-y-auto">{trayRows}</div>
           {trayFooter}
         </div>
       )}
@@ -255,10 +249,10 @@ export default function DicePage() {
           {tray.length === 0 ? (
             <p className="text-muted-foreground text-sm">No dice yet - add one below.</p>
           ) : (
-            <div className="space-y-2 overflow-y-auto">
-              {trayRows}
+            <>
+              <div className="min-h-0 flex-1 overflow-y-auto">{trayRows}</div>
               {trayFooter}
-            </div>
+            </>
           )}
         </SheetContent>
       </Sheet>

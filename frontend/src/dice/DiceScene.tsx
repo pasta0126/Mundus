@@ -291,9 +291,7 @@ export const DiceScene = forwardRef<DiceSceneHandle, DiceSceneProps>(function Di
         }
         const material = new THREE.MeshStandardMaterial({ color, map: marblePattern, roughness: 0.5, metalness: 0.05, side: THREE.DoubleSide })
         const mesh = new THREE.Mesh(geometry, material)
-        // Only a d100's two halves pass `tens` at all; a standalone die (tens undefined) uses the ordinary light shade like every other numeral die.
-        const shade = tens === true ? "dark" : "light"
-        for (const decal of buildDecals(tens === undefined ? kind : "d10", shape, shade)) mesh.add(decal)
+        for (const decal of buildDecals(tens === undefined ? kind : "d10", shape, color)) mesh.add(decal)
         scene.add(mesh)
 
         const restHeight = shape.radius * 1.02
