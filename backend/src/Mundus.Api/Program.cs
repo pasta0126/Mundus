@@ -1,11 +1,14 @@
 using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
+using Mundus.Api.Feedback;
 using Mundus.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+builder.Services.AddHttpClient();
+builder.Services.Configure<FeedbackOptions>(builder.Configuration.GetSection("Feedback"));
 // The OpenAPI document generator reads Http.Json.JsonOptions, a separate
 // options type from Mvc.JsonOptions above - without this, the generated
 // schema (and any client generated from it) says enums are numbers even
