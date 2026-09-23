@@ -1,5 +1,6 @@
-import { Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
+import { Coffee, Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
+import { Button } from "@/components/ui/button"
 
 interface Feature {
   title: string
@@ -38,6 +39,17 @@ export default function AboutPage() {
             </div>
           </div>
         ))}
+      </section>
+
+      <section aria-label="Support this project" className="bg-card flex flex-col items-center gap-3 rounded-lg border p-6 text-center">
+        <h2 className="font-semibold">Support this project</h2>
+        <p className="text-muted-foreground max-w-sm text-sm">Mundus is free and made for fun. If you'd like to help keep it running, you can buy me a coffee.</p>
+        <Button asChild>
+          <a href="https://www.buymeacoffee.com/pasta0126" target="_blank" rel="noopener noreferrer">
+            <Coffee />
+            Buy me a coffee
+          </a>
+        </Button>
       </section>
     </main>
   )
