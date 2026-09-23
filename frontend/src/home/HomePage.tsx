@@ -67,7 +67,12 @@ export default function HomePage() {
           </a>
         ))}
       </nav>
-      <span className="text-muted-foreground font-mono text-xs">v{__APP_VERSION__}</span>
+      <footer className="flex items-center gap-3 text-xs">
+        <a href="/about" className="text-muted-foreground hover:text-foreground underline underline-offset-2">
+          About
+        </a>
+        <span className="text-muted-foreground font-mono">v{__APP_VERSION__}</span>
+      </footer>
     </main>
   )
 }

@@ -61,3 +61,10 @@ dungeons.
 #### Scenario: There is no dungeons card
 - **WHEN** the home page is shown
 - **THEN** no card mentions dungeons
+
+### Requirement: A footer link to the About page
+The home page SHALL show a small footer with a link to `/about`.
+
+#### Scenario: The footer links to About
+- **WHEN** the home page is shown
+- **THEN** a footer link to `/about` is visible

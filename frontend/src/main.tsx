@@ -11,6 +11,7 @@ const DungeonsPage = lazy(() => import('./dungeons/DungeonsPage.tsx'))
 const PlanetsPage = lazy(() => import('./planets/PlanetsPage.tsx'))
 const SystemsPage = lazy(() => import('./planets/SystemsPage.tsx'))
 const DicePage = lazy(() => import('./dice/DicePage.tsx'))
+const AboutPage = lazy(() => import('./about/AboutPage.tsx'))
 
 function Page() {
   const path = window.location.pathname
@@ -19,6 +20,7 @@ function Page() {
   if (path.startsWith('/planets')) return <PlanetsPage />
   if (path.startsWith('/systems')) return <SystemsPage />
   if (path.startsWith('/dice')) return <DicePage />
+  if (path.startsWith('/about')) return <AboutPage />
   // The root, and any unknown path, gets the hub - never a heavy page.
   return <HomePage />
 }
