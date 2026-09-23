@@ -1,8 +1,9 @@
-import { ArrowRight, Castle, Coffee, ExternalLink, Dices, Globe, MessageCircle, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
+import { ArrowRight, Castle, Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
 import { useState, type FormEvent } from "react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { BrandLink } from "./BrandLink"
 
 interface Section {
   title: string
@@ -169,12 +170,9 @@ export default function AboutPage() {
       <section aria-label="Support this project" className="bg-card flex flex-col items-center gap-3 rounded-lg border p-6 text-center">
         <h2 className="font-semibold">Support this project</h2>
         <p className="text-muted-foreground max-w-sm text-sm">Mundus is free and made for fun. If you'd like to help keep it running, you can buy me a coffee.</p>
-        <Button asChild>
-          <a href="https://www.buymeacoffee.com/pasta0126" target="_blank" rel="noopener noreferrer">
-            <Coffee />
-            Buy me a coffee
-          </a>
-        </Button>
+        <BrandLink brand="buymeacoffee" href="https://www.buymeacoffee.com/pasta0126">
+          Buy me a coffee
+        </BrandLink>
       </section>
 
       <section aria-label="Send feedback" className="bg-card flex flex-col gap-3 rounded-lg border p-6">
@@ -182,19 +180,13 @@ export default function AboutPage() {
           <h2 className="font-semibold">Comments, bugs and ideas</h2>
           <p className="text-muted-foreground text-sm">Comments go to Discord; bugs and feature requests become GitHub issues. Nothing here is stored.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm">
-            <a href="https://discord.gg/hPpqCKxZD" target="_blank" rel="noopener noreferrer">
-              <MessageCircle />
-              Join the Discord
-            </a>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <a href="https://github.com/pasta0126/Mundus" target="_blank" rel="noopener noreferrer">
-              <ExternalLink />
-              View the repository
-            </a>
-          </Button>
+        <div className="flex flex-wrap justify-center gap-3">
+          <BrandLink brand="discord" href="https://discord.gg/hPpqCKxZD">
+            Join the Discord
+          </BrandLink>
+          <BrandLink brand="github" href="https://github.com/pasta0126/Mundus">
+            View the repository
+          </BrandLink>
         </div>
         <form onSubmit={submitFeedback} className="flex flex-col gap-3">
           <select
