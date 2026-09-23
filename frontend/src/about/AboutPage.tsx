@@ -1,20 +1,86 @@
-import { Coffee, Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
+import { ArrowRight, Castle, Coffee, Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
 import { useState, type FormEvent } from "react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
-interface Feature {
+interface Section {
   title: string
-  description: string
+  href: string
+  linkLabel: string
+  summary: string
+  features: readonly string[]
   icon: LucideIcon
 }
 
-const FEATURES: readonly Feature[] = [
-  { title: "Map", description: "An endless world of oceans, mountains and forests, dotted with places to find.", icon: MapIcon },
-  { title: "Planet", description: "Spin a planet from its name alone: its surface, its clouds, its rings and its moons.", icon: Globe },
-  { title: "System", description: "Watch a whole planetary system orbit, or build one from planets of your own.", icon: Orbit },
-  { title: "Dice", description: "Drop any mix of dice into a physics-real tray and roll them all at once.", icon: Dices },
+const SECTIONS: readonly Section[] = [
+  {
+    title: "Map",
+    href: "/maps",
+    linkLabel: "Open the map",
+    summary: "An endless world generated from a seed - the same seed always gives the same land, so you can share a place by its link.",
+    features: [
+      "Pan by dragging and zoom through several levels, or jump to exact coordinates",
+      "Oceans, beaches, deserts, grasslands, forests, mountains, snow and more, with a biome legend",
+      "Points of interest - monuments, legends and whole settlements - that name themselves on hover or tap",
+      "Toggleable layers: compass rose, region borders and each kind of point of interest",
+      "Type any seed to explore its world, or regenerate for a random one",
+      "Download the current view as a PNG, showing only the layers you have on",
+    ],
+    icon: MapIcon,
+  },
+  {
+    title: "Dungeons",
+    href: "/maps",
+    linkLabel: "Find one on the map",
+    summary: "Some points of interest on the map hide a dungeon. Tap or click one to enter it.",
+    features: [
+      "A single-floor dungeon per place - rooms and corridors, or tunnels and chambers for caves",
+      "An entrance, treasures of several rarities, and bosses - one final boss plus lesser ones",
+      "Always the same dungeon for the same place, with a button back to where you left the map",
+      "Copy the seed and specs to reuse a dungeon at your table",
+    ],
+    icon: Castle,
+  },
+  {
+    title: "Planet",
+    href: "/planets",
+    linkLabel: "Spin a planet",
+    summary: "A rotatable 3D planet created from nothing but a name.",
+    features: [
+      "Drag to rotate; each planet has its own type, surface, atmosphere and clouds",
+      "Rings, asteroid fields and moons where the seed calls for them",
+      "A sheet describing the planet and its notable features",
+      "Random pronounceable names, shareable links, and copy-seed / copy-specs buttons",
+    ],
+    icon: Globe,
+  },
+  {
+    title: "System",
+    href: "/systems",
+    linkLabel: "Watch a system",
+    summary: "A whole planetary system in motion around one or two central bodies.",
+    features: [
+      "Planets on their own orbits, with at most one asteroid belt, all in deterministic motion",
+      "Open any planet from the system to look at it up close",
+      "Build a custom system: choose a central seed and add up to eight planet seeds and an optional belt",
+      "A custom system lives entirely in its link - nothing is saved on a server",
+    ],
+    icon: Orbit,
+  },
+  {
+    title: "Dice",
+    href: "/dice",
+    linkLabel: "Roll some dice",
+    summary: "A 3D tray with real physics for the dice your table needs.",
+    features: [
+      "d4, d6, d8, d10, d12, d20 and d100 - any mix, any number",
+      "Roll everything at once, or click a single die to throw only that one; on a phone, shake to roll",
+      "Give each die its own colour and name, and see a live total",
+      "Every roll is kept in a history (last 100) that you can download as JSON or clear",
+    ],
+    icon: Dices,
+  },
 ]
 
 const FEEDBACK_KINDS = [
@@ -68,14 +134,34 @@ export default function AboutPage() {
         </p>
       </header>
 
-      <section aria-label="What Mundus offers" className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        {FEATURES.map(({ title, description, icon: Icon }) => (
-          <div key={title} className="bg-card flex items-start gap-3 rounded-lg border p-4">
-            <Icon className="mt-0.5 size-6 shrink-0" aria-hidden />
-            <div>
-              <h2 className="font-semibold">{title}</h2>
-              <p className="text-muted-foreground text-sm">{description}</p>
+      <section aria-label="About Mundus" className="space-y-2 text-sm leading-relaxed">
+        <p>
+          Mundus is a free toolbox of generators for tabletop games and worldbuilding. Everything is created from a <strong>seed</strong> - a name or a few characters - so the same seed always gives the same world, planet, system or dungeon, and you can share any of them just by sharing its link. There is nothing to install, no account to make, and nothing is stored on a server.
+        </p>
+        <p className="text-muted-foreground">
+          Made by Guille, an independent developer based in Barcelona, as part of Northern Archive. Every page works on phones and tablets as well as on a computer.
+        </p>
+      </section>
+
+      <section aria-label="What each page does" className="flex flex-col gap-4">
+        {SECTIONS.map(({ title, href, linkLabel, summary, features, icon: Icon }) => (
+          <div key={title} className="bg-card flex flex-col gap-3 rounded-lg border p-5">
+            <div className="flex items-start gap-3">
+              <Icon className="mt-0.5 size-6 shrink-0" aria-hidden />
+              <div>
+                <h2 className="font-semibold">{title}</h2>
+                <p className="text-muted-foreground text-sm">{summary}</p>
+              </div>
             </div>
+            <ul className="text-muted-foreground list-disc space-y-1 pl-9 text-sm">
+              {features.map((feature) => (
+                <li key={feature}>{feature}</li>
+              ))}
+            </ul>
+            <a href={href} className="hover:text-foreground flex items-center gap-1 self-start pl-9 text-sm font-medium underline underline-offset-2">
+              {linkLabel}
+              <ArrowRight className="size-3.5" aria-hidden />
+            </a>
           </div>
         ))}
       </section>
