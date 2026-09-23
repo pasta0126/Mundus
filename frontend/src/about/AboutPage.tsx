@@ -1,4 +1,4 @@
-import { ArrowRight, Castle, Coffee, Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
+import { ArrowRight, Castle, Coffee, ExternalLink, Dices, Globe, MessageCircle, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
 import { useState, type FormEvent } from "react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { Button } from "@/components/ui/button"
@@ -180,7 +180,21 @@ export default function AboutPage() {
       <section aria-label="Send feedback" className="bg-card flex flex-col gap-3 rounded-lg border p-6">
         <div>
           <h2 className="font-semibold">Comments, bugs and ideas</h2>
-          <p className="text-muted-foreground text-sm">Send it straight to the person behind Mundus - nothing here is stored.</p>
+          <p className="text-muted-foreground text-sm">Comments go to Discord; bugs and feature requests become GitHub issues. Nothing here is stored.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <a href="https://discord.gg/hPpqCKxZD" target="_blank" rel="noopener noreferrer">
+              <MessageCircle />
+              Join the Discord
+            </a>
+          </Button>
+          <Button asChild variant="outline" size="sm">
+            <a href="https://github.com/pasta0126/Mundus" target="_blank" rel="noopener noreferrer">
+              <ExternalLink />
+              View the repository
+            </a>
+          </Button>
         </div>
         <form onSubmit={submitFeedback} className="flex flex-col gap-3">
           <select

@@ -7,7 +7,7 @@ using Mundus.Api.Feedback;
 namespace Mundus.Api.Controllers;
 
 /// <summary>
-/// Relays visitor feedback to Discord and GitHub Issues. Nothing submitted
+/// Relays visitor comments to Discord and bugs/feature requests to GitHub Issues. Nothing submitted
 /// here is ever persisted server-side - see the `feedback` spec.
 /// </summary>
 [ApiController]
@@ -38,12 +38,12 @@ public sealed class FeedbackController : ControllerBase
 
         var name = string.IsNullOrWhiteSpace(request.Name) ? null : request.Name.Trim();
 
-        // Both sinks are attempted independently - one failing shouldn't
-        // swallow a submission the other could still deliver.
-        var discordOk = await TryPostToDiscordAsync(request.Kind, message, name, cancellationToken);
-        var gitHubOk = await TryCreateGitHubIssueAsync(request.Kind, message, name, cancellationToken);
+        // Conversation goes to Discord; bugs and feature requests are tracked as GitHub Issues.
+        var relayed = request.Kind == FeedbackKind.Comment
+            ? await TryPostToDiscordAsync(request.Kind, message, name, cancellationToken)
+            : await TryCreateGitHubIssueAsync(request.Kind, message, name, cancellationToken);
 
-        if (!discordOk && !gitHubOk)
+        if (!relayed)
         {
             return StatusCode(StatusCodes.Status502BadGateway, "Failed to relay feedback.");
         }
