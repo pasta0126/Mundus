@@ -37,6 +37,15 @@ export function appendHistoryEntry(entries: readonly HistoryEntry[], entry: Hist
   return next
 }
 
+/** Deletes the entire persisted history. */
+export function clearHistory() {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // Storage unavailable - nothing to clear.
+  }
+}
+
 /** Saves the full history as a downloaded JSON file, each entry's date/time included. */
 export function downloadHistory(entries: readonly HistoryEntry[]) {
   const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" })

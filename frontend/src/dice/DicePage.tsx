@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { DiceScene, type DiceSceneHandle, MAX_DICE, type TrayItem } from "./DiceScene"
 import { DIE_KINDS, type DieKind } from "./dieTypes"
-import { appendHistoryEntry, downloadHistory, loadHistory, type HistoryEntry } from "./history"
+import { appendHistoryEntry, clearHistory, downloadHistory, loadHistory, type HistoryEntry } from "./history"
 
 const DIE_LABELS: Record<DieKind, string> = {
   d4: "D4",
@@ -163,10 +163,24 @@ export default function DicePage() {
     <SheetContent>
       <SheetHeader className="flex-row items-center justify-between pr-8">
         <SheetTitle>History ({history.length}/100)</SheetTitle>
-        <Button variant="outline" size="sm" onClick={() => downloadHistory(history)} disabled={history.length === 0}>
-          <Download />
-          Download
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              clearHistory()
+              setHistory([])
+            }}
+            disabled={history.length === 0}
+          >
+            <Trash2 />
+            Clear
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => downloadHistory(history)} disabled={history.length === 0}>
+            <Download />
+            Download
+          </Button>
+        </div>
       </SheetHeader>
       {history.length === 0 ? (
         <p className="text-muted-foreground text-sm">No rolls yet.</p>

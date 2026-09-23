@@ -203,7 +203,10 @@ and time it settled, every die involved with its kind, its tray label (if
 any) and its value, and that event's total. The history SHALL persist in
 the person's browser across page reloads, oldest entries dropped first
 once the count exceeds 100. The system SHALL let the person download the
-full history as a JSON file, including each entry's date and time.
+full history as a JSON file, including each entry's date and time. The
+system SHALL also let the person delete the entire stored history at once,
+removing every entry from both the displayed list and the persisted
+storage.
 
 #### Scenario: A finished throw is added to the history
 - **WHEN** any throw (the whole tray or a single die) settles
@@ -220,6 +223,10 @@ full history as a JSON file, including each entry's date and time.
 #### Scenario: The history can be downloaded
 - **WHEN** the person downloads the history
 - **THEN** a JSON file is produced containing every kept entry with its dice, values, total and date/time
+
+#### Scenario: The history can be cleared
+- **WHEN** the person uses the clear-history control
+- **THEN** every entry is removed from the displayed history and from persisted storage, and the history remains empty after a reload
 
 ### Requirement: A new roll re-throws only dice still in the tray
 Dice removed or cleared before a roll SHALL NOT be part of that roll or its
