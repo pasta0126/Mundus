@@ -1,14 +1,15 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.13.0",
+  "version": "1.14.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "generate:api-types": "openapi-typescript http://localhost:5253/api/openapi/v1.json -o src/api/schema.d.ts"
+    "generate:api-types": "openapi-typescript http://localhost:5253/api/openapi/v1.json -o src/api/schema.d.ts",
+    "test": "node --test tests/slots.test.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",

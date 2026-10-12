@@ -1,4 +1,4 @@
-import { Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
+import { Coins, Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 
 interface Card {
@@ -10,7 +10,8 @@ interface Card {
   tint: string
 }
 
-const CARDS: readonly Card[] = [
+/** The three generators: large vertical cards in the first row. */
+const GENERATOR_CARDS: readonly Card[] = [
   {
     href: "/maps",
     title: "Map",
@@ -32,12 +33,23 @@ const CARDS: readonly Card[] = [
     icon: Orbit,
     tint: "bg-amber-100 hover:bg-amber-200/80 dark:bg-amber-950 dark:hover:bg-amber-900",
   },
+]
+
+/** The two tools: horizontal cards in a second row, together as wide as the three above. */
+const TOOL_CARDS: readonly Card[] = [
   {
     href: "/dice",
     title: "Dice",
     description: "Drop any mix of dice into a physics-real tray and roll them all at once.",
     icon: Dices,
     tint: "bg-rose-100 hover:bg-rose-200/80 dark:bg-rose-950 dark:hover:bg-rose-900",
+  },
+  {
+    href: "/slots",
+    title: "Slots",
+    description: "Spin the reels for the weather, a creature's mood or a haul of loot - or try your luck at the casino.",
+    icon: Coins,
+    tint: "bg-sky-100 hover:bg-sky-200/80 dark:bg-sky-950 dark:hover:bg-sky-900",
   },
 ]
 
@@ -52,20 +64,33 @@ export default function HomePage() {
           Everything a tabletop needs to come alive - worlds to explore, dungeons to brave, and dice to throw - so your table can play, organically.
         </p>
       </header>
-      <nav aria-label="What to generate" className="grid w-full max-w-6xl flex-1 grid-cols-1 gap-5 md:grid-cols-4">
-        {CARDS.map(({ href, title, description, icon: Icon, tint }) => (
-          <a
-            key={title}
-            href={href}
-            className={`${tint} text-foreground flex min-h-64 flex-col justify-between gap-6 rounded-2xl border p-8 shadow-md transition-colors md:min-h-[28rem]`}
-          >
-            <Icon className="size-14" aria-hidden />
-            <div className="min-h-28 space-y-2">
-              <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
-              <p className="text-sm leading-snug">{description}</p>
-            </div>
-          </a>
-        ))}
+      <nav aria-label="What to generate" className="flex w-full max-w-6xl flex-1 flex-col gap-5">
+        <div className="grid flex-1 grid-cols-1 gap-5 md:grid-cols-3">
+          {GENERATOR_CARDS.map(({ href, title, description, icon: Icon, tint }) => (
+            <a
+              key={title}
+              href={href}
+              className={`${tint} text-foreground flex min-h-64 flex-col justify-between gap-6 rounded-2xl border p-8 shadow-md transition-colors md:min-h-[28rem]`}
+            >
+              <Icon className="size-14" aria-hidden />
+              <div className="min-h-28 space-y-2">
+                <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
+                <p className="text-sm leading-snug">{description}</p>
+              </div>
+            </a>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          {TOOL_CARDS.map(({ href, title, description, icon: Icon, tint }) => (
+            <a key={title} href={href} className={`${tint} text-foreground flex items-center gap-6 rounded-2xl border p-6 shadow-md transition-colors sm:p-8`}>
+              <Icon className="size-14 shrink-0" aria-hidden />
+              <div className="space-y-2">
+                <h2 className="text-2xl font-semibold tracking-tight">{title}</h2>
+                <p className="text-sm leading-snug">{description}</p>
+              </div>
+            </a>
+          ))}
+        </div>
       </nav>
       <footer className="flex items-center gap-3 text-xs">
         <a href="/about" className="text-muted-foreground hover:text-foreground underline underline-offset-2">

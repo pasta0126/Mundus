@@ -1,4 +1,4 @@
-import { ArrowRight, Castle, Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
+import { ArrowRight, Castle, Coins, Dices, Globe, Map as MapIcon, Orbit, type LucideIcon } from "lucide-react"
 import { useState, type FormEvent } from "react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { Button } from "@/components/ui/button"
@@ -81,6 +81,19 @@ const SECTIONS: readonly Section[] = [
       "Every roll is kept in a history (last 100) that you can download as JSON or clear",
     ],
     icon: Dices,
+  },
+  {
+    title: "Slots",
+    href: "/slots",
+    linkLabel: "Spin the reels",
+    summary: "A single row of reels whose spins add up to one reading - the weather, a creature's mood, a haul of loot or a casino result.",
+    features: [
+      "A low-poly 3D machine with three or five drums - pull the lever or press Spin - and weather, creature mood, fortune and casino themes",
+      "Spin as often as you like and read every spin together - or set a maximum number of spins for a closed session",
+      "A full match of identical symbols is a bonus; on a phone, shake to spin",
+      "The casino plays with toy credits only - no real money - and every closed session is kept in a history (last 100) you can download as JSON or clear",
+    ],
+    icon: Coins,
   },
 ]
 
