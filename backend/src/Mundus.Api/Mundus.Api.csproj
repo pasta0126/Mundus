@@ -8,13 +8,10 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Mundus.Core\Mundus.Core.csproj" />
-    <ProjectReference Include="..\Mundus.Infrastructure\Mundus.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

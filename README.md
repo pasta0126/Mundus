@@ -37,7 +37,6 @@ Live at [mundus.northernarchive.com](https://mundus.northernarchive.com).
   - `src/Mundus.Core` - deterministic generation engine (seeded RNG,
     per-cell infinite terrain noise, `MapGenerator`); no ASP.NET/EF Core
     dependencies
-  - `src/Mundus.Infrastructure` - EF Core `DbContext` (Npgsql/PostgreSQL)
   - `tests/Mundus.Core.Tests` - xUnit tests for the generation engine
 - `frontend/` - React + Vite + TypeScript, Tailwind CSS, shadcn/ui, Framer
   Motion. API client (`src/api/client.ts`, `src/api/schema.d.ts`) is
@@ -78,11 +77,8 @@ npm run generate:api-types
 
 ## Data
 
-The backend connects to a `mundus` database on a Postgres instance that is
-infrastructure, not something this project provisions - see
-`openspec/changes/establish-project-architecture/design.md` for how the
-tenant was set up. Connection string is supplied via `DATABASE_URL` in a
-git-ignored `.env` (see `.env.example`).
+Mundus has no database: everything is generated deterministically from a
+seed and nothing is stored server-side.
 
 ## Deployment
 

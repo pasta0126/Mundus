@@ -2,7 +2,6 @@
   <Folder Name="/src/">
     <Project Path="src/Mundus.Api/Mundus.Api.csproj" />
     <Project Path="src/Mundus.Core/Mundus.Core.csproj" />
-    <Project Path="src/Mundus.Infrastructure/Mundus.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Mundus.Core.Tests/Mundus.Core.Tests.csproj" />

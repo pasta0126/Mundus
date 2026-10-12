@@ -4,7 +4,6 @@ WORKDIR /src
 COPY Mundus.slnx ./
 COPY src/Mundus.Api/Mundus.Api.csproj src/Mundus.Api/
 COPY src/Mundus.Core/Mundus.Core.csproj src/Mundus.Core/
-COPY src/Mundus.Infrastructure/Mundus.Infrastructure.csproj src/Mundus.Infrastructure/
 COPY tests/Mundus.Core.Tests/Mundus.Core.Tests.csproj tests/Mundus.Core.Tests/
 RUN dotnet restore src/Mundus.Api/Mundus.Api.csproj
 
