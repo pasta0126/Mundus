@@ -166,34 +166,31 @@ export default function SlotsPage() {
     setLastClosed(closed)
   }
 
-  /** Closes the open session and starts a fresh one with the given settings. Changing the theme or the reels also wipes the shown result; closing by hand keeps it visible. */
+  /** Closes the open session (recording it) and starts a fresh one with the given settings. This is session memory only: it never touches the machine. */
   function restart(nextTheme: ThemeId, nextReels: ReelCount, nextMax: number | null, wipeResult = false) {
     recordClosed(sessionRef.current)
     applySession(newSession(nextTheme, nextReels, nextMax))
-    setShown(null)
     if (wipeResult) setLastClosed(null)
   }
 
   function chooseTheme(id: ThemeId) {
     if (spinning || id === themeId) return
     setThemeId(id)
+    setShown(null) // the new theme's machine starts at rest
     restart(id, reels, maxSpins, true)
   }
 
   function chooseReels(count: ReelCount) {
     if (spinning || count === reels) return
     setReels(count)
+    setShown(null)
     restart(themeId, count, maxSpins, true)
   }
 
-  /** Closes the open session - recorded in the history and shown as the last closed session - and turns the drums back to rest. */
+  /** Closes the open session - recorded in the history and shown as the last closed session. Memory only: the machine is left exactly as it is. */
   function clearResults() {
     if (spinning || sessionRef.current.spins.length === 0) return
     restart(themeId, reels, maxSpins)
-    const rest = theme.symbols.slice(0, reels).map((s) => s.id)
-    // The drums turn back to rest (or jump there when motion is reduced).
-    if (prefersReducedMotion()) machineRef.current?.snap(rest)
-    else machineRef.current?.spin(rest, () => {})
   }
 
   /** Applies the typed maximum to the open session. If the session has already made that many spins it closes at once, like a bounded session reaching its last spin. */
@@ -208,7 +205,6 @@ export default function SlotsPage() {
     if (value !== null && updated.spins.length >= value) {
       recordClosed(updated)
       applySession(newSession(themeId, reels, value))
-      setShown(null)
     } else {
       applySession(updated)
     }

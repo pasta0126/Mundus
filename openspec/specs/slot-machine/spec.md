@@ -272,8 +272,19 @@ Setting the maximum number of spins from the current session group SHALL apply t
 - **WHEN** a bounded session is open and the person empties the maximum field
 - **THEN** the session has no limit
 
-### Requirement: Clear closes the session
-The current session group SHALL offer a Clear action that closes the open session: it SHALL be recorded in the history with its result, shown as the last closed session, and the drums SHALL turn back to rest and a new empty session with the same theme, reels and maximum SHALL start. Clear SHALL be the only control for closing a session by hand. Clear SHALL NOT change the casino balance, and SHALL NOT be available while a spin is in progress nor when the open session has no spins.
+### Requirement: The spin control fills the bar and takes the theme colour
+The spin control SHALL be the largest control of the bottom bar, filling the width of that bar that the other controls leave free, and SHALL take the accent colour of the selected theme.
+
+#### Scenario: Spin fills the bar
+- **WHEN** the slot machine page is shown
+- **THEN** the spin control spans the free width of the bottom bar beside the other buttons
+
+#### Scenario: Spin takes the theme colour
+- **WHEN** a different theme is selected
+- **THEN** the spin control takes that theme's accent colour
+
+### Requirement: Clear only closes the session
+The current session group SHALL offer a Clear action that closes the open session: it SHALL be recorded in the history with its result, shown as the last closed session, and a new empty session with the same theme, reels and maximum SHALL start. Clear is a matter of the session record only and SHALL NOT move or change the machine: the drums and the symbols they show SHALL stay exactly as they are. Clear SHALL be the only control for closing a session by hand. Clear SHALL NOT change the casino balance, and SHALL NOT be available while a spin is in progress nor when the open session has no spins.
 
 #### Scenario: Clearing an open session records it
 - **WHEN** the person uses Clear on a session with spins
@@ -287,21 +298,10 @@ The current session group SHALL offer a Clear action that closes the open sessio
 - **WHEN** the person uses Clear in the casino after spinning
 - **THEN** the balance is unchanged
 
-#### Scenario: Clear returns the drums to rest
+#### Scenario: Clear leaves the machine alone
 - **WHEN** the person uses Clear after a spin
-- **THEN** the drums turn and land on the machine's resting symbols
+- **THEN** the drums do not turn and keep showing the symbols of that spin
 
 #### Scenario: Nothing to clear
 - **WHEN** the open session has no spins
 - **THEN** the Clear action is disabled
-
-### Requirement: The spin control fills the bar and takes the theme colour
-The spin control SHALL be the largest control of the bottom bar, filling the width of that bar that the other controls leave free, and SHALL take the accent colour of the selected theme.
-
-#### Scenario: Spin fills the bar
-- **WHEN** the slot machine page is shown
-- **THEN** the spin control spans the free width of the bottom bar beside the other buttons
-
-#### Scenario: Spin takes the theme colour
-- **WHEN** a different theme is selected
-- **THEN** the spin control takes that theme's accent colour
