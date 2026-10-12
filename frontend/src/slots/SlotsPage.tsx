@@ -1,4 +1,4 @@
-import { Coins, Download, Eraser, Flag, History, List, Play, RotateCcw, Smartphone, Trash2 } from "lucide-react"
+import { Coins, Download, Eraser, History, List, Play, RotateCcw, Smartphone, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { Button } from "@/components/ui/button"
@@ -186,12 +186,10 @@ export default function SlotsPage() {
     restart(themeId, count, maxSpins, true)
   }
 
-  /** Discards the open session and any shown result without recording it; the drums return to rest. */
+  /** Closes the open session - recorded in the history and shown as the last closed session - and turns the drums back to rest. */
   function clearResults() {
-    if (spinning) return
-    applySession(newSession(themeId, reels, maxSpins))
-    setLastClosed(null)
-    setShown(null)
+    if (spinning || sessionRef.current.spins.length === 0) return
+    restart(themeId, reels, maxSpins)
     const rest = theme.symbols.slice(0, reels).map((s) => s.id)
     // The drums turn back to rest (or jump there when motion is reduced).
     if (prefersReducedMotion()) machineRef.current?.snap(rest)
@@ -214,11 +212,6 @@ export default function SlotsPage() {
     } else {
       applySession(updated)
     }
-  }
-
-  function closeNow() {
-    if (spinning || sessionRef.current.spins.length === 0) return
-    restart(themeId, reels, maxSpins)
   }
 
   function clearTimers() {
@@ -413,7 +406,7 @@ export default function SlotsPage() {
               ? `${lastClosed.spins.length}${lastClosed.maxSpins !== null ? `/${lastClosed.maxSpins}` : ""} spins`
               : `${session.spins.length}${session.maxSpins !== null ? `/${session.maxSpins}` : ""} spins${session.maxSpins === null ? " - free" : ""}`}
           </span>
-          <Button variant="outline" size="xs" onClick={clearResults} disabled={spinning || (session.spins.length === 0 && lastClosed === null)}>
+          <Button variant="outline" size="xs" onClick={clearResults} disabled={spinning || session.spins.length === 0}>
             <Eraser />
             Clear
           </Button>
@@ -444,6 +437,36 @@ export default function SlotsPage() {
         </ul>
       )}
     </>
+  )
+
+  // The casino's money controls and notice, below the session group on wide screens and with the spin control on narrow ones.
+  const casinoBlock = (
+    <div className="bg-card flex w-full flex-col items-center gap-1.5 rounded-lg border p-2 shadow-lg">
+      <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
+        <span className="flex items-center gap-1.5 font-semibold">
+          <Coins className="size-4" aria-hidden />
+          <span className="font-mono" data-testid="balance">
+            {balance}
+          </span>
+          credits
+        </span>
+        <Button variant="ghost" size="sm" onClick={() => applyBalance(STARTING_BALANCE)} disabled={spinning}>
+          <RotateCcw />
+          Reset to {STARTING_BALANCE}
+        </Button>
+      </div>
+      <div className="flex items-center gap-1" role="group" aria-label="Bet per spin">
+        {BETS.map((amount) => (
+          <Button key={amount} variant={bet === amount ? "default" : "outline"} size="sm" onClick={() => setBet(amount)} disabled={spinning} aria-pressed={bet === amount}>
+            Bet {amount}
+          </Button>
+        ))}
+      </div>
+      <p className="text-muted-foreground text-center text-xs">
+        Toy credits only - no real-money value, nothing here can be bought or cashed out.
+        {!canAfford && <span className="ml-1 font-semibold text-amber-700 dark:text-amber-300">Not enough credits for this bet - lower it or reset the balance.</span>}
+      </p>
+    </div>
   )
 
   return (
@@ -493,12 +516,10 @@ export default function SlotsPage() {
         )}
       </div>
 
-      {/* Desktop: the session is always visible in a side panel. Below md it moves into a sheet. */}
-      <div
-        className="bg-card fixed top-4 right-4 z-10 hidden w-72 flex-col gap-3 overflow-hidden rounded-lg border p-3 shadow-lg md:flex"
-        style={{ maxHeight: `calc(100dvh - ${barHeight + 40}px)` }}
-      >
-        {sessionBody}
+      {/* Desktop: the session is always visible in a side column, with the casino block below it. Below md the session moves into a sheet. */}
+      <div className="fixed top-4 right-4 z-10 hidden w-72 flex-col gap-3 md:flex" style={{ maxHeight: `calc(100dvh - ${barHeight + 40}px)` }}>
+        <div className="bg-card flex min-h-0 flex-col gap-3 overflow-hidden rounded-lg border p-3 shadow-lg">{sessionBody}</div>
+        {isCasino && wide && casinoBlock}
       </div>
 
       <Sheet open={showSession} onOpenChange={setShowSession}>
@@ -514,91 +535,68 @@ export default function SlotsPage() {
         {historySheet}
       </Sheet>
 
-      <div ref={barRef} className="fixed inset-x-0 bottom-4 z-10 flex flex-col items-center gap-2 px-4 md:pr-[19rem]">
-        {/* Below md the session panel is a sheet: its result stays in view as a small pill that opens it. */}
-        <button
-          type="button"
-          onClick={() => setShowSession(true)}
-          className="bg-card max-w-full truncate rounded-lg border px-3 py-1 text-xs shadow-lg md:hidden"
-          aria-label="Open the session"
-        >
-          {resultText}
-        </button>
+      <div ref={barRef} className="fixed inset-x-0 bottom-4 z-10 flex justify-center px-4 md:pr-[19rem]">
+        {/* One column as wide as the choices bar: the casino block and the actions follow its width. */}
+        <div className="flex w-fit max-w-full flex-col items-stretch gap-2">
+          {/* Below md the session panel is a sheet: its result stays in view as a small pill that opens it. */}
+          <button
+            type="button"
+            onClick={() => setShowSession(true)}
+            className="bg-card max-w-full self-center truncate rounded-lg border px-3 py-1 text-xs shadow-lg md:hidden"
+            aria-label="Open the session"
+          >
+            {resultText}
+          </button>
 
-        <div className="bg-card flex max-w-full flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-lg border p-2 shadow-lg">
-          <div className="flex flex-wrap items-center justify-center gap-1.5" role="group" aria-label="Theme">
-            {THEMES.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                title={t.description}
-                onClick={() => chooseTheme(t.id)}
-                disabled={spinning}
-                aria-pressed={t.id === themeId}
-                className="bg-background coarse:min-h-11 rounded-lg border-2 px-2.5 py-1 text-sm font-medium transition-colors disabled:opacity-60"
-                style={{ borderColor: t.id === themeId ? t.accent : "transparent" }}
-              >
-                {t.name}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-1" role="group" aria-label="Number of reels">
-            {([3, 5] as const).map((count) => (
-              <Button key={count} variant={reels === count ? "default" : "outline"} size="sm" onClick={() => chooseReels(count)} disabled={spinning} aria-pressed={reels === count}>
-                {count} reels
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* The casino's money controls and notice, apart from the theme bar and only in the casino. */}
-        {isCasino && (
-          <div className="bg-card flex max-w-full flex-col items-center gap-1.5 rounded-lg border p-2 shadow-lg">
-            <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-              <span className="flex items-center gap-1.5 font-semibold">
-                <Coins className="size-4" aria-hidden />
-                <span className="font-mono" data-testid="balance">
-                  {balance}
-                </span>
-                credits
-              </span>
-              <div className="flex items-center gap-1" role="group" aria-label="Bet per spin">
-                {BETS.map((amount) => (
-                  <Button key={amount} variant={bet === amount ? "default" : "outline"} size="sm" onClick={() => setBet(amount)} disabled={spinning} aria-pressed={bet === amount}>
-                    Bet {amount}
-                  </Button>
-                ))}
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => applyBalance(STARTING_BALANCE)} disabled={spinning}>
-                <RotateCcw />
-                Reset to {STARTING_BALANCE}
-              </Button>
+          <div className="bg-card flex flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-lg border p-2 shadow-lg">
+            <div className="flex flex-wrap items-center justify-center gap-1.5" role="group" aria-label="Theme">
+              {THEMES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  title={t.description}
+                  onClick={() => chooseTheme(t.id)}
+                  disabled={spinning}
+                  aria-pressed={t.id === themeId}
+                  className="bg-background coarse:min-h-11 rounded-lg border-2 px-2.5 py-1 text-sm font-medium transition-colors disabled:opacity-60"
+                  style={{ borderColor: t.id === themeId ? t.accent : "transparent" }}
+                >
+                  {t.name}
+                </button>
+              ))}
             </div>
-            <p className="text-muted-foreground text-center text-xs">
-              Toy credits only - no real-money value, nothing here can be bought or cashed out.
-              {!canAfford && <span className="ml-1 font-semibold text-amber-700 dark:text-amber-300">Not enough credits for this bet - lower it or reset the balance.</span>}
-            </p>
-          </div>
-        )}
 
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button size="lg" className="min-w-32" onClick={startSpin} disabled={spinning || !canAfford}>
-            <Play />
-            Spin
-          </Button>
-          <Button variant="outline" size="lg" className="bg-card" onClick={closeNow} disabled={spinning || session.spins.length === 0}>
-            <Flag />
-            Close session
-          </Button>
-          <Button variant="outline" size="lg" className="bg-card md:hidden" onClick={() => setShowSession(true)}>
-            <List />
-            Session
-          </Button>
-          <Button variant="outline" size="lg" className="bg-card" onClick={() => setShowHistory(true)}>
-            <History />
-            History
-          </Button>
+            <div className="flex items-center gap-1" role="group" aria-label="Number of reels">
+              {([3, 5] as const).map((count) => (
+                <Button key={count} variant={reels === count ? "default" : "outline"} size="sm" onClick={() => chooseReels(count)} disabled={spinning} aria-pressed={reels === count}>
+                  {count} reels
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {isCasino && !wide && casinoBlock}
+
+          <div className="flex items-stretch gap-2">
+            <Button
+              size="lg"
+              className="h-12 flex-1 text-base font-semibold text-white shadow-lg hover:brightness-110"
+              style={{ backgroundColor: theme.accent }}
+              onClick={startSpin}
+              disabled={spinning || !canAfford}
+            >
+              <Play />
+              Spin
+            </Button>
+            <Button variant="outline" size="lg" className="bg-card h-12 md:hidden" onClick={() => setShowSession(true)}>
+              <List />
+              Session
+            </Button>
+            <Button variant="outline" size="lg" className="bg-card h-12" onClick={() => setShowHistory(true)}>
+              <History />
+              History
+            </Button>
+          </div>
         </div>
       </div>
     </div>

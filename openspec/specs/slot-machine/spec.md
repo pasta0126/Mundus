@@ -96,7 +96,7 @@ A spin SHALL give every reel a symbol of the selected theme, chosen independentl
 - **THEN** Sun and Cloud appear clearly more often than Storm
 
 ### Requirement: Sessions
-Every spin SHALL belong to a session. A session SHALL be free, with no limit on its spins, unless the person has set a maximum number of spins, in which case it is bounded. A free session SHALL stay open until the person closes it with an explicit action or until the theme or the number of reels is changed. A bounded session SHALL close by itself on its last spin and SHALL NOT accept further spins. The maximum SHALL be a whole number from 1 to 100. A session SHALL record its theme, its number of reels, its maximum (none when free), its spins in order, its result and when it closed.
+Every spin SHALL belong to a session. A session SHALL be free, with no limit on its spins, unless the person has set a maximum number of spins, in which case it is bounded. A free session SHALL stay open until the person clears it or until the theme or the number of reels is changed. A bounded session SHALL close by itself on its last spin and SHALL NOT accept further spins. The maximum SHALL be a whole number from 1 to 100. A session SHALL record its theme, its number of reels, its maximum (none when free), its spins in order, its result and when it closed.
 
 #### Scenario: A free session grows
 - **WHEN** the person spins five times with no maximum set
@@ -107,11 +107,11 @@ Every spin SHALL belong to a session. A session SHALL be free, with no limit on 
 - **THEN** the session closes on the third spin and further spins start a new session
 
 #### Scenario: A free session closes on request
-- **WHEN** the person uses the close session action on a session with spins
+- **WHEN** the person uses Clear on a session with spins
 - **THEN** the session is closed and recorded, and a new empty session starts
 
 #### Scenario: An empty session is not recorded
-- **WHEN** the person closes a session that has no spins
+- **WHEN** a session that has no spins is closed, for instance by changing the theme
 - **THEN** nothing is added to the history
 
 ### Requirement: Reading a session in blend mode
@@ -203,31 +203,8 @@ The system SHALL keep a history of the last 100 closed sessions. Each entry SHAL
 - **WHEN** the person deletes the history
 - **THEN** no entry remains in the displayed list or in the browser's storage
 
-### Requirement: Clearing the results
-The results section SHALL offer a Clear action that discards the open session's spins and any closed session's result shown there, turns the drums back to rest and starts a new empty session with the same theme, reels and maximum. Clearing SHALL NOT add anything to the history and SHALL NOT change the casino balance. Clear SHALL NOT be available while a spin is in progress, nor when there is nothing to clear.
-
-#### Scenario: Clearing an open session
-- **WHEN** the person uses Clear on a session with spins
-- **THEN** the results section shows no spins and no result, and the history is unchanged
-
-#### Scenario: Clearing a closed session's result
-- **WHEN** a bounded session has just closed and the person uses Clear
-- **THEN** its result is no longer shown, and its history entry remains
-
-#### Scenario: Clearing keeps the balance
-- **WHEN** the person uses Clear in the casino after spinning
-- **THEN** the balance is unchanged
-
-#### Scenario: The drums return to rest
-- **WHEN** the person uses Clear after a spin
-- **THEN** the drums turn and land on the machine's resting symbols
-
-#### Scenario: Nothing to clear
-- **WHEN** the session has no spins and no closed result is shown
-- **THEN** the Clear action is disabled
-
 ### Requirement: Controls grouped by purpose
-The bar of choices SHALL hold only the themes and the number of reels. In the casino, the balance, the bet per spin, the balance reset and the toy-credit notice SHALL sit together in their own block, separate from that bar, shown only while the casino theme is selected. The maximum number of spins SHALL sit in the current session group, where it is set.
+The bar of choices SHALL hold only the themes and the number of reels. In the casino, the balance, the bet per spin, the balance reset and the toy-credit notice SHALL sit together in their own block, shown only while the casino theme is selected and placed below the current session group. Where the session is a sheet instead of a side panel, that block SHALL sit with the spin control so the bet stays reachable. The maximum number of spins SHALL sit in the current session group, where it is set.
 
 #### Scenario: The bar holds themes and reels only
 - **WHEN** the slot machine page is shown
@@ -235,7 +212,7 @@ The bar of choices SHALL hold only the themes and the number of reels. In the ca
 
 #### Scenario: Casino controls in their own block
 - **WHEN** the casino theme is selected
-- **THEN** the balance, the bets, the reset and the toy-credit notice appear together in a block of their own, outside the theme bar
+- **THEN** the balance, the bets, the reset and the toy-credit notice appear together in a block of their own, below the current session group and outside the theme bar
 
 #### Scenario: The maximum is set in the current session group
 - **WHEN** the slot machine page is shown
@@ -294,3 +271,37 @@ Setting the maximum number of spins from the current session group SHALL apply t
 #### Scenario: Clearing the field frees the session
 - **WHEN** a bounded session is open and the person empties the maximum field
 - **THEN** the session has no limit
+
+### Requirement: Clear closes the session
+The current session group SHALL offer a Clear action that closes the open session: it SHALL be recorded in the history with its result, shown as the last closed session, and the drums SHALL turn back to rest and a new empty session with the same theme, reels and maximum SHALL start. Clear SHALL be the only control for closing a session by hand. Clear SHALL NOT change the casino balance, and SHALL NOT be available while a spin is in progress nor when the open session has no spins.
+
+#### Scenario: Clearing an open session records it
+- **WHEN** the person uses Clear on a session with spins
+- **THEN** the session is added to the history with its result and a new empty session starts
+
+#### Scenario: The cleared result stays readable
+- **WHEN** the person uses Clear
+- **THEN** the closed session's result is shown as the last closed session until the next spin or a change of theme or reels
+
+#### Scenario: Clearing keeps the balance
+- **WHEN** the person uses Clear in the casino after spinning
+- **THEN** the balance is unchanged
+
+#### Scenario: Clear returns the drums to rest
+- **WHEN** the person uses Clear after a spin
+- **THEN** the drums turn and land on the machine's resting symbols
+
+#### Scenario: Nothing to clear
+- **WHEN** the open session has no spins
+- **THEN** the Clear action is disabled
+
+### Requirement: The spin control fills the bar and takes the theme colour
+The spin control SHALL be the largest control of the bottom bar, filling the width of that bar that the other controls leave free, and SHALL take the accent colour of the selected theme.
+
+#### Scenario: Spin fills the bar
+- **WHEN** the slot machine page is shown
+- **THEN** the spin control spans the free width of the bottom bar beside the other buttons
+
+#### Scenario: Spin takes the theme colour
+- **WHEN** a different theme is selected
+- **THEN** the spin control takes that theme's accent colour
