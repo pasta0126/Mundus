@@ -21,8 +21,8 @@ const REEL_APOTHEM = REEL_RADIUS * Math.cos(Math.PI / FACES)
 const REEL_PITCH = 1.3
 
 const SPIN_SPEED = 16 // rad/s
-const FIRST_BRAKE_MS = 600
-const BRAKE_STAGGER_MS = 380
+const FIRST_BRAKE_MS = 450
+const BRAKE_STAGGER_MS = 260
 const LEVER_DOWN_MS = 140
 const MACHINE_HALF_HEIGHT = 1.9
 const LEVER_UP_MS = 380

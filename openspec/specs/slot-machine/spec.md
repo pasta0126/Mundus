@@ -177,41 +177,6 @@ In payout mode a spin SHALL pay when at least two reels, in any position, show t
 - **WHEN** a 3-reel spin shows three different symbols
 - **THEN** the spin pays nothing
 
-### Requirement: Spin presentation
-The reels SHALL be shown as a three-dimensional, low-poly machine in the style of the dice tray and planet pages: each reel a drum with one flat face per symbol of the selected theme, set in a cabinet that takes the theme's accent colour, with a lever at its side. The three-dimensional space SHALL fill the whole page, with the controls, the session and the history laid over it as on the dice page, the machine kept centred in the space the controls leave free. The win line, where the result sits, SHALL be only a faint, translucent guide that does not compete with the symbols. A spin SHALL turn every drum, stop them one after another from left to right, and land each on its symbol, and SHALL show its result only when every drum has settled. The person SHALL be able to spin by using the lever as well as the spin control, and SHALL be able to skip the animation. Each symbol SHALL be drawn on its face as a clear icon with its name, legible from the front. The camera MAY be turned a little but the front of the drums SHALL stay in view. When the device cannot draw three-dimensional graphics, the machine SHALL fall back to a flat row of reels with the same behaviour. A person who prefers reduced motion SHALL see each spin land at once without the turning.
-
-#### Scenario: The controls float over the scene
-- **WHEN** the slot machine page is shown
-- **THEN** the 3D space fills the page and the controls are laid over it, with the machine fully visible and not covered by them
-
-#### Scenario: The result waits for the drums
-- **WHEN** a spin is made
-- **THEN** the spin and the session result update only after every drum has settled
-
-#### Scenario: Drums stop from left to right
-- **WHEN** a spin is made on a 5-reel machine
-- **THEN** the first drum settles first, and each following drum settles after the previous one
-
-#### Scenario: Each drum lands on its symbol
-- **WHEN** a spin settles
-- **THEN** each drum shows, facing the front, the symbol of that reel's result
-
-#### Scenario: The lever spins
-- **WHEN** the person uses the lever
-- **THEN** the lever is pulled and the machine spins once, as with the spin control
-
-#### Scenario: Skipping the animation
-- **WHEN** the person skips the animation during a spin
-- **THEN** the drums show their final symbols at once
-
-#### Scenario: A flat fallback without 3D graphics
-- **WHEN** the device cannot draw three-dimensional graphics
-- **THEN** the reels are shown as a flat row that spins, settles and can be skipped in the same way
-
-#### Scenario: Reduced motion
-- **WHEN** the person prefers reduced motion
-- **THEN** a spin shows its final symbols at once without the drums turning
-
 ### Requirement: Shaking a device spins
 On a device that exposes motion sensors, physically shaking it SHALL spin the machine once, the same as using the spin control.
 
@@ -239,7 +204,7 @@ The system SHALL keep a history of the last 100 closed sessions. Each entry SHAL
 - **THEN** no entry remains in the displayed list or in the browser's storage
 
 ### Requirement: Clearing the results
-The results section SHALL offer a Clear action that discards the open session's spins and any closed session's result shown there, returns the drums to rest and starts a new empty session with the same theme, reels and maximum. Clearing SHALL NOT add anything to the history and SHALL NOT change the casino balance. Clear SHALL NOT be available while a spin is in progress, nor when there is nothing to clear.
+The results section SHALL offer a Clear action that discards the open session's spins and any closed session's result shown there, turns the drums back to rest and starts a new empty session with the same theme, reels and maximum. Clearing SHALL NOT add anything to the history and SHALL NOT change the casino balance. Clear SHALL NOT be available while a spin is in progress, nor when there is nothing to clear.
 
 #### Scenario: Clearing an open session
 - **WHEN** the person uses Clear on a session with spins
@@ -253,12 +218,16 @@ The results section SHALL offer a Clear action that discards the open session's 
 - **WHEN** the person uses Clear in the casino after spinning
 - **THEN** the balance is unchanged
 
+#### Scenario: The drums return to rest
+- **WHEN** the person uses Clear after a spin
+- **THEN** the drums turn and land on the machine's resting symbols
+
 #### Scenario: Nothing to clear
 - **WHEN** the session has no spins and no closed result is shown
 - **THEN** the Clear action is disabled
 
 ### Requirement: Controls grouped by purpose
-The bar of choices SHALL hold only the themes and the number of reels. In the casino, the balance, the bet per spin, the balance reset and the toy-credit notice SHALL sit together in their own block, separate from that bar, shown only while the casino theme is selected. The maximum number of spins SHALL sit with the spin controls.
+The bar of choices SHALL hold only the themes and the number of reels. In the casino, the balance, the bet per spin, the balance reset and the toy-credit notice SHALL sit together in their own block, separate from that bar, shown only while the casino theme is selected. The maximum number of spins SHALL sit in the current session group, where it is set.
 
 #### Scenario: The bar holds themes and reels only
 - **WHEN** the slot machine page is shown
@@ -268,6 +237,60 @@ The bar of choices SHALL hold only the themes and the number of reels. In the ca
 - **WHEN** the casino theme is selected
 - **THEN** the balance, the bets, the reset and the toy-credit notice appear together in a block of their own, outside the theme bar
 
+#### Scenario: The maximum is set in the current session group
+- **WHEN** the slot machine page is shown
+- **THEN** the maximum number of spins is a field of the current session group, and not part of the theme bar or the spin controls
+
 #### Scenario: Other themes show no casino block
 - **WHEN** the weather, creature mood or fortune theme is selected
 - **THEN** no balance, bet or toy-credit notice is shown
+
+### Requirement: Animated spin presentation
+The reels SHALL be shown as a three-dimensional, low-poly machine in the style of the dice tray and planet pages: each reel a drum with one flat face per symbol of the selected theme, set in a cabinet that takes the theme's accent colour, with a lever at its side. The three-dimensional space SHALL fill the whole page, with the controls, the session and the history laid over it as on the dice page, the machine kept centred in the space the controls leave free. The win line, where the result sits, SHALL be only a faint, translucent guide that does not compete with the symbols. A spin SHALL turn every drum, stop them one after another from left to right, and land each on its symbol, and SHALL show its result only when every drum has settled. The person SHALL be able to spin by using the lever as well as the spin control. Each symbol SHALL be drawn on its face as a clear icon with its name, legible from the front. The camera MAY be turned a little but the front of the drums SHALL stay in view. When the device cannot draw three-dimensional graphics, the machine SHALL fall back to a flat row of reels with the same behaviour. A person who prefers reduced motion SHALL see each spin land at once without the turning.
+
+#### Scenario: The controls float over the scene
+- **WHEN** the slot machine page is shown
+- **THEN** the 3D space fills the page and the controls are laid over it, with the machine fully visible and not covered by them
+
+#### Scenario: The result waits for the drums
+- **WHEN** a spin is made
+- **THEN** the spin and the session result update only after every drum has settled
+
+#### Scenario: Drums stop from left to right
+- **WHEN** a spin is made on a 5-reel machine
+- **THEN** the first drum settles first, and each following drum settles after the previous one
+
+#### Scenario: Each drum lands on its symbol
+- **WHEN** a spin settles
+- **THEN** each drum shows, facing the front, the symbol of that reel's result
+
+#### Scenario: The lever spins
+- **WHEN** the person uses the lever
+- **THEN** the lever is pulled and the machine spins once, as with the spin control
+
+#### Scenario: No skip control
+- **WHEN** a spin is in progress
+- **THEN** no control to skip the animation is offered
+
+#### Scenario: A flat fallback without 3D graphics
+- **WHEN** the device cannot draw three-dimensional graphics
+- **THEN** the reels are shown as a flat row that spins and settles in the same way
+
+#### Scenario: Reduced motion
+- **WHEN** the person prefers reduced motion
+- **THEN** a spin shows its final symbols at once without the drums turning
+
+### Requirement: The maximum applies to the open session
+Setting the maximum number of spins from the current session group SHALL apply to the open session, not only to later ones, once the person has finished entering it. Clearing the field SHALL make the session free again. If the open session has already made at least as many spins as the new maximum, it SHALL close at once and be recorded, and a new empty session with that maximum SHALL start.
+
+#### Scenario: Bounding an open session
+- **WHEN** a free session has one spin and the person sets a maximum of 3
+- **THEN** the session is bounded at 3 and closes by itself after two more spins
+
+#### Scenario: Lowering the maximum below the spins made
+- **WHEN** a session has four spins and the person sets a maximum of 3
+- **THEN** the session closes and is recorded, and a new empty session with a maximum of 3 starts
+
+#### Scenario: Clearing the field frees the session
+- **WHEN** a bounded session is open and the person empties the maximum field
+- **THEN** the session has no limit

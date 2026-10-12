@@ -1,4 +1,4 @@
-import { Coins, Download, Eraser, FastForward, Flag, History, List, Play, RotateCcw, Smartphone, Trash2 } from "lucide-react"
+import { Coins, Download, Eraser, Flag, History, List, Play, RotateCcw, Smartphone, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { Button } from "@/components/ui/button"
@@ -113,7 +113,9 @@ function ReadingView({ theme, reading }: { theme: Theme; reading: Reading }) {
 export default function SlotsPage() {
   const [themeId, setThemeId] = useState<ThemeId>("weather")
   const [reels, setReels] = useState<ReelCount>(3)
+  // The maximum is edited as text (maxInput) and takes effect, on the open session too, when committed (blur or Enter).
   const [maxInput, setMaxInput] = useState("")
+  const [maxSpins, setMaxSpins] = useState<number | null>(null)
   const [session, setSession] = useState<Session>(() => newSession("weather", 3, null))
   const [lastClosed, setLastClosed] = useState<ClosedSession | null>(null)
   const [history, setHistory] = useState<ClosedSession[]>(() => loadHistory())
@@ -137,7 +139,6 @@ export default function SlotsPage() {
 
   const theme = themeById(themeId)
   const isCasino = theme.mode === "payout"
-  const maxSpins = normalizeMaxSpins(maxInput === "" ? null : Number(maxInput))
   const canAfford = !isCasino || balance >= bet
 
   // Timers and the spin in flight outlive renders, so they read the latest state through refs.
@@ -191,13 +192,28 @@ export default function SlotsPage() {
     applySession(newSession(themeId, reels, maxSpins))
     setLastClosed(null)
     setShown(null)
-    machineRef.current?.snap(theme.symbols.slice(0, reels).map((s) => s.id))
+    const rest = theme.symbols.slice(0, reels).map((s) => s.id)
+    // The drums turn back to rest (or jump there when motion is reduced).
+    if (prefersReducedMotion()) machineRef.current?.snap(rest)
+    else machineRef.current?.spin(rest, () => {})
   }
 
-  function changeMax(value: string) {
-    setMaxInput(value)
-    // A session already under way keeps the maximum it started with; an empty one adopts the new value.
-    if (sessionRef.current.spins.length === 0) applySession(newSession(themeId, reels, normalizeMaxSpins(value === "" ? null : Number(value))))
+  /** Applies the typed maximum to the open session. If the session has already made that many spins it closes at once, like a bounded session reaching its last spin. */
+  function commitMax() {
+    if (spinning) return
+    const value = normalizeMaxSpins(maxInput === "" ? null : Number(maxInput))
+    setMaxInput(value === null ? "" : String(value))
+    setMaxSpins(value)
+    const current = sessionRef.current
+    if (value === current.maxSpins) return
+    const updated: Session = { ...current, maxSpins: value }
+    if (value !== null && updated.spins.length >= value) {
+      recordClosed(updated)
+      applySession(newSession(themeId, reels, value))
+      setShown(null)
+    } else {
+      applySession(updated)
+    }
   }
 
   function closeNow() {
@@ -263,10 +279,6 @@ export default function SlotsPage() {
       )
     })
     timers.current.push(window.setTimeout(() => commit(spin), FIRST_STOP_MS + (reels - 1) * STOP_STAGGER_MS + SETTLE_MS))
-  }
-
-  function skip() {
-    if (pending.current) commit(pending.current)
   }
 
   // Shake to spin, with the same motion handling as the dice tray.
@@ -407,6 +419,22 @@ export default function SlotsPage() {
           </Button>
         </div>
       </div>
+      <label className="flex items-center gap-1.5 text-sm">
+        <span className="text-muted-foreground">Max spins</span>
+        <input
+          type="number"
+          inputMode="numeric"
+          min={1}
+          max={MAX_SPINS_LIMIT}
+          value={maxInput}
+          onChange={(e) => setMaxInput(e.target.value)}
+          onBlur={commitMax}
+          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          placeholder="Free"
+          disabled={spinning}
+          className="border-input bg-background coarse:min-h-11 h-7 w-20 rounded-md border px-2 text-sm"
+        />
+      </label>
       {showingLast && lastClosed ? <ReadingView theme={themeById(lastClosed.themeId)} reading={lastClosed.result} /> : <ReadingView theme={theme} reading={reading} />}
       {session.spins.length > 0 && (
         <ul className="min-h-0 divide-y overflow-y-auto">
@@ -415,7 +443,6 @@ export default function SlotsPage() {
           ))}
         </ul>
       )}
-      {session.spins.length > 0 && maxSpins !== session.maxSpins && <p className="text-muted-foreground text-xs">The new maximum applies to the next session.</p>}
     </>
   )
 
@@ -556,30 +583,10 @@ export default function SlotsPage() {
         )}
 
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <label className="bg-card coarse:min-h-11 flex items-center gap-1.5 rounded-lg border px-2 py-1 text-sm shadow-lg">
-            <span className="text-muted-foreground">Max spins</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={MAX_SPINS_LIMIT}
-              value={maxInput}
-              onChange={(e) => changeMax(e.target.value)}
-              placeholder="Free"
-              disabled={spinning}
-              className="border-input bg-background h-7 w-16 rounded-md border px-2 text-sm"
-            />
-          </label>
           <Button size="lg" className="min-w-32" onClick={startSpin} disabled={spinning || !canAfford}>
             <Play />
             Spin
           </Button>
-          {spinning && (
-            <Button variant="outline" size="lg" className="bg-card" onClick={skip}>
-              <FastForward />
-              Skip
-            </Button>
-          )}
           <Button variant="outline" size="lg" className="bg-card" onClick={closeNow} disabled={spinning || session.spins.length === 0}>
             <Flag />
             Close session
