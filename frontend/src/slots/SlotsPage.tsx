@@ -1,4 +1,4 @@
-import { Coins, Download, FastForward, Flag, History, List, Play, RotateCcw, Smartphone, Trash2 } from "lucide-react"
+import { Coins, Download, Eraser, FastForward, Flag, History, List, Play, RotateCcw, Smartphone, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { Button } from "@/components/ui/button"
@@ -165,23 +165,33 @@ export default function SlotsPage() {
     setLastClosed(closed)
   }
 
-  /** Closes the open session and starts a fresh one with the given settings. */
-  function restart(nextTheme: ThemeId, nextReels: ReelCount, nextMax: number | null) {
+  /** Closes the open session and starts a fresh one with the given settings. Changing the theme or the reels also wipes the shown result; closing by hand keeps it visible. */
+  function restart(nextTheme: ThemeId, nextReels: ReelCount, nextMax: number | null, wipeResult = false) {
     recordClosed(sessionRef.current)
     applySession(newSession(nextTheme, nextReels, nextMax))
     setShown(null)
+    if (wipeResult) setLastClosed(null)
   }
 
   function chooseTheme(id: ThemeId) {
     if (spinning || id === themeId) return
     setThemeId(id)
-    restart(id, reels, maxSpins)
+    restart(id, reels, maxSpins, true)
   }
 
   function chooseReels(count: ReelCount) {
     if (spinning || count === reels) return
     setReels(count)
-    restart(themeId, count, maxSpins)
+    restart(themeId, count, maxSpins, true)
+  }
+
+  /** Discards the open session and any shown result without recording it; the drums return to rest. */
+  function clearResults() {
+    if (spinning) return
+    applySession(newSession(themeId, reels, maxSpins))
+    setLastClosed(null)
+    setShown(null)
+    machineRef.current?.snap(theme.symbols.slice(0, reels).map((s) => s.id))
   }
 
   function changeMax(value: string) {
@@ -385,11 +395,17 @@ export default function SlotsPage() {
     <>
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-muted-foreground text-xs font-semibold tracking-wide uppercase">{showingLast ? "Last closed session" : "Current session"}</h2>
-        <span className="text-muted-foreground font-mono text-xs">
-          {showingLast && lastClosed
-            ? `${lastClosed.spins.length}${lastClosed.maxSpins !== null ? `/${lastClosed.maxSpins}` : ""} spins`
-            : `${session.spins.length}${session.maxSpins !== null ? `/${session.maxSpins}` : ""} spins${session.maxSpins === null ? " - free" : ""}`}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-muted-foreground font-mono text-xs">
+            {showingLast && lastClosed
+              ? `${lastClosed.spins.length}${lastClosed.maxSpins !== null ? `/${lastClosed.maxSpins}` : ""} spins`
+              : `${session.spins.length}${session.maxSpins !== null ? `/${session.maxSpins}` : ""} spins${session.maxSpins === null ? " - free" : ""}`}
+          </span>
+          <Button variant="outline" size="xs" onClick={clearResults} disabled={spinning || (session.spins.length === 0 && lastClosed === null)}>
+            <Eraser />
+            Clear
+          </Button>
+        </div>
       </div>
       {showingLast && lastClosed ? <ReadingView theme={themeById(lastClosed.themeId)} reading={lastClosed.result} /> : <ReadingView theme={theme} reading={reading} />}
       {session.spins.length > 0 && (
@@ -507,23 +523,11 @@ export default function SlotsPage() {
               </Button>
             ))}
           </div>
+        </div>
 
-          <label className="flex items-center gap-1.5 text-sm">
-            <span className="text-muted-foreground">Max spins</span>
-            <input
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={MAX_SPINS_LIMIT}
-              value={maxInput}
-              onChange={(e) => changeMax(e.target.value)}
-              placeholder="Free"
-              disabled={spinning}
-              className="border-input bg-background coarse:min-h-11 h-8 w-20 rounded-lg border px-2 text-sm"
-            />
-          </label>
-
-          {isCasino && (
+        {/* The casino's money controls and notice, apart from the theme bar and only in the casino. */}
+        {isCasino && (
+          <div className="bg-card flex max-w-full flex-col items-center gap-1.5 rounded-lg border p-2 shadow-lg">
             <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
               <span className="flex items-center gap-1.5 font-semibold">
                 <Coins className="size-4" aria-hidden />
@@ -544,17 +548,28 @@ export default function SlotsPage() {
                 Reset to {STARTING_BALANCE}
               </Button>
             </div>
-          )}
-        </div>
-
-        {isCasino && (
-          <p className="bg-card max-w-full rounded-lg border px-3 py-1 text-center text-xs shadow-lg">
-            Toy credits only - no real-money value, nothing here can be bought or cashed out.
-            {!canAfford && <span className="ml-1 font-semibold text-amber-700 dark:text-amber-300">Not enough credits for this bet - lower it or reset the balance.</span>}
-          </p>
+            <p className="text-muted-foreground text-center text-xs">
+              Toy credits only - no real-money value, nothing here can be bought or cashed out.
+              {!canAfford && <span className="ml-1 font-semibold text-amber-700 dark:text-amber-300">Not enough credits for this bet - lower it or reset the balance.</span>}
+            </p>
+          </div>
         )}
 
-        <div className="flex flex-wrap justify-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <label className="bg-card coarse:min-h-11 flex items-center gap-1.5 rounded-lg border px-2 py-1 text-sm shadow-lg">
+            <span className="text-muted-foreground">Max spins</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={MAX_SPINS_LIMIT}
+              value={maxInput}
+              onChange={(e) => changeMax(e.target.value)}
+              placeholder="Free"
+              disabled={spinning}
+              className="border-input bg-background h-7 w-16 rounded-md border px-2 text-sm"
+            />
+          </label>
           <Button size="lg" className="min-w-32" onClick={startSpin} disabled={spinning || !canAfford}>
             <Play />
             Spin

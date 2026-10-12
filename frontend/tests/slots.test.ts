@@ -163,6 +163,12 @@ describe("casino payouts", () => {
   })
 })
 
+describe("empty sessions", () => {
+  it("read as no text in every mode", () => {
+    for (const theme of THEMES) assert.equal(readSession(theme, []).text, "", theme.id)
+  })
+})
+
 describe("sessions", () => {
   it("normalises a maximum to a whole number from 1 to 100, or null", () => {
     assert.equal(normalizeMaxSpins(null), null)

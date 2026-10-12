@@ -212,6 +212,7 @@ function readBlend(theme: Theme, spins: readonly Spin[], rng: Rng): BlendReading
 }
 
 function readLoot(theme: Theme, spins: readonly Spin[]): LootReading {
+  if (spins.length === 0) return { mode: "loot", items: [], penalties: [], text: "" }
   const quantities = new Map<string, number>()
   for (const spin of spins) {
     for (const id of spin.symbols) quantities.set(id, (quantities.get(id) ?? 0) + 1)
@@ -242,7 +243,8 @@ function readPayout(spins: readonly Spin[]): PayoutReading {
   const bet = spins.reduce((sum, s) => sum + (s.bet ?? 0), 0)
   const payout = spins.reduce((sum, s) => sum + (s.payout ?? 0), 0)
   const net = payout - bet
-  return { mode: "payout", bet, payout, net, text: `Bet ${bet}, won ${payout} (net ${net >= 0 ? "+" : ""}${net})` }
+  const text = spins.length === 0 ? "" : `Bet ${bet}, won ${payout} (net ${net >= 0 ? "+" : ""}${net})`
+  return { mode: "payout", bet, payout, net, text }
 }
 
 /** Reads a whole session at once, in the theme's mode. `rng` only breaks ties for the dominant symbol. */
