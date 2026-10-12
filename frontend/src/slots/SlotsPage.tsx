@@ -1,4 +1,4 @@
-import { Coins, Download, Eraser, History, List, Play, RotateCcw, Smartphone, Trash2 } from "lucide-react"
+import { ChevronDown, ChevronRight, Coins, Download, Eraser, History, List, Play, RotateCcw, Smartphone, Trash2 } from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import mundusIcon from "@/assets/mundus-icon-header.png"
 import { Button } from "@/components/ui/button"
@@ -132,6 +132,7 @@ export default function SlotsPage() {
   const [flat, setFlat] = useState(() => !webglAvailable())
   const machineRef = useRef<Machine3DHandle>(null)
   const [showSession, setShowSession] = useState(false)
+  const [casinoOpen, setCasinoOpen] = useState(false)
   // Space taken by the overlaid controls, so the 3D machine can sit centred in what's left of the screen.
   const barRef = useRef<HTMLDivElement>(null)
   const [barHeight, setBarHeight] = useState(180)
@@ -391,6 +392,45 @@ export default function SlotsPage() {
 
   const resultText = (showingLast && lastClosed ? lastClosed.result.text : reading.text) || "Spin to see a result."
 
+  // The casino's money controls: a section of the session group, collapsed by default. Its header always shows the balance (as toy credits) and the bet.
+  const casinoSection = (
+    <div className="rounded-lg border">
+      <button
+        type="button"
+        onClick={() => setCasinoOpen((open) => !open)}
+        aria-expanded={casinoOpen}
+        className="coarse:min-h-11 flex w-full items-center gap-1.5 px-2 py-1.5 text-left text-sm"
+      >
+        {casinoOpen ? <ChevronDown className="size-4 shrink-0" aria-hidden /> : <ChevronRight className="size-4 shrink-0" aria-hidden />}
+        <Coins className="size-4 shrink-0" aria-hidden />
+        <span className="font-semibold">Casino</span>
+        <span className="text-muted-foreground ml-auto text-xs">
+          <span className="font-mono" data-testid="balance">
+            {balance}
+          </span>{" "}
+          toy credits - bet {bet}
+        </span>
+      </button>
+      {!canAfford && <p className="px-2 pb-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300">Not enough credits for this bet - lower it or reset the balance.</p>}
+      {casinoOpen && (
+        <div className="flex flex-col items-center gap-1.5 border-t p-2">
+          <div className="flex items-center gap-1" role="group" aria-label="Bet per spin">
+            {BETS.map((amount) => (
+              <Button key={amount} variant={bet === amount ? "default" : "outline"} size="sm" onClick={() => setBet(amount)} disabled={spinning} aria-pressed={bet === amount}>
+                Bet {amount}
+              </Button>
+            ))}
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => applyBalance(STARTING_BALANCE)} disabled={spinning}>
+            <RotateCcw />
+            Reset to {STARTING_BALANCE}
+          </Button>
+          <p className="text-muted-foreground text-center text-xs">Toy credits only - no real-money value, nothing here can be bought or cashed out.</p>
+        </div>
+      )}
+    </div>
+  )
+
   // The open session (or, right after one closes, the last closed one): its count, its reading and its spins.
   const sessionBody = (
     <>
@@ -424,6 +464,7 @@ export default function SlotsPage() {
           className="border-input bg-background coarse:min-h-11 h-7 w-20 rounded-md border px-2 text-sm"
         />
       </label>
+      {isCasino && casinoSection}
       {showingLast && lastClosed ? <ReadingView theme={themeById(lastClosed.themeId)} reading={lastClosed.result} /> : <ReadingView theme={theme} reading={reading} />}
       {session.spins.length > 0 && (
         <ul className="min-h-0 divide-y overflow-y-auto">
@@ -433,36 +474,6 @@ export default function SlotsPage() {
         </ul>
       )}
     </>
-  )
-
-  // The casino's money controls and notice, below the session group on wide screens and with the spin control on narrow ones.
-  const casinoBlock = (
-    <div className="bg-card flex w-full flex-col items-center gap-1.5 rounded-lg border p-2 shadow-lg">
-      <div className="flex flex-wrap items-center justify-center gap-2 text-sm">
-        <span className="flex items-center gap-1.5 font-semibold">
-          <Coins className="size-4" aria-hidden />
-          <span className="font-mono" data-testid="balance">
-            {balance}
-          </span>
-          credits
-        </span>
-        <Button variant="ghost" size="sm" onClick={() => applyBalance(STARTING_BALANCE)} disabled={spinning}>
-          <RotateCcw />
-          Reset to {STARTING_BALANCE}
-        </Button>
-      </div>
-      <div className="flex items-center gap-1" role="group" aria-label="Bet per spin">
-        {BETS.map((amount) => (
-          <Button key={amount} variant={bet === amount ? "default" : "outline"} size="sm" onClick={() => setBet(amount)} disabled={spinning} aria-pressed={bet === amount}>
-            Bet {amount}
-          </Button>
-        ))}
-      </div>
-      <p className="text-muted-foreground text-center text-xs">
-        Toy credits only - no real-money value, nothing here can be bought or cashed out.
-        {!canAfford && <span className="ml-1 font-semibold text-amber-700 dark:text-amber-300">Not enough credits for this bet - lower it or reset the balance.</span>}
-      </p>
-    </div>
   )
 
   return (
@@ -515,7 +526,6 @@ export default function SlotsPage() {
       {/* Desktop: the session is always visible in a side column, with the casino block below it. Below md the session moves into a sheet. */}
       <div className="fixed top-4 right-4 z-10 hidden w-72 flex-col gap-3 md:flex" style={{ maxHeight: `calc(100dvh - ${barHeight + 40}px)` }}>
         <div className="bg-card flex min-h-0 flex-col gap-3 overflow-hidden rounded-lg border p-3 shadow-lg">{sessionBody}</div>
-        {isCasino && wide && casinoBlock}
       </div>
 
       <Sheet open={showSession} onOpenChange={setShowSession}>
@@ -570,8 +580,6 @@ export default function SlotsPage() {
               ))}
             </div>
           </div>
-
-          {isCasino && !wide && casinoBlock}
 
           <div className="flex items-stretch gap-2">
             <Button

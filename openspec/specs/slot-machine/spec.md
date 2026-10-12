@@ -204,7 +204,7 @@ The system SHALL keep a history of the last 100 closed sessions. Each entry SHAL
 - **THEN** no entry remains in the displayed list or in the browser's storage
 
 ### Requirement: Controls grouped by purpose
-The bar of choices SHALL hold only the themes and the number of reels. In the casino, the balance, the bet per spin, the balance reset and the toy-credit notice SHALL sit together in their own block, shown only while the casino theme is selected and placed below the current session group. Where the session is a sheet instead of a side panel, that block SHALL sit with the spin control so the bet stays reachable. The maximum number of spins SHALL sit in the current session group, where it is set.
+The bar of choices SHALL hold only the themes and the number of reels. In the casino, the balance, the bet per spin, the balance reset and the toy-credit notice SHALL sit together in one collapsible section of the current session group, placed right below the maximum number of spins, shown only while the casino theme is selected and collapsed by default. While collapsed, its header SHALL still show the balance as toy credits and the bet, and SHALL say so when the balance can't cover the bet. The maximum number of spins SHALL sit in the current session group, where it is set.
 
 #### Scenario: The bar holds themes and reels only
 - **WHEN** the slot machine page is shown
@@ -212,7 +212,19 @@ The bar of choices SHALL hold only the themes and the number of reels. In the ca
 
 #### Scenario: Casino controls in their own block
 - **WHEN** the casino theme is selected
-- **THEN** the balance, the bets, the reset and the toy-credit notice appear together in a block of their own, below the current session group and outside the theme bar
+- **THEN** the balance, the bets, the reset and the toy-credit notice are together in one section of the current session group, below the maximum number of spins and outside the theme bar
+
+#### Scenario: The casino section starts collapsed
+- **WHEN** the casino theme is selected
+- **THEN** the casino section is collapsed, showing only its header with the balance and the bet
+
+#### Scenario: Expanding the casino section
+- **WHEN** the person expands the casino section
+- **THEN** the bets, the balance reset and the toy-credit notice are shown, and collapsing hides them again
+
+#### Scenario: A short balance is visible when collapsed
+- **WHEN** the balance is lower than the bet and the casino section is collapsed
+- **THEN** its header says there are not enough credits for the bet
 
 #### Scenario: The maximum is set in the current session group
 - **WHEN** the slot machine page is shown
